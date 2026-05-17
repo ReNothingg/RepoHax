@@ -372,9 +372,9 @@ namespace Cheat::Widgets
         return Hax::Gui::IsItemClicked(id);
     }
 
-    void Image(Hax::Gui::Texture2D tex)
+    void Image(Hax::Gui::TextureHandle tex)
     {
-        const Hax::Vector2 size = {(float)tex.Width, (float)tex.Height};
+        const Hax::Vector2 size = Hax::Gui::GetImageSize(tex);
 
         Hax::Rect bounds;
         bounds.Min = Hax::Gui::GetCursorPos();

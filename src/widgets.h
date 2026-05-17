@@ -29,7 +29,7 @@ namespace Cheat
         struct AutoLayoutButtonParams
         {
             bool Disabled;
-            Hax::Gui::Texture2D Icon;
+            Hax::Gui::TextureHandle Icon;
         };
 
         void Label(Hax::Gui::FontHandle hFont, Hax::WStringView text, float fontH, Hax::Gui::Color col);
@@ -51,7 +51,7 @@ namespace Cheat
         Hax::Vector2 CalcButtonSize(Hax::WStringView label);
         float CalcButtonHeight();
         bool Button(size_t id, Hax::WStringView label, Hax::WStringView desc = {}, const ButtonParams& params = {});
-        void Image(Hax::Gui::Texture2D tex);
+        void Image(Hax::Gui::TextureHandle tex);
         bool TabButton(size_t id, Hax::WStringView text, Hax::char16 icon16, bool active);
         void BeginPanel(size_t id);
         void EndPanel();

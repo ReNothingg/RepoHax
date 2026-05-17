@@ -1,6 +1,6 @@
 #pragma once
 
-#include "haxsdk/gui/hax_gui.h"
+#include "haxsdk/gui/hax_gui_dx11.h"
 
 namespace Cheat::Visuals
 {

@@ -1063,7 +1063,7 @@ namespace Cheat::Visuals
                     Widgets::SliderEx(HAX_LINE, g_Loc[LocKey_LightIntensity], buf, &intensity, 10, 20, Widgets::SliderConvertInt);
                 }
 
-               Widgets::HorizontalLine(1_px);
+                Widgets::HorizontalLine(1_px);
 
                 {
                     int& angle = GCheat->Flashlight.Angle;
@@ -1073,7 +1073,7 @@ namespace Cheat::Visuals
                     Widgets::SliderEx(HAX_LINE, g_Loc[LocKey_IlluminationAngle], buf, &angle, 60, 120, Widgets::SliderConvertInt);
                 }
 
-               Widgets::HorizontalLine(1_px);
+                Widgets::HorizontalLine(1_px);
 
                 {
                    Widgets::ToggleEx(HAX_LINE, GCheat->Flashlight.AllowInCrouch, g_Loc[LocKey_WorksWhileCrouching]);
@@ -1115,9 +1115,9 @@ namespace Cheat::Visuals
                 Widgets::HorizontalLine(1_px);
 
                 {
-                    Hax::char16 buf[16]{};
-                    swprintf_s(buf, _countof(buf), L"%dm", GCheat->ValuablesEspDistance);
-                    Widgets::SliderEx(HAX_LINE, g_Loc[LocKey_DisplayDistance], buf, &GCheat->ValuablesEspDistance, 5, 500, Widgets::SliderConvertInt);
+                    Hax::WStringBuilder<16> sb;
+                    sb.AppendF(L"%dm", GCheat->ValuablesEspDistance);
+                    Widgets::SliderEx(HAX_LINE, g_Loc[LocKey_DisplayDistance], sb.View(), &GCheat->ValuablesEspDistance, 5, 500, Widgets::SliderConvertInt);
                 }
 
                 Widgets::HorizontalLine(1_px);
@@ -1135,7 +1135,7 @@ namespace Cheat::Visuals
                     Widgets::ToggleEx(HAX_LINE, GCheat->Unbreakable, g_Loc[LocKey_NoDamageValuables], g_Loc[LocKey_AvailableIfHost], {.Disabled = GCheat->IsClient});
                 }
 
-               Widgets::HorizontalLine(1_px);
+                Widgets::HorizontalLine(1_px);
 
                 {
                     Widgets::MainLabel(g_Loc[LocKey_ChangeValue]);
@@ -1169,7 +1169,7 @@ namespace Cheat::Visuals
                     Widgets::ToggleEx(HAX_LINE, GCheat->ExtrPointsEsp, g_Loc[LocKey_DisplayThroughWalls]);
                 }
 
-               Widgets::HorizontalLine(1_px);
+                Widgets::HorizontalLine(1_px);
 
                 RoundDirector dir = RoundDirector::instance();
                 bool disabled = !GCheat->IsInGame || !dir || dir.extractionPointActive();
@@ -1318,7 +1318,7 @@ namespace Cheat::Visuals
                     }
                 }
 
-               Widgets::HorizontalLine(1_px);
+                Widgets::HorizontalLine(1_px);
 
                 bool disabled = GCheat->IsClient || !GCheat->IsInGame;
                 if (Widgets::Button(HAX_LINE, g_Loc[LocKey_NextLevel], {}, {.Enabled = !disabled, .MinW = Hax::Gui::GetContentRegionAvail().X}))
@@ -1385,7 +1385,7 @@ namespace Cheat::Visuals
                     Widgets::ToggleEx(HAX_LINE, GCheat->TruckEsp, g_Loc[LocKey_DisplayThroughWalls]);
                 }
 
-               Widgets::HorizontalLine(1_px);
+                Widgets::HorizontalLine(1_px);
 
                 {
                     TruckSafetySpawnPoint truck = TruckSafetySpawnPoint::instance();

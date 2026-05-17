@@ -19,10 +19,10 @@ namespace Cheat
 
     static void RegisterConfig(Hax::IniFile& iniFile)
     {
-        Hax::IniAddEntry(iniFile, "Cheat", "UseConsole",  &GCheat->UseConsole,  Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
-        Hax::IniAddEntry(iniFile, "Cheat", "VkOpenClose", &GCheat->VkOpenClose, Hax::IniFileWrite_Int,  IniFileRead_IntClamped<VK_OEM_3, 1, 255>);
-        Hax::IniAddEntry(iniFile, "Cheat", "Language", &GCheat->Lang, Hax::IniFileWrite_Int,  IniFileRead_IntClamped<Visuals::Lang_Eng, Visuals::Lang_Eng, Visuals::Lang_Count - 1>);
-        Hax::IniAddEntry(iniFile, "Cheat", "DarkenBackground", &GCheat->DarkenBg, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(iniFile, "Settings", "UseConsole",  &GCheat->UseConsole,  Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(iniFile, "Settings", "VkOpenClose", &GCheat->VkOpenClose, Hax::IniFileWrite_Int,  IniFileRead_IntClamped<VK_OEM_3, 1, 255>);
+        Hax::IniAddEntry(iniFile, "Settings", "Language", &GCheat->Lang, Hax::IniFileWrite_Int,  IniFileRead_IntClamped<0, 0, Visuals::Lang_Count - 1>);
+        Hax::IniAddEntry(iniFile, "Settings", "DarkenBackground", &GCheat->DarkenBg, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
 
         Hax::IniAddEntry(iniFile, "Stats", "Godmode", &GCheat->Godmode, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(iniFile, "Stats", "InfiniteStamina", &GCheat->InfStamina, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);

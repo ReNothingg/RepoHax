@@ -286,7 +286,7 @@ namespace Cheat::WinHooks
         GCheat->LockedCursorPos.Reset();
         GCheat->MenuVisible = false;
 
-        Hax::IniSave(GCheat->IniFile);
+        //Hax::IniSave(GCheat->IniFile);
     }
 
 }

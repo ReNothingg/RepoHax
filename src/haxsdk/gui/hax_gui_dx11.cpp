@@ -14,23 +14,18 @@ namespace Hax::Gui
 
     struct DirectX11Backend : IBackend
     {
-        DirectX11Backend(Context& ctx) : m_Context(ctx) {}
+                                DirectX11Backend(Context& ctx, ID3D11Device* device);
+                                ~DirectX11Backend() override;
 
-        bool                    Init(ID3D11Device* device);
         void                    Render() override;
 
-        Texture2D               CreateTexture(const uint8* pixels, int width, int height) override;
-        Texture2D               CreateTextureR8(const uint8* pixels, int width, int height) override;
-        Texture2DArray          CreateAtlasArray(int width, int height, int depth) override;
-        void                    SetSubarray(Texture2DArray array, int depth, int w, int h, const uint8* data) override;
-
-        void                    UpdateTextureRect(Texture2D tex, const uint8* pixels, const RectU& rect) override;
-
-        void                    DestroyTexture(TexHandle handle) override;
+        Texture2D               CreateTexture(TextureFormat format, const uint8* pixels, uint32 width, uint32 height, uint32 depth = 1) override;
+        void                    UpdateTextureRegion(Texture2D tex, const RectU& region, const uint8* src, uint32 srcPitch, uint32 arraySlice = 0) override;
+        void                    DestroyTexture(Texture2D handle) override;
 
     private:
-        bool                    CompileVertexShader(const char* vertexShaderText);
-        bool                    CompilePixelShader(const char* pixelShaderText);
+        void                    CompileVertexShader(const char* vertexShaderText);
+        void                    CompilePixelShader(const char* pixelShaderText);
         void                    CreateConstantBuffers();
         void                    CreateRenderStates();
         void                    SetupRenderState(const Vector2& viewportSize);
@@ -44,7 +39,6 @@ namespace Hax::Gui
         ID3D11VertexShader*     m_VertexShader          = nullptr;
         ID3D11InputLayout*      m_InputLayout           = nullptr;
         ID3D11Buffer*           m_MatrixContantBuffer   = nullptr;
-        ID3D11Buffer*           m_FontConstantBuffer    = nullptr;
         ID3D11PixelShader*      m_PixelShader           = nullptr;
         ID3D11BlendState*       m_BlendState            = nullptr;
         ID3D11RasterizerState*  m_RasterizerState       = nullptr;
@@ -54,21 +48,31 @@ namespace Hax::Gui
         size_t                  m_InstanceBufferSize    = 0;
     };
 
-    bool DirectX11Backend::Init(ID3D11Device* device)
+    DirectX11Backend::DirectX11Backend(Context& ctx, ID3D11Device* device) : m_Context(ctx)
     {
+        HAX_ASSERT(device != nullptr);
+
         m_Device = device;
         m_Device->GetImmediateContext(&m_DeviceContext);
 
-        if (!this->CompileVertexShader(g_VertexShaderText))
-            return false;
-
+        this->CompileVertexShader(g_VertexShaderText);
         this->CreateConstantBuffers();
-
-        if (!this->CompilePixelShader(g_PixelShaderText))
-            return false;
-
+        this->CompilePixelShader(g_PixelShaderText);
         this->CreateRenderStates();
-        return true;
+    }
+
+    DirectX11Backend::~DirectX11Backend()
+    {
+        m_BlendState->Release();
+        m_RasterizerState->Release();
+        m_DepthStencilState->Release();
+        m_Sampler->Release();
+        m_PixelShader->Release();
+        m_VertexShader->Release();
+        m_InputLayout->Release();
+        m_MatrixContantBuffer->Release();
+        m_InstanceBuffer->Release();
+        m_DeviceContext->Release();
     }
 
     void DirectX11Backend::Render()
@@ -77,7 +81,7 @@ namespace Hax::Gui
 
         CopyRenderItems(m_Context.Layers);
 
-        struct BACKUP_DX11_STATE
+        struct BackupState
         {
             UINT                        ScissorRectsCount, ViewportsCount;
             D3D11_RECT                  ScissorRects[D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE];
@@ -98,13 +102,13 @@ namespace Hax::Gui
             ID3D11ComputeShader*        CS;
             D3D11_PRIMITIVE_TOPOLOGY    PrimitiveTopology;
             ID3D11Buffer*               IndexBuffer, *VertexBuffer;
-            ID3D11Buffer*               VSConstantBuffers[2];
+            ID3D11Buffer*               VSConstantBuffer;
             UINT                        IndexBufferOffset, VertexBufferStride, VertexBufferOffset;
             DXGI_FORMAT                 IndexBufferFormat;
             ID3D11InputLayout*          InputLayout;
         };
 
-        BACKUP_DX11_STATE old = {};
+        BackupState old{};
         old.ScissorRectsCount = old.ViewportsCount = D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
         m_DeviceContext->RSGetScissorRects(&old.ScissorRectsCount, old.ScissorRects);
         m_DeviceContext->RSGetViewports(&old.ViewportsCount, old.Viewports);
@@ -121,7 +125,7 @@ namespace Hax::Gui
         m_DeviceContext->HSGetShader(&old.HS, nullptr, &numInstances); HAX_ASSERT(numInstances == 0);
         m_DeviceContext->DSGetShader(&old.DS, nullptr, &numInstances); HAX_ASSERT(numInstances == 0);
         m_DeviceContext->CSGetShader(&old.CS, nullptr, &numInstances); HAX_ASSERT(numInstances == 0);
-        m_DeviceContext->VSGetConstantBuffers(0, 2, old.VSConstantBuffers);//!
+        m_DeviceContext->VSGetConstantBuffers(0, 1, &old.VSConstantBuffer);
 
         m_DeviceContext->IAGetPrimitiveTopology(&old.PrimitiveTopology);
         m_DeviceContext->IAGetIndexBuffer(&old.IndexBuffer, &old.IndexBufferFormat, &old.IndexBufferOffset);
@@ -134,334 +138,292 @@ namespace Hax::Gui
         m_DeviceContext->RSSetScissorRects(old.ScissorRectsCount, old.ScissorRects);
         m_DeviceContext->RSSetViewports(old.ViewportsCount, old.Viewports);
         m_DeviceContext->RSSetState(old.RS); if (old.RS) old.RS->Release();
-        m_DeviceContext->OMSetBlendState(old.BlendState, old.BlendFactor, old.SampleMask); if (old.BlendState) old.BlendState->Release();
-        m_DeviceContext->OMSetDepthStencilState(old.DepthStencilState, old.StencilRef); if (old.DepthStencilState) old.DepthStencilState->Release();
+        m_DeviceContext->OMSetBlendState(old.BlendState, old.BlendFactor, old.SampleMask);  if (old.BlendState) old.BlendState->Release();
+        m_DeviceContext->OMSetDepthStencilState(old.DepthStencilState, old.StencilRef);     if (old.DepthStencilState) old.DepthStencilState->Release();
         m_DeviceContext->PSSetShaderResources(0, 3, old.PSShaderResources);
-        if (old.PSShaderResources[0]) old.PSShaderResources[0]->Release();
-        if (old.PSShaderResources[1]) old.PSShaderResources[1]->Release();
-        if (old.PSShaderResources[2]) old.PSShaderResources[2]->Release();
-        m_DeviceContext->PSSetSamplers(0, 1, &old.PSSampler); if (old.PSSampler) old.PSSampler->Release();
-        m_DeviceContext->PSSetShader(old.PS, nullptr, 0); if (old.PS) old.PS->Release();
-        m_DeviceContext->VSSetShader(old.VS, nullptr, 0); if (old.VS) old.VS->Release();
-        m_DeviceContext->VSSetConstantBuffers(0, 2, old.VSConstantBuffers); 
-        if (old.VSConstantBuffers[0]) old.VSConstantBuffers[0]->Release();
-        if (old.VSConstantBuffers[1]) old.VSConstantBuffers[1]->Release();
-        m_DeviceContext->GSSetShader(old.GS, nullptr, 0); if (old.GS) old.GS->Release();
-        m_DeviceContext->HSSetShader(old.HS, nullptr, 0); if (old.HS) old.HS->Release();
-        m_DeviceContext->DSSetShader(old.DS, nullptr, 0); if (old.DS) old.DS->Release();
-        m_DeviceContext->CSSetShader(old.CS, nullptr, 0); if (old.CS) old.CS->Release();
+                                                                                            if (old.PSShaderResources[0]) old.PSShaderResources[0]->Release();
+                                                                                            if (old.PSShaderResources[1]) old.PSShaderResources[1]->Release();
+                                                                                            if (old.PSShaderResources[2]) old.PSShaderResources[2]->Release();
+        m_DeviceContext->PSSetSamplers(0, 1, &old.PSSampler);                               if (old.PSSampler) old.PSSampler->Release();
+        m_DeviceContext->PSSetShader(old.PS, nullptr, 0);                                   if (old.PS) old.PS->Release();
+        m_DeviceContext->VSSetShader(old.VS, nullptr, 0);                                   if (old.VS) old.VS->Release();
+        m_DeviceContext->VSSetConstantBuffers(0, 1, &old.VSConstantBuffer);                 if (old.VSConstantBuffer) old.VSConstantBuffer->Release();
+        m_DeviceContext->GSSetShader(old.GS, nullptr, 0);                                   if (old.GS) old.GS->Release();
+        m_DeviceContext->HSSetShader(old.HS, nullptr, 0);                                   if (old.HS) old.HS->Release();
+        m_DeviceContext->DSSetShader(old.DS, nullptr, 0);                                   if (old.DS) old.DS->Release();
+        m_DeviceContext->CSSetShader(old.CS, nullptr, 0);                                   if (old.CS) old.CS->Release();
 
         m_DeviceContext->IASetPrimitiveTopology(old.PrimitiveTopology);
-        m_DeviceContext->IASetIndexBuffer(old.IndexBuffer, old.IndexBufferFormat, old.IndexBufferOffset); if (old.IndexBuffer) old.IndexBuffer->Release();
+        m_DeviceContext->IASetIndexBuffer(old.IndexBuffer, old.IndexBufferFormat, old.IndexBufferOffset);               if (old.IndexBuffer) old.IndexBuffer->Release();
         m_DeviceContext->IASetVertexBuffers(0, 1, &old.VertexBuffer, &old.VertexBufferStride, &old.VertexBufferOffset); if (old.VertexBuffer) old.VertexBuffer->Release();
-        m_DeviceContext->IASetInputLayout(old.InputLayout); if (old.InputLayout) old.InputLayout->Release();
+        m_DeviceContext->IASetInputLayout(old.InputLayout);                                                             if (old.InputLayout) old.InputLayout->Release();
     }
 
-    Texture2D DirectX11Backend::CreateTexture(const uint8* pixels, int width, int height)
+    static DXGI_FORMAT ToDxgiFormat(TextureFormat format)
+    {
+        switch (format)
+        {
+            case TextureFormat::R8_UNorm: return DXGI_FORMAT_R8_UNORM;
+            case TextureFormat::R8G8B8A8_UNorm: return DXGI_FORMAT_R8G8B8A8_UNORM;
+        }
+
+        HAX_ASSERT(0);
+        return DXGI_FORMAT_UNKNOWN;
+    }
+
+    Texture2D DirectX11Backend::CreateTexture(TextureFormat format, const uint8* pixels, uint32 width, uint32 height, uint32 depth)
     {
         HAX_ASSERT(m_Device != nullptr && "API not initialized");
 
-        D3D11_TEXTURE2D_DESC desc{};
-        desc.Width = width;
-        desc.Height = height;
-        desc.MipLevels = 1;
-        desc.ArraySize = 1;
-        desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-        desc.SampleDesc.Count = 1;
-        desc.Usage = D3D11_USAGE_DEFAULT;
-        desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-        desc.CPUAccessFlags = 0;
+        DXGI_FORMAT dxgiFormat = ToDxgiFormat(format);
+        D3D11_TEXTURE2D_DESC desc =
+        {
+            .Width = width,
+            .Height = height,
+            .MipLevels = 1,
+            .ArraySize = depth,
+            .Format = dxgiFormat,
+            .SampleDesc = {.Count = 1},
+            .Usage = D3D11_USAGE_DEFAULT,
+            .BindFlags = D3D11_BIND_SHADER_RESOURCE,
+            .CPUAccessFlags = 0,
+        };
 
-        ID3D11Texture2D* tex = nullptr;
-        D3D11_SUBRESOURCE_DATA subResource{};
-        subResource.pSysMem = pixels;
-        subResource.SysMemPitch = 4 * (uint32)width;
-        subResource.SysMemSlicePitch = 0;
-        m_Device->CreateTexture2D(&desc, &subResource, &tex);
-        HAX_ASSERT(tex != nullptr);
+        ID3D11Texture2D* texture = nullptr;
+        D3D11_SUBRESOURCE_DATA subResource = 
+        {
+            .pSysMem = pixels,
+            .SysMemPitch = GetBytesPerChannel(format) * GetChannelCount(format) * (uint32)width,
+            .SysMemSlicePitch = 0
+        };
+        m_Device->CreateTexture2D(&desc, pixels == nullptr ? nullptr : &subResource, &texture);
+        HAX_ASSERT(texture != nullptr);
 
-        D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-        srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-        srvDesc.Texture2D.MipLevels = desc.MipLevels;
-        srvDesc.Texture2D.MostDetailedMip = 0;
+        D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {.Format = desc.Format};
+        if (depth > 1)
+        {
+            srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
+            srvDesc.Texture2DArray = {.MipLevels = desc.MipLevels, .ArraySize = depth};
+        }
+        else
+        {
+            srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+            srvDesc.Texture2D = {.MipLevels = desc.MipLevels};
+        }
+
         ID3D11ShaderResourceView* srv = nullptr;
-        m_Device->CreateShaderResourceView(tex, &srvDesc, &srv);
-        tex->Release();
+        m_Device->CreateShaderResourceView(texture, &srvDesc, &srv);
+        texture->Release();
 
-        Texture2D tex2d;
-        tex2d.Tex = (Handle)tex;
-        tex2d.Srv = (Handle)srv;
-        tex2d.Width = width;
-        tex2d.Height = height;
-
-        return tex2d;
+        return Texture2D 
+        {
+            .Tex = (void*)texture,
+            .View = (void*)srv,
+            .Width = width,
+            .Height = height,
+            .Depth = depth
+        };
     }
 
-    Texture2D DirectX11Backend::CreateTextureR8(const uint8* pixels, int width, int height)
+    void DirectX11Backend::UpdateTextureRegion(Texture2D tex, const RectU& region, const uint8* src, uint32 srcPitch, uint32 arraySlice)
     {
-        HAX_ASSERT(m_Device != nullptr && "API not initialized");
-
-        D3D11_TEXTURE2D_DESC desc{};
-        desc.Width = width;
-        desc.Height = height;
-        desc.MipLevels = 1;
-        desc.ArraySize = 1;
-        desc.Format = DXGI_FORMAT_R8_UNORM;
-        desc.SampleDesc.Count = 1;
-        desc.Usage = D3D11_USAGE_DEFAULT;
-        desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-        desc.CPUAccessFlags = 0;
-
-        ID3D11Texture2D* tex = nullptr;
-        D3D11_SUBRESOURCE_DATA subResource{};
-        subResource.pSysMem = pixels;
-        subResource.SysMemPitch = 1 * (UINT)width;
-        subResource.SysMemSlicePitch = 0;
-        m_Device->CreateTexture2D(&desc, &subResource, &tex);
-        HAX_ASSERT(tex != nullptr);
-        ID3D11ShaderResourceView* srv = nullptr;
-        m_Device->CreateShaderResourceView(tex, nullptr, &srv);
-        tex->Release();
-
-        Texture2D tex2d;
-        tex2d.Tex = (Handle)tex;
-        tex2d.Srv = (Handle)srv;
-        tex2d.Width = width;
-        tex2d.Height = height;
-
-        return tex2d;
-    }
-
-    Texture2DArray DirectX11Backend::CreateAtlasArray(int width, int height, int depth)
-    {
-        D3D11_TEXTURE2D_DESC desc = {};
-        desc.Width     = width;
-        desc.Height    = height;
-        desc.MipLevels = 1;
-        desc.ArraySize = depth;
-        desc.Format    = DXGI_FORMAT_R8G8B8A8_UNORM;
-        desc.SampleDesc.Count = 1;
-        desc.Usage     = D3D11_USAGE_DEFAULT; 
-        desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-
-        ID3D11Texture2D* tex = nullptr;
-        m_Device->CreateTexture2D(&desc, nullptr, &tex);
-
-        D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-        srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY; // Ключевой флаг
-        srvDesc.Texture2DArray.ArraySize = depth;       // Столько же, сколько в ArraySize текстуры
-        srvDesc.Texture2DArray.FirstArraySlice = 0; // Начинаем с первого слоя
-        srvDesc.Texture2DArray.MipLevels = 1;
-
-        ID3D11ShaderResourceView* pSRV = nullptr;
-        m_Device->CreateShaderResourceView(tex, &srvDesc, &pSRV);
-
-        Texture2DArray tex2d;
-        tex2d.Srv = (Handle)pSRV;
-        tex2d.Tex = (Handle)tex;
-        tex2d.Depth = depth;
-        tex2d.Width = width;
-        tex2d.Height = height;
-
-        return tex2d;
-    }
-
-    void DirectX11Backend::SetSubarray(Texture2DArray array, int depth, int w, int h, const uint8* data)
-    {
-        D3D11_BOX box;
-        box.left = 0;   box.right = w;
-        box.top  = 0;   box.bottom = h;
-        box.front = 0;  box.back = 1;
-
-        UINT subresourceIndex = D3D11CalcSubresource(0, depth, 1);
-
-        UINT rowPitch = w * 4;
-
-        m_DeviceContext->UpdateSubresource((ID3D11Texture2D*)array.Tex, subresourceIndex, &box, data, rowPitch, 0);
-    }
-
-    void DirectX11Backend::UpdateTextureRect(Texture2D tex, const uint8* pixels, const RectU& rect)
-    {
-        if (tex.Tex == 0)
+        if (tex.Tex == nullptr)
             return;
 
-        D3D11_BOX destBox;
-        destBox.left   = (UINT)rect.MinX;
-        destBox.top    = (UINT)rect.MinY;
-        destBox.front  = 0;
-        destBox.right  = (UINT)rect.MaxX;
-        destBox.bottom = (UINT)rect.MaxY;
-        destBox.back   = 1;
+        D3D11_BOX dstBox =
+        {
+            .left   = (UINT)region.MinX,
+            .top    = (UINT)region.MinY,
+            .front  = 0,
+            .right  = (UINT)region.MaxX,
+            .bottom = (UINT)region.MaxY,
+            .back   = 1
+        };
 
-        const uint8* dest = pixels + rect.MinY * kBitmapSize + rect.MinX;
-        m_DeviceContext->UpdateSubresource((ID3D11Resource*)tex.Tex, 0, &destBox, dest, (UINT)kBitmapSize, 0);
+        UINT subresource = D3D11CalcSubresource(0, arraySlice, 1);
+        m_DeviceContext->UpdateSubresource((ID3D11Resource*)tex.Tex, subresource, &dstBox, src, srcPitch, 0);
     }
 
-    void DirectX11Backend::DestroyTexture(TexHandle handle)
+    void DirectX11Backend::DestroyTexture(Texture2D texture2D)
     {
         HAX_ASSERT(m_Device != nullptr && "API not initialized");
 
-        if (handle)
-            ((ID3D11ShaderResourceView*)handle)->Release();
+        if (texture2D.View != nullptr)
+            ((ID3D11ShaderResourceView*)texture2D.View)->Release();
     }
 
-    bool DirectX11Backend::CompileVertexShader(const char* vertexShaderText)
+    void DirectX11Backend::CompileVertexShader(const char* vertexShaderText)
     {
+        HRESULT res;
         ID3DBlob* vertexShaderBlob;
-        bool failed = FAILED(D3DCompile(vertexShaderText, strlen(vertexShaderText), nullptr, nullptr, nullptr, "main", "vs_4_0", 0, 0, &vertexShaderBlob, nullptr));
-        HAX_ASSERT(!failed && "Unable to compile vertex shader");
 
-        if (m_Device->CreateVertexShader(vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(), nullptr, &m_VertexShader) != S_OK)
-        {
-            vertexShaderBlob->Release();
-            return false;
-        }
+        res = D3DCompile(vertexShaderText, strlen(vertexShaderText), nullptr, nullptr, nullptr, "main", "vs_4_0", 0, 0, &vertexShaderBlob, nullptr);
+        HAX_PANIC(res == S_OK, g_Context->Logger, L"Unable to compile vertex shader: %08X", res);
 
-        D3D11_INPUT_ELEMENT_DESC local_layout[] =
+        res = m_Device->CreateVertexShader(vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(), nullptr, &m_VertexShader);
+        HAX_PANIC(res == S_OK, g_Context->Logger, L"Unable to create vertex shader: %08X", res);
+
+        D3D11_INPUT_ELEMENT_DESC layout[] =
         {
-            { "PARAMS",   0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, (uint32)offsetof(RenderItem, Params14), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-            { "PARAMS",   1, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, (uint32)offsetof(RenderItem, Params58), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-            { "PARAMS",   2, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, (uint32)offsetof(RenderItem, Params912), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-            { "PARAM",   0, DXGI_FORMAT_R32_FLOAT, 0, (uint32)offsetof(RenderItem, Param13), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-            { "PARAM",   1, DXGI_FORMAT_R32_FLOAT, 0, (uint32)offsetof(RenderItem, Param14), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-            { "TYPE",     0, DXGI_FORMAT_R32_UINT,  0, (uint32)offsetof(RenderItem, Type), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-            { "COLOR",   0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, (uint32)offsetof(RenderItem, Color1), D3D11_INPUT_PER_INSTANCE_DATA, 1},
-            { "COLOR",   1, DXGI_FORMAT_R8G8B8A8_UNORM, 0, (uint32)offsetof(RenderItem, Color2), D3D11_INPUT_PER_INSTANCE_DATA, 1},
-            { "SINCOS",   0, DXGI_FORMAT_R32G32_FLOAT, 0, (uint32)offsetof(RenderItem, Sin), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+            {"PARAMS",  0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, (uint32)offsetof(RenderItem, Params14),  D3D11_INPUT_PER_INSTANCE_DATA, 1},
+            {"PARAMS",  1, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, (uint32)offsetof(RenderItem, Params58),  D3D11_INPUT_PER_INSTANCE_DATA, 1},
+            {"PARAMS",  2, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, (uint32)offsetof(RenderItem, Params912), D3D11_INPUT_PER_INSTANCE_DATA, 1},
+            {"PARAM",   0, DXGI_FORMAT_R32_FLOAT,          0, (uint32)offsetof(RenderItem, Param13),   D3D11_INPUT_PER_INSTANCE_DATA, 1},
+            {"PARAM",   1, DXGI_FORMAT_R32_FLOAT,          0, (uint32)offsetof(RenderItem, Param14),   D3D11_INPUT_PER_INSTANCE_DATA, 1},
+            {"TYPE",    0, DXGI_FORMAT_R32_UINT,           0, (uint32)offsetof(RenderItem, Type),      D3D11_INPUT_PER_INSTANCE_DATA, 1},
+            {"COLOR",   0, DXGI_FORMAT_R8G8B8A8_UNORM,     0, (uint32)offsetof(RenderItem, Color1),    D3D11_INPUT_PER_INSTANCE_DATA, 1},
+            {"COLOR",   1, DXGI_FORMAT_R8G8B8A8_UNORM,     0, (uint32)offsetof(RenderItem, Color2),    D3D11_INPUT_PER_INSTANCE_DATA, 1},
+            {"SINCOS",  0, DXGI_FORMAT_R32G32_FLOAT,       0, (uint32)offsetof(RenderItem, Sin),       D3D11_INPUT_PER_INSTANCE_DATA, 1},
         };
-        HRESULT res = m_Device->CreateInputLayout(local_layout, _countof(local_layout), vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(), &m_InputLayout);
-        HAX_ASSERT(res == S_OK && "Unable to create input layout");
+
+        res = m_Device->CreateInputLayout(layout, _countof(layout), vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(), &m_InputLayout);
+        HAX_PANIC(res == S_OK, g_Context->Logger, L"Unable to create input layout: %08X", res);
 
         vertexShaderBlob->Release();
-        return true;
     }
 
-    bool DirectX11Backend::CompilePixelShader(const char* pixelShaderText)
+    void DirectX11Backend::CompilePixelShader(const char* pixelShaderText)
     {
+        HRESULT res;
         ID3DBlob* pixelShaderBlob;
-        HRESULT res = D3DCompile(pixelShaderText, strlen(pixelShaderText), nullptr, nullptr, nullptr, "main", "ps_4_0", 0, 0, &pixelShaderBlob, nullptr);
-        HAX_ASSERT(res == S_OK && "Unable to compile pixel shader");
 
-        if (m_Device->CreatePixelShader(pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize(), nullptr, &m_PixelShader) != S_OK)
-        {
-            pixelShaderBlob->Release();
-            return false;
-        }
+        res = D3DCompile(pixelShaderText, strlen(pixelShaderText), nullptr, nullptr, nullptr, "main", "ps_4_0", 0, 0, &pixelShaderBlob, nullptr);
+        HAX_PANIC(res == S_OK, g_Context->Logger, L"Unable to compile pixel shader: %08X", res);
+
+        res = m_Device->CreatePixelShader(pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize(), nullptr, &m_PixelShader);
+        HAX_PANIC(res == S_OK, g_Context->Logger, L"Unable to create pixel shader: %08X", res);
+
         pixelShaderBlob->Release();
-        return true;
     }
 
     struct VERTEX_CONSTANT_BUFFER_DX11
     {
-        float   mvp[4][4];
+        float MVP[4][4];
     };
 
     void DirectX11Backend::CreateConstantBuffers()
     {
+        D3D11_BUFFER_DESC desc =
         {
-            D3D11_BUFFER_DESC desc{};
-            desc.ByteWidth = sizeof(VERTEX_CONSTANT_BUFFER_DX11);
-            desc.Usage = D3D11_USAGE_DYNAMIC;
-            desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-            desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-            desc.MiscFlags = 0;
-            HRESULT res = m_Device->CreateBuffer(&desc, nullptr, &m_MatrixContantBuffer);
-            HAX_ASSERT(res == S_OK);
-        }
+            .ByteWidth = sizeof(VERTEX_CONSTANT_BUFFER_DX11),
+            .Usage = D3D11_USAGE_DYNAMIC,
+            .BindFlags = D3D11_BIND_CONSTANT_BUFFER,
+            .CPUAccessFlags = D3D11_CPU_ACCESS_WRITE,
+            .MiscFlags = 0
+        };
+
+        HRESULT res = m_Device->CreateBuffer(&desc, nullptr, &m_MatrixContantBuffer);
+        HAX_PANIC(res == S_OK, g_Context->Logger, L"Unable to create const buffer: %08X", res);
     }
 
     void DirectX11Backend::CreateRenderStates()
     {
+        // Blend
         {
-            D3D11_BLEND_DESC desc{};
-            desc.AlphaToCoverageEnable = false;
-            desc.RenderTarget[0].BlendEnable = true;
-            desc.RenderTarget[0].SrcBlend = D3D11_BLEND_ONE;
-            desc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+            D3D11_BLEND_DESC desc =
+            {
+                .AlphaToCoverageEnable = false,
+                .RenderTarget = 
+                {
+                    {
+                        .BlendEnable = true,
+                        .SrcBlend = D3D11_BLEND_ONE,
+                        .DestBlend = D3D11_BLEND_INV_SRC_ALPHA,
+                        .BlendOp = D3D11_BLEND_OP_ADD,
+                        .SrcBlendAlpha = D3D11_BLEND_ONE,
+                        .DestBlendAlpha = D3D11_BLEND_INV_SRC_ALPHA,
+                        .BlendOpAlpha = D3D11_BLEND_OP_ADD,
+                        .RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL,
+                    }
+                }
+            };
 
-            desc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-
-            desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-            desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_INV_SRC_ALPHA;
-            desc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-            desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
             HRESULT res = m_Device->CreateBlendState(&desc, &m_BlendState);
-            HAX_ASSERT(res == S_OK);
+            HAX_PANIC(res == S_OK, g_Context->Logger, L"Unable to create blend state: %08X", res);
         }
 
-        // Create the rasterizer state
+        // Rasterizer
         {
-            D3D11_RASTERIZER_DESC desc{};
-            desc.FillMode = D3D11_FILL_SOLID;
-            desc.CullMode = D3D11_CULL_NONE;
-            desc.ScissorEnable = true;
-            desc.DepthClipEnable = true;
+            D3D11_RASTERIZER_DESC desc =
+            {
+                .FillMode = D3D11_FILL_SOLID,
+                .CullMode = D3D11_CULL_NONE,
+                .DepthClipEnable = true,
+                .ScissorEnable = true
+            };
+
             HRESULT res = m_Device->CreateRasterizerState(&desc, &m_RasterizerState);
-            HAX_ASSERT(res == S_OK);
+            HAX_PANIC(res == S_OK, g_Context->Logger, L"Unable to create rast state: %08X", res);
         }
 
-        // Create depth-stencil State
+        // Depth-stencil
         {
-            D3D11_DEPTH_STENCIL_DESC desc{};
-            desc.DepthEnable = false;
-            desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-            desc.DepthFunc = D3D11_COMPARISON_ALWAYS;
-            desc.StencilEnable = false;
-            desc.FrontFace.StencilFailOp = desc.FrontFace.StencilDepthFailOp = desc.FrontFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
-            desc.FrontFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
-            desc.BackFace = desc.FrontFace;
+            D3D11_DEPTH_STENCIL_DESC desc =
+            {
+                .DepthEnable = false,
+                .DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO,
+                .StencilEnable = false,
+            };
+
             HRESULT res = m_Device->CreateDepthStencilState(&desc, &m_DepthStencilState);
-            HAX_ASSERT(res == S_OK);
+            HAX_PANIC(res == S_OK, g_Context->Logger, L"Unable to create depth state: %08X", res);
         }
 
+        // Sampler
         {
-            D3D11_SAMPLER_DESC desc{};
-            desc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
-            desc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
-            desc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
-            desc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
-            desc.MipLODBias = 0.f;
-            desc.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
-            desc.MinLOD = 0.f;
-            desc.MaxLOD = 0.f;
+            D3D11_SAMPLER_DESC desc =
+            {
+                .Filter = D3D11_FILTER_MIN_MAG_MIP_POINT,
+                .AddressU = D3D11_TEXTURE_ADDRESS_CLAMP,
+                .AddressV = D3D11_TEXTURE_ADDRESS_CLAMP,
+                .AddressW = D3D11_TEXTURE_ADDRESS_CLAMP,
+                .MipLODBias = 0.0f,
+                .ComparisonFunc = D3D11_COMPARISON_ALWAYS,
+                .MinLOD = 0.0f,
+                .MaxLOD = 0.0f
+            };
+
             HRESULT res = m_Device->CreateSamplerState(&desc, &m_Sampler);
-            HAX_ASSERT(res == S_OK);
+            HAX_PANIC(res == S_OK, g_Context->Logger, L"Unable to create sampler state: %08X", res);
         }
     }
 
     void DirectX11Backend::SetupRenderState(const Vector2& viewportSize)
     {
-        D3D11_VIEWPORT vp = {};
-        vp.Width = viewportSize.X;
-        vp.Height = viewportSize.Y;
-        vp.MinDepth = 0.0f;
-        vp.MaxDepth = 1.0f;
-        vp.TopLeftX = vp.TopLeftY = 0;
+        D3D11_VIEWPORT vp =
+        {
+            .TopLeftX = 0.0f,
+            .TopLeftY = 0.0f,
+            .Width = viewportSize.X,
+            .Height = viewportSize.Y,
+            .MinDepth = 0.0f,
+            .MaxDepth = 1.0f
+        };
         m_DeviceContext->RSSetViewports(1, &vp);
 
-        D3D11_MAPPED_SUBRESOURCE mapped_resource;
-        if (m_DeviceContext->Map(m_MatrixContantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_resource) == S_OK)
         {
-            VERTEX_CONSTANT_BUFFER_DX11* constant_buffer = (VERTEX_CONSTANT_BUFFER_DX11*)mapped_resource.pData;
+            D3D11_MAPPED_SUBRESOURCE mappedResource;
+            HRESULT res = m_DeviceContext->Map(m_MatrixContantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+            HAX_PANIC(res == S_OK, g_Context->Logger, L"Unable to map const buffer: %08X", res);
+
+            VERTEX_CONSTANT_BUFFER_DX11* constantBuffer = (VERTEX_CONSTANT_BUFFER_DX11*)mappedResource.pData;
             float L = 0;
             float R = viewportSize.X;
             float T = 0;
             float B = viewportSize.Y;
             float mvp[4][4] =
             {
-                { 2.0f/(R-L),   0.0f,           0.0f,       0.0f },
-                { 0.0f,         2.0f/(T-B),     0.0f,       0.0f },
-                { 0.0f,         0.0f,           0.5f,       0.0f },
-                { (R+L)/(L-R),  (T+B)/(B-T),    0.5f,       1.0f },
+                {2.0f / (R - L),    0.0f,               0.0f,   0.0f },
+                {0.0f,              2.0f / (T - B),     0.0f,   0.0f },
+                {0.0f,              0.0f,               0.5f,   0.0f },
+                {(R + L) / (L - R), (T + B) / (B - T),  0.5f,   1.0f },
             };
-            memcpy(&constant_buffer->mvp, mvp, sizeof(mvp));
+            memcpy(&constantBuffer->MVP, mvp, sizeof(mvp));
             m_DeviceContext->Unmap(m_MatrixContantBuffer, 0);
         }
 
-        unsigned int stride = sizeof(RenderItem);
-        unsigned int offset = 0;
+        uint32 stride = sizeof(RenderItem);
+        uint32 offset = 0;
         m_DeviceContext->IASetInputLayout(m_InputLayout);
         m_DeviceContext->IASetVertexBuffers(0, 1, &m_InstanceBuffer, &stride, &offset);
         m_DeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -474,13 +436,13 @@ namespace Hax::Gui
         m_DeviceContext->DSSetShader(nullptr, nullptr, 0);
         m_DeviceContext->CSSetShader(nullptr, nullptr, 0);
 
-        const float blend_factor[4] = { 0.f, 0.f, 0.f, 0.f };
+        const float blend_factor[4] = {0.f, 0.f, 0.f, 0.f};
         m_DeviceContext->OMSetBlendState(m_BlendState, blend_factor, 0xffffffff);
         m_DeviceContext->OMSetDepthStencilState(m_DepthStencilState, 0);
         m_DeviceContext->RSSetState(m_RasterizerState);
 
-        m_DeviceContext->PSSetShaderResources(1, 1, (ID3D11ShaderResourceView**)&g_Context->AtlasArray.Srv);
-        m_DeviceContext->PSSetShaderResources(2, 1, (ID3D11ShaderResourceView**)&g_Context->Bitmap.Texture.Srv);
+        m_DeviceContext->PSSetShaderResources(1, 1, (ID3D11ShaderResourceView**)&g_Context->AtlasArray.View);
+        m_DeviceContext->PSSetShaderResources(2, 1, (ID3D11ShaderResourceView**)&g_Context->Bitmap.Texture.View);
     }
 
     void DirectX11Backend::CopyRenderItems(Vector<Layer*>& layers)
@@ -489,7 +451,7 @@ namespace Hax::Gui
         for (Layer* layer : layers)
             totalItems += layer->RenderItems.Size();
 
-        if (!m_InstanceBuffer || m_InstanceBufferSize < totalItems)
+        if (m_InstanceBuffer == nullptr || m_InstanceBufferSize < totalItems)
         {
             if (m_InstanceBuffer) 
             { 
@@ -499,20 +461,27 @@ namespace Hax::Gui
 
             m_InstanceBufferSize = totalItems + 100;
 
-            D3D11_BUFFER_DESC desc{};
-            desc.Usage = D3D11_USAGE_DYNAMIC;
-            desc.ByteWidth = (uint32)m_InstanceBufferSize * (uint32)sizeof(RenderItem);
-            desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-            desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-            if (m_Device->CreateBuffer(&desc, nullptr, &m_InstanceBuffer) < 0)
-                return;
+            D3D11_BUFFER_DESC desc =
+            {
+                .ByteWidth = (uint32)m_InstanceBufferSize * (uint32)sizeof(RenderItem),
+                .Usage = D3D11_USAGE_DYNAMIC,
+                .BindFlags = D3D11_BIND_VERTEX_BUFFER,
+                .CPUAccessFlags = D3D11_CPU_ACCESS_WRITE
+            };
 
-            printf("Instance buffer resized to %zu\n", m_InstanceBufferSize);
+            HRESULT res = m_Device->CreateBuffer(&desc, nullptr, &m_InstanceBuffer);
+            HAX_PANIC(res == S_OK, g_Context->Logger, L"Unable to create instance buffer: %08X", res);
+
+            #ifdef _DEBUG
+            StringBuilder<> sb;
+            sb.AppendF("Instance buffer resized to %zu\n", m_InstanceBufferSize);
+            ::OutputDebugStringA(sb.CStr());
+            #endif
         }
 
         D3D11_MAPPED_SUBRESOURCE resource;
         HRESULT res = m_DeviceContext->Map(m_InstanceBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-        HAX_ASSERT(res == S_OK);
+        HAX_PANIC(res == S_OK, g_Context->Logger, L"Unable to map instance buffer: %08X", res);
 
         size_t offset = 0;
         for (Layer* layer : layers)
@@ -563,11 +532,9 @@ namespace Hax::Gui
         g_Context = New<Context>();
         Initialize(hwnd);
 
-        DirectX11Backend* graphicsApi = New<DirectX11Backend>(g_Context->GeneralAlloc, *g_Context);
-        graphicsApi->Init(device);
+        DirectX11Backend* graphicsApi = New<DirectX11Backend>(g_Context->GeneralAlloc, *g_Context, device);
         g_Context->Backend = graphicsApi;
-
-        g_Context->Bitmap.Texture = g_Context->Backend->CreateTextureR8(g_Context->Bitmap.Pixels, kBitmapSize, kBitmapSize);
+        g_Context->Bitmap.Texture = g_Context->Backend->CreateTexture(TextureFormat::R8_UNorm, g_Context->Bitmap.Pixels, kBitmapSize, kBitmapSize, 1);
     }
 
     const char* g_VertexShaderText = R"(
@@ -621,7 +588,7 @@ float2 rotate(float2 p, float2 c, float2 sc)
 float2 calcEllipse(VS_INPUT input, uint vertId)
 {
     float2 center = input.params14.xy;
-    float2 r = input.params14.zw + 2.0;
+    float2 r = input.params14.zw + 1.0;
 
     float2 tl = rotate(center - r, center, input.sincos);
     float2 tr = rotate(float2(center.x + r.x, center.y - r.y), center, input.sincos);
@@ -634,8 +601,8 @@ float2 calcEllipse(VS_INPUT input, uint vertId)
 
 float2 calcRect(VS_INPUT input, uint vertId)
 {
-    float2 tl = input.params14.xy - 2.0;
-    float2 br = input.params14.zw + 2.0;
+    float2 tl = input.params14.xy - 1.0;
+    float2 br = input.params14.zw + 1.0;
 
     float2 center = (tl + br) * 0.5;
     float2 tr = rotate(float2(br.x, tl.y), center, input.sincos);
@@ -704,7 +671,7 @@ float2 calcLine(VS_INPUT input, uint vertId)
     b = rotate(b, center, input.sincos);
 
     float2 dir = normalize(b - a);
-    float2 normal = float2(-dir.y, dir.x) * ((th + 2.0) / 2.0);
+    float2 normal = float2(-dir.y, dir.x) * ((th + 1.0) / 2.0);
 
     float2 tl = a - normal;
     float2 bl = a + normal;
@@ -831,7 +798,7 @@ float4 shaderEllipse(PS_INPUT input)
     float2 pRot = fastMap(p, center, input.sincos);
 
     float d  = sdEllipse(pRot, center, r);
-    float aa = fwidth(d);
+    float aa = fwidth(p) * 0.7;
 
     float s_d = abs(d + th * 0.5f) - th * 0.5f;
     float s_mask = smoothstep(aa, -aa, s_d) * step(0.0001f, th);
@@ -871,7 +838,7 @@ float4 shaderRect(PS_INPUT input)
     float2 pRot     = fastMap(p, center, input.sincos);
 
     float d  = sdRect(pRot, a, b, r);
-    float aa = fwidth(d) * 0.5;
+    float aa = fwidth(p) * 0.5;
 
     float s_d = abs(d + th * 0.5) - th * 0.5;
     float s_mask = smoothstep(aa, -aa, s_d) * step(0.0001, th);
@@ -911,7 +878,7 @@ float4 shaderTriangle(PS_INPUT input)
     float2 pRot   = fastMap(p, center, input.sincos);
 
     float d  = sdTriangle(pRot, a, b, c);
-    float aa = fwidth(d);
+    float aa = fwidth(p) * 0.5;
 
     float s_d = abs(d + th * 0.5f) - th * 0.5f;
     float s_mask = smoothstep(aa, -aa, s_d) * step(0.0001f, th);
@@ -948,7 +915,7 @@ float4 shaderLine(PS_INPUT input)
 
     float d = sdSegment(pRot, a, b) - th * 0.5;
 
-    float aa = fwidth(d) * 0.4;
+    float aa = fwidth(p) * 0.5;
 
     float coverage = smoothstep(aa, -aa, d);
 
@@ -978,7 +945,7 @@ float4 shaderImage(PS_INPUT input)
     float2 pRot = fastMap(p, center, input.sincos);
     
     float d = sdRect(pRot, a, b, r);
-    float aa = fwidth(d);
+    float aa = fwidth(p) * 0.5;
 
     float mask = smoothstep(aa, -aa, d);
     

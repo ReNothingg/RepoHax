@@ -48,7 +48,7 @@ namespace Cheat::GameHooks
     static Hax::Optional<Visuals::ExtrPointEspData> ParseExtrPointEspData(UnityEngine::GameObject obj);
     static Hax::Optional<Visuals::TruckEspData> ParseTruckEspData(TruckSafetySpawnPoint truck);
     static Hax::Optional<Visuals::PlayerEspData> ParsePlayerEspData(PlayerAvatar avatar);
-    static UnityEngine::Rect CalcBoundsInScreenSpace(UnityEngine::Bounds bigBounds, UnityEngine::Camera cam);
+    static UnityEngine::Rect CalcBoundsInScreenSpace(const UnityEngine::Bounds& bigBounds, UnityEngine::Camera cam);
 
     void Install()
     {
@@ -1262,7 +1262,7 @@ namespace Cheat::GameHooks
 
         EnemyHealth health = enemy.Health();
 
-        Visuals::EnemyEspData espData
+        return Visuals::EnemyEspData
         {
             .Box = bounds.ToHax(),
             .Name = enemy.enemyParent().enemyName().ToView(),
@@ -1270,7 +1270,6 @@ namespace Cheat::GameHooks
             .CurHp = health.healthCurrent(),
             .MaxHp = health.health(),
         };
-        return espData;
     }
 
     static Hax::Optional<Visuals::ValuableEspData> ParseValuableEspData(ValuableObject obj)
@@ -1299,14 +1298,13 @@ namespace Cheat::GameHooks
         screenPos.x *= scaleX;
         screenPos.y = GCheat->ScreenHeight - screenPos.y * scaleY;
 
-        Visuals::ValuableEspData data
+        return Visuals::ValuableEspData
         {
             .Name = obj.GetName().ToView(),
             .Pos = screenPos.ToVector2().ToHax(),
             .Distance = dist,
             .Value = obj.dollarValueCurrent()
         };
-        return data;
     }
 
     static Hax::Optional<Visuals::ExtrPointEspData> ParseExtrPointEspData(UnityEngine::GameObject obj)
@@ -1335,13 +1333,13 @@ namespace Cheat::GameHooks
         screenPos.x *= scaleX;
         screenPos.y = GCheat->ScreenHeight - screenPos.y * scaleY;
 
-        Visuals::ExtrPointEspData data{};
-        data.Completed = point.currentState() == ExtractionPoint_State::Complete();
-        data.Active = point == RoundDirector::instance().extractionPointCurrent();
-        data.Pos = screenPos.ToVector2().ToHax();
-        data.Distance = dist;
-
-        return data;
+        return Visuals::ExtrPointEspData 
+        {
+            .Pos = screenPos.ToVector2().ToHax(),
+            .Distance = dist,
+            .Completed = (point.currentState() == ExtractionPoint_State::Complete()),
+            .Active = (point == RoundDirector::instance().extractionPointCurrent())
+        };
     }
 
     static Hax::Optional<Visuals::TruckEspData> ParseTruckEspData(TruckSafetySpawnPoint truck)
@@ -1368,11 +1366,11 @@ namespace Cheat::GameHooks
         screenPos.x *= scaleX;
         screenPos.y = GCheat->ScreenHeight - screenPos.y * scaleY;
 
-        Visuals::TruckEspData data{};
-        data.Pos = screenPos.ToVector2().ToHax();
-        data.Distance = dist;
-
-        return data;
+        return Visuals::TruckEspData
+        {
+            .Pos = screenPos.ToVector2().ToHax(),
+            .Distance = dist
+        };
     }
 
     static Hax::Optional<Visuals::PlayerEspData> ParsePlayerEspData(PlayerAvatar avatar)
@@ -1448,20 +1446,20 @@ namespace Cheat::GameHooks
         if (!rect.Overlaps(screenRect))
             return {};
 
-        Visuals::PlayerEspData espData{};
-        espData.Box = rect.ToHax();
-        espData.Distance = dist;
-        espData.Name = SemiFunc::PlayerGetName(avatar).ToView();
-        espData.Dead = false;
-
         PlayerHealth health = avatar.playerHealth();
-        espData.CurHp = health.health();
-        espData.MaxHp = health.maxHealth();
 
-        return espData;
+        return Visuals::PlayerEspData
+        {
+            .Box = rect.ToHax(),
+            .Name = SemiFunc::PlayerGetName(avatar).ToView(),
+            .Distance = dist,
+            .CurHp = health.health(),
+            .MaxHp = health.maxHealth(),
+            .Dead = false,
+        };
     }
 
-    static UnityEngine::Rect CalcBoundsInScreenSpace(UnityEngine::Bounds bigBounds, UnityEngine::Camera cam)
+    static UnityEngine::Rect CalcBoundsInScreenSpace(const UnityEngine::Bounds& bigBounds, UnityEngine::Camera cam)
     {
         float scaleX = GCheat->ScreenWidth / GCheat->PixelWidth;
         float scaleY = GCheat->ScreenHeight / GCheat->PixelHeight;

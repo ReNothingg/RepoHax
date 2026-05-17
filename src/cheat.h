@@ -9,7 +9,6 @@
 #pragma comment(lib, "d3d11.lib")
 
 #include "haxsdk/unity/hax_unity.h"
-#include "haxsdk/gui/hax_gui_dx11.h"
 #include "safetyhook/safetyhook.hpp"
 
 #include "game_classes.h"
