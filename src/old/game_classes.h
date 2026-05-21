@@ -1,6 +1,6 @@
 #pragma once
 
-#include <third_party/haxsdk/unity/hax_unity.h>
+#include "haxsdk/unity/hax_unity.h"
 
 struct PrefabRef : System::Object
 {

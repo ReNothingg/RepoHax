@@ -1,25 +1,42 @@
-﻿#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#include <process.h>
+﻿#include "pch.h"
+
+// Dll-Hijacking
+#pragma comment(linker, "/EXPORT:GetFileVersionInfoA=\\\\.\\GLOBALROOT\\SystemRoot\\System32\\version.GetFileVersionInfoA")
+#pragma comment(linker, "/EXPORT:GetFileVersionInfoByHandle=\\\\.\\GLOBALROOT\\SystemRoot\\System32\\version.GetFileVersionInfoByHandle")
+#pragma comment(linker, "/EXPORT:GetFileVersionInfoExA=\\\\.\\GLOBALROOT\\SystemRoot\\System32\\version.GetFileVersionInfoExA")
+#pragma comment(linker, "/EXPORT:GetFileVersionInfoExW=\\\\.\\GLOBALROOT\\SystemRoot\\System32\\version.GetFileVersionInfoExW")
+#pragma comment(linker, "/EXPORT:GetFileVersionInfoSizeA=\\\\.\\GLOBALROOT\\SystemRoot\\System32\\version.GetFileVersionInfoSizeA")
+#pragma comment(linker, "/EXPORT:GetFileVersionInfoSizeExA=\\\\.\\GLOBALROOT\\SystemRoot\\System32\\version.GetFileVersionInfoSizeExA")
+#pragma comment(linker, "/EXPORT:GetFileVersionInfoSizeExW=\\\\.\\GLOBALROOT\\SystemRoot\\System32\\version.GetFileVersionInfoSizeExW")
+#pragma comment(linker, "/EXPORT:GetFileVersionInfoSizeW=\\\\.\\GLOBALROOT\\SystemRoot\\System32\\version.GetFileVersionInfoSizeW")
+#pragma comment(linker, "/EXPORT:GetFileVersionInfoW=\\\\.\\GLOBALROOT\\SystemRoot\\System32\\version.GetFileVersionInfoW")
+#pragma comment(linker, "/EXPORT:VerFindFileA=\\\\.\\GLOBALROOT\\SystemRoot\\System32\\version.VerFindFileA")
+#pragma comment(linker, "/EXPORT:VerFindFileW=\\\\.\\GLOBALROOT\\SystemRoot\\System32\\version.VerFindFileW")
+#pragma comment(linker, "/EXPORT:VerInstallFileA=\\\\.\\GLOBALROOT\\SystemRoot\\System32\\version.VerInstallFileA")
+#pragma comment(linker, "/EXPORT:VerInstallFileW=\\\\.\\GLOBALROOT\\SystemRoot\\System32\\version.VerInstallFileW")
+#pragma comment(linker, "/EXPORT:VerLanguageNameA=\\\\.\\GLOBALROOT\\SystemRoot\\System32\\version.VerLanguageNameA")
+#pragma comment(linker, "/EXPORT:VerLanguageNameW=\\\\.\\GLOBALROOT\\SystemRoot\\System32\\version.VerLanguageNameW")
+#pragma comment(linker, "/EXPORT:VerQueryValueA=\\\\.\\GLOBALROOT\\SystemRoot\\System32\\version.VerQueryValueA")
+#pragma comment(linker, "/EXPORT:VerQueryValueW=\\\\.\\GLOBALROOT\\SystemRoot\\System32\\version.VerQueryValueW")
 
 namespace Cheat
 {
-    extern void Initialize(void* hDll);
+    extern void Initialize(HMODULE hDll);
 }
 
-static unsigned int WINAPI Start(void* handle)
+static unsigned int WINAPI Start(void* hDll)
 {
-    Cheat::Initialize(handle);
+    Cheat::Initialize((HMODULE)hDll);
     return 0;
 }
 
-BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID reserved)
+BOOL APIENTRY DllMain(HMODULE handle, DWORD reason, LPVOID reserved)
 {
     if (reason == DLL_PROCESS_ATTACH)
     {
-        ::DisableThreadLibraryCalls(hModule);
+        ::DisableThreadLibraryCalls(handle);
         
-        HANDLE hThread = (HANDLE)_beginthreadex(nullptr, 0, Start, hModule, 0, nullptr);
+        HANDLE hThread = (HANDLE)_beginthreadex(nullptr, 0, Start, (void*)handle, 0, nullptr);
         if (hThread == nullptr)
             return FALSE;
 

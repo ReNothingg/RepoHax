@@ -18,81 +18,123 @@
     <ClCompile Include="src\dllmain.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="src\version.cpp">
+    <ClCompile Include="third_party\haxsdk\gui\hax_gui.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\haxsdk\gui\hax_gui_dx11.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\haxsdk\hax.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\haxsdk\unity\hax_unity.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\safetyhook\safetyhook.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\safetyhook\Zydis.c">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="src\cheat.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="src\haxsdk\gui\hax_gui.cpp">
+    <ClCompile Include="src\pch.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="src\haxsdk\gui\hax_gui_dx11.cpp">
+    <ClCompile Include="src\overlay\menu\tabs\stats_tab.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="src\haxsdk\hax.cpp">
+    <ClCompile Include="src\hooks\game_hooks.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="src\haxsdk\unity\hax_unity.cpp">
+    <ClCompile Include="src\hooks\win_hooks.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="src\safetyhook\safetyhook.cpp">
+    <ClCompile Include="src\hooks\graphics_hooks.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="src\safetyhook\Zydis.c">
+    <ClCompile Include="src\overlay\menu\menu.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="src\widgets.cpp">
+    <ClCompile Include="src\overlay\esp\esp.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="src\visuals.cpp">
+    <ClCompile Include="src\overlay\menu\widgets.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="src\win_hooks.cpp">
+    <ClCompile Include="src\overlay\menu\tabs\entities_tab.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="src\game_hooks.cpp">
+    <ClCompile Include="src\overlay\menu\tabs\vision_tab.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="src\overlay\menu\tabs\valuables_tab.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="src\overlay\menu\tabs\items_tab.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="src\overlay\menu\tabs\level_tab.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="src\overlay\menu\tabs\misc_tab.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="src\overlay\menu\tabs\settings_tab.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="src\overlay\overlay.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\cheat.h">
+    <ClInclude Include="third_party\haxsdk\gui\hax_gui.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="src\haxsdk\gui\hax_gui.h">
+    <ClInclude Include="third_party\haxsdk\gui\hax_gui_dx11.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="src\haxsdk\gui\hax_gui_dx11.h">
+    <ClInclude Include="third_party\haxsdk\hax.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="src\haxsdk\hax.h">
+    <ClInclude Include="third_party\haxsdk\unity\hax_unity.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="src\haxsdk\unity\hax_unity.h">
+    <ClInclude Include="third_party\safetyhook\safetyhook.hpp">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="src\safetyhook\safetyhook.hpp">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="src\safetyhook\Zydis.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="src\game_classes.h">
+    <ClInclude Include="third_party\safetyhook\Zydis.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
     <ClInclude Include="src\resource.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="src\widgets.h">
+    <ClInclude Include="src\cheat.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="src\visuals.h">
+    <ClInclude Include="src\pch.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="src\win_hooks.h">
+    <ClInclude Include="src\overlay\menu\localization.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="src\game_hooks.h">
+    <ClInclude Include="src\game_classes.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="src\overlay\esp\esp.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="src\overlay\menu\widgets.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="src\overlay\menu\menu.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="src\overlay\overlay.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="src\overlay\menu\tabs\tabs.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>

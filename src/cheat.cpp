@@ -1,11 +1,50 @@
-#include "cheat.h"
+#include "pch.h"
 
-#include "win_hooks.h"
-#include "game_hooks.h"
+#include "cheat.h"
 
 namespace Cheat
 {
-    static void* Hooked_MonoRuntimeInvoke(UVM::Method* a1, void* a2, void* a3, void* a4);
+    extern void HookMonoRuntimeInvoke(); // game_hooks.cpp
+    extern void HookWinProcs(); // win_hooks.cpp
+    extern void HookGraphics(); // graphics_hooks.cpp
+    extern void HookGameFuncs(); // game_hooks.cpp
+    extern void HookPlayerLoop(); // game_hooks.cpp
+
+    Context* G;
+
+    static void SetupConfig(Hax::IniFile& ini);
+    static void WaitForUnityToLoad();
+
+    void Initialize(HMODULE hCheatDll)
+    {
+        if (!Hax::Unity::IsUnityProcess())
+            return;
+
+        G = new Context();
+        G->Handle = hCheatDll;
+
+        SetupConfig(G->Config);
+        Hax::InitLogFile(G->Logger, L"haxsdk_logs.txt", G->UseConsole);
+
+        WaitForUnityToLoad();
+        Hax::Unity::Initialize(&G->Logger);
+
+        HookWinProcs();
+
+        HMODULE hDirectX11 = 0;
+        do 
+        { 
+            Sleep(200); 
+            hDirectX11 = ::GetModuleHandleW(L"d3d11.dll"); 
+        } while (hDirectX11 == 0);
+
+        HookGraphics();
+        HookGameFuncs();
+
+        while (!G->PlayerLoop.ReadyToHook) 
+            Sleep(200);
+        HookPlayerLoop();
+    }
 
     template <int Default, int Min, int Max>
     static void IniFileRead_IntClamped(void* data, const char* str)
@@ -17,122 +56,76 @@ namespace Cheat
         *(int*)data = Hax::Clamp(value, Min, Max);
     }
 
-    static void RegisterConfig(Hax::IniFile& iniFile)
+    static void SetupConfig(Hax::IniFile& ini)
     {
-        Hax::IniAddEntry(iniFile, "Settings", "UseConsole",  &GCheat->UseConsole,  Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
-        Hax::IniAddEntry(iniFile, "Settings", "VkOpenClose", &GCheat->VkOpenClose, Hax::IniFileWrite_Int,  IniFileRead_IntClamped<VK_OEM_3, 1, 255>);
-        Hax::IniAddEntry(iniFile, "Settings", "Language", &GCheat->Lang, Hax::IniFileWrite_Int,  IniFileRead_IntClamped<0, 0, Visuals::Lang_Count - 1>);
-        Hax::IniAddEntry(iniFile, "Settings", "DarkenBackground", &GCheat->DarkenBg, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Settings",   "UseConsole",          &G->UseConsole,          Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Settings",   "VkOpenClose",         &G->VkOpenClose,         Hax::IniFileWrite_Int,  IniFileRead_IntClamped<VK_OEM_3, 1, 255>);
+        Hax::IniAddEntry(ini, "Settings",   "Language",            &G->Language,            Hax::IniFileWrite_Int,  IniFileRead_IntClamped<0, 0, Lang_Count - 1>);
+        Hax::IniAddEntry(ini, "Settings",   "DarkenBackground",    &G->DarkenBackground,    Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
 
-        Hax::IniAddEntry(iniFile, "Stats", "Godmode", &GCheat->Godmode, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
-        Hax::IniAddEntry(iniFile, "Stats", "InfiniteStamina", &GCheat->InfStamina, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
-        Hax::IniAddEntry(iniFile, "Stats", "WalkingSpeed", &GCheat->Acceleration.Walking, Hax::IniFileWrite_Int, IniFileRead_IntClamped<1, 1, 5>);
-        Hax::IniAddEntry(iniFile, "Stats", "SprintingSpeed", &GCheat->Acceleration.Sprinting, Hax::IniFileWrite_Int, IniFileRead_IntClamped<1, 1, 5>);
-        Hax::IniAddEntry(iniFile, "Stats", "CrouchingSpeed", &GCheat->Acceleration.Crouching, Hax::IniFileWrite_Int, IniFileRead_IntClamped<1, 1, 5>);
-        Hax::IniAddEntry(iniFile, "Stats", "InfiniteJumps", &GCheat->InfJumps, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
-        Hax::IniAddEntry(iniFile, "Stats", "NoTumble", &GCheat->NoTumble, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
-        Hax::IniAddEntry(iniFile, "Stats", "EasyGrab", &GCheat->EasyGrab, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
-        Hax::IniAddEntry(iniFile, "Stats", "UnlimitedGrabRange", &GCheat->UnlimGrabRange, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
-        Hax::IniAddEntry(iniFile, "Stats", "NoOverCharge", &GCheat->NoOverCharge, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
-        Hax::IniAddEntry(iniFile, "Stats", "AutoUseUpgrades", &GCheat->AutoUseUpgr, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Stats",      "Godmode",             &G->Godmode,             Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Stats",      "InfiniteStamina",     &G->InfStamina,          Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Stats",      "WalkingSpeed",        &G->Accel.Walking,       Hax::IniFileWrite_Int,  IniFileRead_IntClamped<1, 1, 5>);
+        Hax::IniAddEntry(ini, "Stats",      "SprintingSpeed",      &G->Accel.Sprinting,     Hax::IniFileWrite_Int,  IniFileRead_IntClamped<1, 1, 5>);
+        Hax::IniAddEntry(ini, "Stats",      "CrouchingSpeed",      &G->Accel.Crouching,     Hax::IniFileWrite_Int,  IniFileRead_IntClamped<1, 1, 5>);
+        Hax::IniAddEntry(ini, "Stats",      "InfiniteJumps",       &G->InfJumps,            Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Stats",      "NoTumble",            &G->NoTumble,            Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Stats",      "EasyGrab",            &G->EasyGrab,            Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Stats",      "UnlimitedGrabRange",  &G->UnlimGrabRange,      Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Stats",      "NoOverCharge",        &G->NoOvercharge,        Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Stats",      "AutoUseUpgrades",     &G->AutoUseUpgrs,        Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
 
-        Hax::IniAddEntry(iniFile, "Entities", "NoGrabMaxTime", &GCheat->NoGrabMaxTime, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
-        Hax::IniAddEntry(iniFile, "Entities", "EnemiesEsp", &GCheat->EnemiesEsp, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
-        Hax::IniAddEntry(iniFile, "Entities", "PlayersEsp", &GCheat->PlayersEsp, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
-        Hax::IniAddEntry(iniFile, "Entities", "PlayerChams", &GCheat->PlayerChams, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        static constexpr const char* s_Names[(int)(UpgradeType::N)] = 
+        {
+            "CrouchRest", "ExtraJump", "Range", "SprintSpeed", "Stamina", "Strength",
+            "Launch", "Wings", "Health", "PlayersCount", "Climb", "HeadBattery"
+        };
 
-        Hax::IniAddEntry(iniFile, "Vision", "ImproveVision", &GCheat->ImproveVision, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
-        Hax::IniAddEntry(iniFile, "Vision", "ThirdPerson", &GCheat->ThirdPerson, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
-        Hax::IniAddEntry(iniFile, "Vision", "FOV", &GCheat->FOV, Hax::IniFileWrite_Int, IniFileRead_IntClamped<60, 60, 140>);
-        Hax::IniAddEntry(iniFile, "Vision", "FlashlightIntensity", &GCheat->Flashlight.Intensity, Hax::IniFileWrite_Int, IniFileRead_IntClamped<10, 10, 20>);
-        Hax::IniAddEntry(iniFile, "Vision", "FlashlightAngle", &GCheat->Flashlight.Angle, Hax::IniFileWrite_Int, IniFileRead_IntClamped<60, 60, 120>);
-        Hax::IniAddEntry(iniFile, "Vision", "FlashlightAllowInCrouch", &GCheat->Flashlight.AllowInCrouch, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
-        Hax::IniAddEntry(iniFile, "Vision", "HeadMaxBattery", &GCheat->HeadMaxBattery, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        for (int i = 0; i < (int)UpgradeType::N; ++i)
+            Hax::IniAddEntry(ini, "UpgradeAutoUse", s_Names[i], &G->UpgradesData[i].AutoUse, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
 
-        Hax::IniAddEntry(iniFile, "Valuables", "ValuablesEsp", &GCheat->ValuablesEsp, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
-        Hax::IniAddEntry(iniFile, "Valuables", "ValuablesEspDistance", &GCheat->ValuablesEspDistance, Hax::IniFileWrite_Int, IniFileRead_IntClamped<50, 5, 500>);
-        Hax::IniAddEntry(iniFile, "Valuables", "ItemsChams", &GCheat->ItemsChams, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
-        Hax::IniAddEntry(iniFile, "Valuables", "Unbreakable", &GCheat->Unbreakable, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
-        Hax::IniAddEntry(iniFile, "Valuables", "ExtractionPointsEsp", &GCheat->ExtrPointsEsp, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Entities",   "NoGrabMaxTime",       &G->NoGrabMaxTime,       Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Entities",   "EnemiesEsp",          &G->EnemiesEsp,          Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Entities",   "PlayersEsp",          &G->PlayersEsp,          Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Entities",   "PlayersChams",        &G->PlayersChams,        Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
 
-        Hax::IniAddEntry(iniFile, "Items", "InfBattery", &GCheat->InfBattery, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
-        Hax::IniAddEntry(iniFile, "Items", "UseLaser", &GCheat->UseLaser, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Vision",     "BetterVision",        &G->BetterVision,        Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Vision",     "ThirdPerson",         &G->ThirdPerson,         Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Vision",     "Fov",                 &G->Fov,                 Hax::IniFileWrite_Int,  IniFileRead_IntClamped<60, 60, 140>);
+        Hax::IniAddEntry(ini, "Vision",     "FlashlightIntensity", &G->Flashlight.Intensity,Hax::IniFileWrite_Int,  IniFileRead_IntClamped<10, 10, 20>);
+        Hax::IniAddEntry(ini, "Vision",     "FlashAngle",          &G->Flashlight.Angle,    Hax::IniFileWrite_Int,  IniFileRead_IntClamped<60, 60, 120>);
+        Hax::IniAddEntry(ini, "Vision",     "FlashInCrouch",       &G->Flashlight.InCrouch, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Vision",     "MaxHeadBattery",      &G->MaxHeadBattery,      Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
 
-        Hax::IniAddEntry(iniFile, "Misc", "TruckEsp", &GCheat->TruckEsp, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Valuables",  "ValuablesEsp",        &G->ValuablesEsp,        Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Valuables",  "ValuablesEspRange",   &G->ValuablesEspRange,   Hax::IniFileWrite_Int,  IniFileRead_IntClamped<50, 5, 500>);
+        Hax::IniAddEntry(ini, "Valuables",  "ValuablesChams",      &G->ValuablesChams,      Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Valuables",  "Unbreakable",         &G->Unbreakable,         Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Valuables",  "ExtrPointsEsp",       &G->ExtrPointsEsp,       Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
 
-        Visuals::RegisterConfig(iniFile);
+        Hax::IniAddEntry(ini, "Items",      "InfBattery",          &G->InfBattery,          Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Items",      "UseLaser",            &G->UseLaser,            Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+
+        Hax::IniAddEntry(ini, "Misc",       "TruckEsp",            &G->TruckEsp,            Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+
+        Hax::IniLoad(G->Config);
+        G->Loc = g_LocDict[G->Language];
     }
 
-    void Initialize(void* hCheat)
+    static void WaitForUnityToLoad()
     {
-        if (!Hax::Unity::IsUnityProcess())
-            return;
-
-        GCheat = Hax::New<Context>();
-        GCheat->hCheat = (HMODULE)hCheat;
-
-        Hax::IniFile& iniFile = GCheat->IniFile;
-        RegisterConfig(iniFile);
-        Hax::IniLoad(iniFile);
-
-        Hax::LogFile& logFile = GCheat->LogFile;
-        Hax::InitLogFile(logFile, L"haxsdk_logs.txt", GCheat->UseConsole);
-
-        Hax::Log(logFile, L"Waiting for unity virtual machine...");
+        Hax::Log(G->Logger, L"Waiting for unity virtual machine...");
         while (!Hax::Unity::GetUvmHandle())
-            Sleep(200);
+            ::Sleep(200);
 
-        {
-            HANDLE hEvent = ::CreateEvent(0, TRUE, FALSE, nullptr);
-            HAX_ASSERT(hEvent != nullptr);
+        HANDLE hEvent = ::CreateEvent(0, TRUE, FALSE, nullptr);
+        HAX_PANIC(hEvent != nullptr, &G->Logger, L"%zu", HAX_LINE);
 
-            GCheat->UnityLoadedEvent = hEvent;
-            HookModuleProc((HMODULE)Hax::Unity::GetUvmHandle(), "mono_runtime_invoke", Hooked_MonoRuntimeInvoke, GCheat->MonoRuntimeInvokeHook);
+        G->UnityLoadedEvent = hEvent;
+        HookMonoRuntimeInvoke();
 
-            Hax::Log(logFile, L"Waiting for unity...");
-            ::WaitForSingleObject(hEvent, INFINITE);
-            ::CloseHandle(hEvent);
-        }
-
-        Hax::Unity::Initialize(&logFile);
-        Cheat::WinHooks::Install();
-
-        HMODULE hDirectX11 = 0;
-        do { Sleep(200); hDirectX11 = ::GetModuleHandleW(L"d3d11.dll"); } while (hDirectX11 == 0);
-
-        Cheat::Visuals::InitializeMenu((Hax::Handle)hDirectX11);
-        Cheat::GameHooks::Install();
-    }
-
-    void Hook(void* ptr, void* detour, SafetyHookInline& out, const char* name)
-    {
-        auto res = SafetyHookInline::create(ptr, detour);
-        HAX_PANIC(res.has_value(), &GCheat->LogFile, L"Failed to hooks %hs. Error %d", name, (int)res.error().type);
-        out = std::move(*res);
-    }
-
-    void HookModuleProc(HMODULE module, LPCSTR procName, void* procHook, SafetyHookInline& out)
-    {
-        void* procPtr = ::GetProcAddress(module, procName);
-        HAX_PANIC(procPtr != nullptr, &GCheat->LogFile, L"Proc %s not found", procName);
-
-        Hook(procPtr, procHook, out, procName);
-    }
-
-    static void* Hooked_MonoRuntimeInvoke(UVM::Method* a1, void* a2, void* a3, void* a4)
-    {
-        void* ret = GCheat->MonoRuntimeInvokeHook.unsafe_ccall<void*, void*, void*, void*, void*>(a1, a2, a3, a4);
-
-        if (GCheat->UnityLoadedEvent != nullptr)
-        {
-            Hax::StringView methodName = UVM::MethodGetName(*a1);
-            if (methodName == "Update")
-            {
-                ::SetEvent(GCheat->UnityLoadedEvent);
-                GCheat->UnityLoadedEvent = nullptr;
-            }
-        }
-
-        return ret;
+        Hax::Log(G->Logger, L"Waiting for unity...");
+        ::WaitForSingleObject(hEvent, INFINITE);
+        ::CloseHandle(hEvent);
     }
 }
