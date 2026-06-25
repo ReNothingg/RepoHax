@@ -107,7 +107,7 @@ namespace Cheat
                 {
                     Hax::Gui::BeginHorizontal();
                     {
-                        Hax::Vector2 customSize = Hax::Gui::GetImageSize(G->Logo) / 2.f;
+                        Hax::Vector2 customSize = Hax::Gui::GetImageSize(G->Logo) * (0.5f * Hax::Gui::G.ScaleFactor);
                         Hax::Gui::Space((sidePanelWidth - customSize.X) / 2.f);
                         Image(G->Logo, customSize);
                     }
