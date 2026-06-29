@@ -99,7 +99,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path release | Out-Null
-          Copy-Item build/Release/bin/version.dll release/version.dll
+          Copy-Item build/Release/bin/dwmapi.dll release/dwmapi.dll
 
       - name: Generate changelog
         id: changelog
@@ -127,7 +127,7 @@ jobs:
           $body = @"
           ## Built for REPO v${{ steps.ver.outputs.repo_version }}
 
-          Drop ``version.dll`` next to the game executable to load the cheat.
+          Drop ``dwmapi.dll`` next to the game executable to load the cheat.
 
           ## $header
 
@@ -140,7 +140,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: RepoHax-${{ steps.params.outputs.release_tag }}
-          path: release/version.dll
+          path: release/dwmapi.dll
           if-no-files-found: error
 
       - name: Create GitHub Release
@@ -150,7 +150,7 @@ jobs:
           tag_name: ${{ steps.params.outputs.release_tag }}
           target_commitish: ${{ steps.sha.outputs.commit_sha }}
           body_path: release_body.md
-          files: release/version.dll
+          files: release/dwmapi.dll
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
