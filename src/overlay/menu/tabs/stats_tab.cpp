@@ -186,7 +186,7 @@ namespace Cheat
                                 continue;
 
                             UpgradeData& data = G->UpgradesData[(int)UpgradeType::N];
-                            Hax::WStringView name = item.itemAttributes().itemAssetName().ToView();
+                            Hax::WStringView name = item.itemAttributes().itemAssetName().ToHaxView();
                             for (size_t j = 0; j < (size_t)UpgradeType::N; ++j)
                             {
                                 if (name.EndsWith(G->UpgradesData[j].InternalNameEnd))
@@ -221,7 +221,7 @@ namespace Cheat
                             continue;
 
                         AidData& data = G->AidsData[(int)AidType::N];
-                        Hax::WStringView name = aid.itemAttributes().itemAssetName().ToView();
+                        Hax::WStringView name = aid.itemAttributes().itemAssetName().ToHaxView();
                         for (size_t j = 0; j < (size_t)AidType::N; ++j)
                         {
                             if (name.EndsWith(G->AidsData[j].InternalNameEnd))

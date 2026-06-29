@@ -56,7 +56,7 @@ namespace Cheat
     void                            RenderEsp();
     Hax::Optional<EnemyEspData>     ParseEnemyEspData(Enemy enemy);
     Hax::Optional<ValuableEspData>  ParseValuableEspData(ValuableObject obj);
-    Hax::Optional<ExtrPointEspData> ParseExtrPointEspData(UnityEngine::GameObject obj);
+    Hax::Optional<ExtrPointEspData> ParseExtrPointEspData(Unity::GameObject obj);
     Hax::Optional<TruckEspData>     ParseTruckEspData(TruckSafetySpawnPoint truck);
     Hax::Optional<PlayerEspData>    ParsePlayerEspData(PlayerAvatar avatar);
     Hax::Optional<CosmeticBoxEspData> ParseCosmeticBoxEspData(CosmeticWorldObject box);

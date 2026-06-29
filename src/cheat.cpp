@@ -1,6 +1,7 @@
 #include "pch.h"
 
 #include "cheat.h"
+#include <third_party/haxsdk/unity/hax_unity_uvm.h>
 
 namespace Cheat
 {

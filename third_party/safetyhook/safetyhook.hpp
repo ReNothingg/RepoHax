@@ -550,8 +550,8 @@ public:
     /// @return The InlineHook or an InlineHook::Error if an error occurred.
     /// @note This will use the default global Allocator.
     /// @note If you don't care about error handling, use the easy API (safetyhook::create_inline).
-    [[nodiscard]] static std::expected<InlineHook, Error> create(
-        void* target, void* destination, Flags flags = Default);
+    [[nodiscard]] static std::optional<Error> create(
+        void* target, void* destination, InlineHook& out);
 
     /// @brief Create an inline hook.
     /// @param target The address of the function to hook.
@@ -561,8 +561,8 @@ public:
     /// @note This will use the default global Allocator.
     /// @note If you don't care about error handling, use the easy API (safetyhook::create_inline).
     template <typename T, typename U>
-    [[nodiscard]] static std::expected<InlineHook, Error> create(T target, U destination, Flags flags = Default) {
-        return create(reinterpret_cast<void*>(target), reinterpret_cast<void*>(destination), flags);
+    [[nodiscard]] static Error create(T target, U destination, InlineHook& out) {
+        return create(reinterpret_cast<void*>(target), reinterpret_cast<void*>(destination), out);
     }
 
     /// @brief Create an inline hook with a given Allocator.
@@ -572,8 +572,8 @@ public:
     /// @param flags The flags to use.
     /// @return The InlineHook or an InlineHook::Error if an error occurred.
     /// @note If you don't care about error handling, use the easy API (safetyhook::create_inline).
-    [[nodiscard]] static std::expected<InlineHook, Error> create(
-        const std::shared_ptr<Allocator>& allocator, void* target, void* destination, Flags flags = Default);
+    [[nodiscard]] static std::optional<Error> create(
+        const std::shared_ptr<Allocator>& allocator, void* target, void* destination, InlineHook& out);
 
     /// @brief Create an inline hook with a given Allocator.
     /// @param allocator The allocator to use.
@@ -880,146 +880,7 @@ namespace safetyhook {
 using MidHookFn = void (*)(Context& ctx);
 
 /// @brief A mid function hook.
-class SAFETYHOOK_API MidHook final {
-public:
-    /// @brief Error type for MidHook.
-    struct Error {
-        /// @brief The type of error.
-        enum : uint8_t {
-            BAD_ALLOCATION,
-            BAD_INLINE_HOOK,
-        } type;
 
-        /// @brief Extra error information.
-        union {
-            Allocator::Error allocator_error;    ///< Allocator error information.
-            InlineHook::Error inline_hook_error; ///< InlineHook error information.
-        };
-
-        /// @brief Create a BAD_ALLOCATION error.
-        /// @param err The Allocator::Error that failed.
-        /// @return The new BAD_ALLOCATION error.
-        [[nodiscard]] static Error bad_allocation(Allocator::Error err) {
-            Error error{};
-            error.type = BAD_ALLOCATION;
-            error.allocator_error = err;
-            return error;
-        }
-
-        /// @brief Create a BAD_INLINE_HOOK error.
-        /// @param err The InlineHook::Error that failed.
-        /// @return The new BAD_INLINE_HOOK error.
-        [[nodiscard]] static Error bad_inline_hook(InlineHook::Error err) {
-            Error error{};
-            error.type = BAD_INLINE_HOOK;
-            error.inline_hook_error = err;
-            return error;
-        }
-    };
-
-    /// @brief Flags for MidHook.
-    enum Flags : int {
-        Default = 0,       ///< Default flags.
-        StartDisabled = 1, ///< Start the hook disabled.
-    };
-
-    /// @brief Creates a new MidHook object.
-    /// @param target The address of the function to hook.
-    /// @param destination_fn The destination function.
-    /// @param flags The flags to use.
-    /// @return The MidHook object or a MidHook::Error if an error occurred.
-    /// @note This will use the default global Allocator.
-    /// @note If you don't care about error handling, use the easy API (safetyhook::create_mid).
-    [[nodiscard]] static std::expected<MidHook, Error> create(
-        void* target, MidHookFn destination_fn, Flags flags = Default);
-
-    /// @brief Creates a new MidHook object.
-    /// @param target The address of the function to hook.
-    /// @param destination_fn The destination function.
-    /// @param flags The flags to use.
-    /// @return The MidHook object or a MidHook::Error if an error occurred.
-    /// @note This will use the default global Allocator.
-    /// @note If you don't care about error handling, use the easy API (safetyhook::create_mid).
-    template <typename T>
-    [[nodiscard]] static std::expected<MidHook, Error> create(
-        T target, MidHookFn destination_fn, Flags flags = Default) {
-        return create(reinterpret_cast<void*>(target), destination_fn, flags);
-    }
-
-    /// @brief Creates a new MidHook object with a given Allocator.
-    /// @param allocator The Allocator to use.
-    /// @param target The address of the function to hook.
-    /// @param destination_fn The destination function.
-    /// @param flags The flags to use.
-    /// @return The MidHook object or a MidHook::Error if an error occurred.
-    /// @note If you don't care about error handling, use the easy API (safetyhook::create_mid).
-    [[nodiscard]] static std::expected<MidHook, Error> create(
-        const std::shared_ptr<Allocator>& allocator, void* target, MidHookFn destination_fn, Flags flags = Default);
-
-    /// @brief Creates a new MidHook object with a given Allocator.
-    /// @tparam T The type of the function to hook.
-    /// @param allocator The Allocator to use.
-    /// @param target The address of the function to hook.
-    /// @param destination_fn The destination function.
-    /// @param flags The flags to use.
-    /// @return The MidHook object or a MidHook::Error if an error occurred.
-    /// @note If you don't care about error handling, use the easy API (safetyhook::create_mid).
-    template <typename T>
-    [[nodiscard]] static std::expected<MidHook, Error> create(
-        const std::shared_ptr<Allocator>& allocator, T target, MidHookFn destination_fn, Flags flags = Default) {
-        return create(allocator, reinterpret_cast<void*>(target), destination_fn, flags);
-    }
-
-    MidHook() = default;
-    MidHook(const MidHook&) = delete;
-    MidHook(MidHook&& other) noexcept;
-    MidHook& operator=(const MidHook&) = delete;
-    MidHook& operator=(MidHook&& other) noexcept;
-    ~MidHook() = default;
-
-    /// @brief Reset the hook.
-    /// @details This will remove the hook and free the stub.
-    /// @note This is called automatically in the destructor.
-    void reset();
-
-    /// @brief Get a pointer to the target.
-    /// @return A pointer to the target.
-    [[nodiscard]] uint8_t* target() const { return m_target; }
-
-    /// @brief Get the address of the target.
-    /// @return The address of the target.
-    [[nodiscard]] uintptr_t target_address() const { return reinterpret_cast<uintptr_t>(m_target); }
-
-    /// @brief Get the destination function.
-    /// @return The destination function.
-    [[nodiscard]] MidHookFn destination() const { return m_destination; }
-
-    /// @brief Returns a vector containing the original bytes of the target function.
-    /// @return A vector of the original bytes of the target function.
-    [[nodiscard]] const auto& original_bytes() const { return m_hook.m_original_bytes; }
-
-    /// @brief Tests if the hook is valid.
-    /// @return true if the hook is valid, false otherwise.
-    explicit operator bool() const { return static_cast<bool>(m_stub); }
-
-    /// @brief Enable the hook.
-    [[nodiscard]] std::expected<void, Error> enable();
-
-    /// @brief Disable the hook.
-    [[nodiscard]] std::expected<void, Error> disable();
-
-    /// @brief Check if the hook is enabled.
-    [[nodiscard]] bool enabled() const { return m_hook.enabled(); }
-
-private:
-    InlineHook m_hook{};
-    uint8_t* m_target{};
-    Allocation m_stub{};
-    MidHookFn m_destination{};
-
-    std::expected<void, Error> setup(
-        const std::shared_ptr<Allocator>& allocator, uint8_t* target, MidHookFn destination);
-};
 } // namespace safetyhook
 
 //
@@ -1046,156 +907,10 @@ import std.compat;
 
 namespace safetyhook {
 /// @brief A hook class that allows for hooking a single method in a VMT.
-class SAFETYHOOK_API VmHook final {
-public:
-    VmHook() = default;
-    VmHook(const VmHook&) = delete;
-    VmHook(VmHook&& other) noexcept;
-    VmHook& operator=(const VmHook&) = delete;
-    VmHook& operator=(VmHook&& other) noexcept;
-    ~VmHook();
 
-    /// @brief Removes the hook.
-    void reset();
-
-    /// @brief Gets the original method pointer.
-    template <typename T> [[nodiscard]] T original() const { return reinterpret_cast<T>(m_original_vm); }
-
-    /// @brief Calls the original method.
-    /// @tparam RetT The return type of the method.
-    /// @tparam Args The argument types of the method.
-    /// @param args The arguments to pass to the method.
-    /// @return The return value of the method.
-    /// @note This will call the original method with the default calling convention.
-    template <typename RetT = void, typename... Args> RetT call(Args... args) {
-        return original<RetT (*)(Args...)>()(args...);
-    }
-
-    /// @brief Calls the original method with the __cdecl calling convention.
-    /// @tparam RetT The return type of the method.
-    /// @tparam Args The argument types of the method.
-    /// @param args The arguments to pass to the method.
-    /// @return The return value of the method.
-    template <typename RetT = void, typename... Args> RetT ccall(Args... args) {
-        return original<RetT(SAFETYHOOK_CCALL*)(Args...)>()(args...);
-    }
-
-    /// @brief Calls the original method with the __thiscall calling convention.
-    /// @tparam RetT The return type of the method.
-    /// @tparam Args The argument types of the method.
-    /// @param args The arguments to pass to the method.
-    /// @return The return value of the method.
-    template <typename RetT = void, typename... Args> RetT thiscall(Args... args) {
-        return original<RetT(SAFETYHOOK_THISCALL*)(Args...)>()(args...);
-    }
-
-    /// @brief Calls the original method with the __stdcall calling convention.
-    /// @tparam RetT The return type of the method.
-    /// @tparam Args The argument types of the method.
-    /// @param args The arguments to pass to the method.
-    /// @return The return value of the method.
-    template <typename RetT = void, typename... Args> RetT stdcall(Args... args) {
-        return original<RetT(SAFETYHOOK_STDCALL*)(Args...)>()(args...);
-    }
-
-    /// @brief Calls the original method with the __fastcall calling convention.
-    /// @tparam RetT The return type of the method.
-    /// @tparam Args The argument types of the method.
-    /// @param args The arguments to pass to the method.
-    /// @return The return value of the method.
-    template <typename RetT = void, typename... Args> RetT fastcall(Args... args) {
-        return original<RetT(SAFETYHOOK_FASTCALL*)(Args...)>()(args...);
-    }
-
-private:
-    friend class VmtHook;
-
-    uint8_t* m_original_vm{};
-    uint8_t* m_new_vm{};
-    uint8_t** m_vmt_entry{};
-
-    // This keeps the allocation alive until the hook is destroyed.
-    std::shared_ptr<Allocation> m_new_vmt_allocation{};
-
-    void destroy();
-};
 
 /// @brief A hook class that copies an entire VMT for a given object and replaces it.
-class SAFETYHOOK_API VmtHook final {
-public:
-    /// @brief Error type for VmtHook.
-    struct Error {
-        /// @brief The type of error.
-        enum : uint8_t {
-            BAD_ALLOCATION, ///< An error occurred while allocating memory.
-        } type;
 
-        /// @brief Extra error information.
-        union {
-            Allocator::Error allocator_error; ///< Allocator error information.
-        };
-
-        /// @brief Create a BAD_ALLOCATION error.
-        /// @param err The Allocator::Error that failed.
-        /// @return The new BAD_ALLOCATION error.
-        [[nodiscard]] static Error bad_allocation(Allocator::Error err) {
-            Error error{};
-            error.type = BAD_ALLOCATION;
-            error.allocator_error = err;
-            return error;
-        }
-    };
-
-    /// @brief Creates a new VmtHook object. Will clone the VMT of the given object and replace it.
-    /// @param object The object to hook.
-    /// @return The VmtHook object or a VmtHook::Error if an error occurred.
-    [[nodiscard]] static std::expected<VmtHook, Error> create(void* object);
-
-    VmtHook() = default;
-    VmtHook(const VmtHook&) = delete;
-    VmtHook(VmtHook&& other) noexcept;
-    VmtHook& operator=(const VmtHook&) = delete;
-    VmtHook& operator=(VmtHook&& other) noexcept;
-    ~VmtHook();
-
-    /// @brief Applies the hook.
-    /// @param object The object to apply the hook to.
-    /// @note This will replace the VMT of the object with the new VMT. You can apply the hook to multiple objects.
-    void apply(void* object);
-
-    /// @brief Removes the hook.
-    /// @param object The object to remove the hook from.
-    void remove(void* object);
-
-    /// @brief Removes the hook from all objects.
-    void reset();
-
-    /// @brief Hooks a method in the VMT.
-    /// @param index The index of the method to hook.
-    /// @param new_function The new function to use.
-    template <typename T> [[nodiscard]] std::expected<VmHook, Error> hook_method(size_t index, T new_function) {
-        VmHook hook{};
-
-        ++index; // Skip RTTI pointer.
-        hook.m_original_vm = m_new_vmt[index];
-        store(reinterpret_cast<uint8_t*>(&hook.m_new_vm), new_function);
-        hook.m_vmt_entry = &m_new_vmt[index];
-        hook.m_new_vmt_allocation = m_new_vmt_allocation;
-        m_new_vmt[index] = hook.m_new_vm;
-
-        return hook;
-    }
-
-private:
-    // Map of object instance to their original VMT.
-    std::unordered_map<void*, uint8_t**> m_objects{};
-
-    // The allocation is a shared_ptr, so it can be shared with VmHooks to ensure the memory is kept alive.
-    std::shared_ptr<Allocation> m_new_vmt_allocation{};
-    uint8_t** m_new_vmt{};
-
-    void destroy();
-};
 } // namespace safetyhook
 
 namespace safetyhook {
@@ -1217,48 +932,8 @@ template <typename T, typename U>
     return create_inline(reinterpret_cast<void*>(target), reinterpret_cast<void*>(destination), flags);
 }
 
-/// @brief Easy to use API for creating a MidHook.
-/// @param target the address of the function to hook.
-/// @param destination The destination function.
-/// @param flags The flags to use.
-/// @return The MidHook object.
-[[nodiscard]] MidHook SAFETYHOOK_API create_mid(
-    void* target, MidHookFn destination, MidHook::Flags flags = MidHook::Default);
-
-/// @brief Easy to use API for creating a MidHook.
-/// @param target the address of the function to hook.
-/// @param destination The destination function.
-/// @param flags The flags to use.
-/// @return The MidHook object.
-template <typename T>
-[[nodiscard]] MidHook create_mid(T target, MidHookFn destination, MidHook::Flags flags = MidHook::Default) {
-    return create_mid(reinterpret_cast<void*>(target), destination, flags);
-}
-
-/// @brief Easy to use API for creating a VmtHook.
-/// @param object The object to hook.
-/// @return The VmtHook object.
-[[nodiscard]] VmtHook SAFETYHOOK_API create_vmt(void* object);
-
-/// @brief Easy to use API for creating a VmHook.
-/// @param vmt The VmtHook to use to create the VmHook.
-/// @param index The index of the method to hook.
-/// @param destination The destination function.
-/// @return The VmHook object.
-template <typename T> [[nodiscard]] VmHook create_vm(VmtHook& vmt, size_t index, T destination) {
-    if (auto hook = vmt.hook_method(index, destination)) {
-        return std::move(*hook);
-    } else {
-        return {};
-    }
-}
-
 } // namespace safetyhook
 
 using SafetyHookContext = safetyhook::Context;
 using SafetyHookInline = safetyhook::InlineHook;
-using SafetyHookMid = safetyhook::MidHook;
 using SafetyInlineHook [[deprecated("Use SafetyHookInline instead.")]] = safetyhook::InlineHook;
-using SafetyMidHook [[deprecated("Use SafetyHookMid instead.")]] = safetyhook::MidHook;
-using SafetyHookVmt = safetyhook::VmtHook;
-using SafetyHookVm = safetyhook::VmHook;

@@ -23,9 +23,8 @@ namespace Cheat
 
     void Hook(void* ptr, void* detour, SafetyHookInline& out, const char* name)
     {
-        auto res = SafetyHookInline::create(ptr, detour);
-        HAX_PANIC(res.has_value(), &G->Logger, L"Failed to hooks %hs. Error %d", name, (int)res.error().type);
-        out = std::move(*res);
+        auto res = SafetyHookInline::create(ptr, detour, out);
+        HAX_PANIC(!res.has_value(), &G->Logger, L"Failed to hooks %hs. Error %d", name, (int)res->type);
     }
 
     void HookModuleProc(HMODULE module, const char* procName, void* procHook, SafetyHookInline& out)

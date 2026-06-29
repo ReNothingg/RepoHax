@@ -69,8 +69,8 @@ namespace Cheat
             int                             Sprinting = 1;
             int                             Crouching = 1;
         } Accel;
-        ItemUpgrade                         UpgradeToToggle;
-        ItemHealthPack                      AidToToggle;
+        ItemUpgrade                         UpgradeToToggle = null;
+        ItemHealthPack                      AidToToggle = null;
         Hax::TripleBuffer<ItemHealthPack>   AidsPool{24};
         Hax::TripleBuffer<ItemUpgrade>      UpgradesPool{24};
 
@@ -104,10 +104,10 @@ namespace Cheat
         bool                                EnemiesEsp;
         bool                                PlayersEsp;
         bool                                PlayersChams;
-        EnemySetup                          EnemyToSpawn;
-        PlayerAvatar                        PlayerToTumble;
-        PlayerAvatar                        PlayerToRevive;
-        PlayerAvatar                        PlayerToKill;
+        EnemySetup                          EnemyToSpawn = null;
+        PlayerAvatar                        PlayerToTumble = null;
+        PlayerAvatar                        PlayerToRevive = null;
+        PlayerAvatar                        PlayerToKill = null;
         ChatPref                            ChatPrefered = ChatPref::None;
         size_t SelectedEnemySetup;
 
@@ -122,11 +122,11 @@ namespace Cheat
             int                             Angle = 60;
             bool                            InCrouch;
         } Flashlight;
-        UnityEngine::CommandBuffer          CommandBuffer;
-        UnityEngine::AssetBundle            Bundle;
-        UnityEngine::Material               ItemsChamsMat;
-        UnityEngine::Material               PlayerChamsMat;
-        UnityEngine::Material HeadChamsMat;
+        Unity::CommandBuffer          CommandBuffer = null;
+        Unity::AssetBundle            Bundle = null;
+        Unity::Material               ItemsChamsMat = null;
+        Unity::Material               PlayerChamsMat = null;
+        Unity::Material             HeadChamsMat = null;
 
         // Valuables
         bool                                ValuablesEsp;
@@ -141,7 +141,7 @@ namespace Cheat
         // Items
         bool                                InfBattery;
         bool                                UseLaser;
-        Item                                ItemToSpawn;
+        Item                                ItemToSpawn = null;
 
         // Levels
         Hax::Vector<LevelBan>               LevelBans;
@@ -205,12 +205,12 @@ namespace Cheat
 
 
         // Misc
-        UVM::Thread*                        UvmThread;
+        Hax::Handle                         UvmThread;
         const Hax::WStringView*             Loc = g_LocDict[0];
         bool                                IsClient;
         bool                                IsInGame;
         Hax::Map<Hax::WStringView, EnemySetup> EnemiesPool;
-        Hax::Map<Hax::WStringView, int>     ItemsPool;
+        Hax::Map<Hax::WStringView, Item>     ItemsPool;
         float PixelHeight;
         float PixelWidth;
         float ScreenHeight;

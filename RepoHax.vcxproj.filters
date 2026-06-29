@@ -27,9 +27,6 @@
     <ClCompile Include="third_party\haxsdk\hax.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="third_party\haxsdk\unity\hax_unity.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
     <ClCompile Include="third_party\safetyhook\safetyhook.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
@@ -90,6 +87,30 @@
     <ClCompile Include="src\overlay\menu\tabs\cosmetic_tabs.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
+    <ClCompile Include="third_party\haxsdk\unity\modules\hax_unity_ai.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\haxsdk\unity\modules\hax_unity_core.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\haxsdk\unity\modules\hax_unity_mscorlib.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\haxsdk\unity\modules\hax_unity_photon.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\haxsdk\unity\modules\hax_unity_physics.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\haxsdk\unity\modules\hax_unity_physics2d.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\haxsdk\unity\hax_unity.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\haxsdk\unity\hax_unity_uvm.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="third_party\haxsdk\gui\hax_gui.h">
@@ -138,6 +159,27 @@
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
     <ClInclude Include="src\overlay\menu\tabs\tabs.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="third_party\haxsdk\unity\modules\hax_unity_ai.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="third_party\haxsdk\unity\modules\hax_unity_core.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="third_party\haxsdk\unity\modules\hax_unity_mscorlib.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="third_party\haxsdk\unity\modules\hax_unity_photon.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="third_party\haxsdk\unity\modules\hax_unity_physics.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="third_party\haxsdk\unity\modules\hax_unity_physics2d.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="third_party\haxsdk\unity\hax_unity_uvm.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>

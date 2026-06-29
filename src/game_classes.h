@@ -4,59 +4,50 @@
 
 struct PrefabRef : System::Object
 {
+    using System::Object::Object;
+
     META("Assembly-CSharp", "", "PrefabRef");
 
-    PrefabRef() : System::Object(nullptr) {}
-    PrefabRef(UVM::Object* ptr) : System::Object(ptr) {}
-
-    inline operator bool() const { return !null(); }
-
-    UnityEngine::GameObject Prefab() { THROW_IF_NULL(); return s_get_Prefab.CallThunk<UnityEngine::GameObject, PrefabRef>(*this); }
+    Unity::GameObject Prefab() { THROW_IF_NULL(); return s_get_Prefab.Call<Unity::GameObject>(*this); }
 
     FIELD(prefabName, System::String);
     FIELD(resourcePath, System::String);
 
 private:
-    METHOD(get_Prefab);
+    METHOD_WRAPPER(get_Prefab);
 };
 
-struct MenuCursor : UnityEngine::MonoBehaviour
+struct MenuCursor : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "MenuCursor");
-
-    MenuCursor() : UnityEngine::MonoBehaviour(nullptr) {}
-    MenuCursor(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() const { return !null(); }
 
     FIELD(showTimer, float);
 
-    METHOD(Update);
+    METHOD_WRAPPER(Update);
 };
 
-struct PlayerHealth : UnityEngine::MonoBehaviour
+struct PlayerHealth : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "PlayerHealth");
-
-    PlayerHealth() : UnityEngine::MonoBehaviour(nullptr) {}
-    PlayerHealth(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() const { return !null(); }
 
     void HealOther(int healAmount, bool effect)
     {
         THROW_IF_NULL();
-        s_HealOther.CallThunk<void, PlayerHealth, int, bool>(*this, healAmount, effect);
+        s_HealOther.Call<void>(*this, healAmount, effect);
     }
 
     FIELD(maxHealth, int);
     FIELD(health, int);
-    FIELD(renderers, System::List<UnityEngine::MeshRenderer>);
+    FIELD(renderers, System::List<Unity::MeshRenderer>);
 
-    METHOD(Hurt);
-    METHOD(Update);
+    METHOD_WRAPPER(Hurt);
+    METHOD_WRAPPER(Update);
 private:
-    METHOD(HealOther);
+    METHOD_WRAPPER(HealOther);
 };
 
 struct PlayerDeathHead;
@@ -65,26 +56,22 @@ struct PlayerVoiceChat;
 struct PlayerTumble;
 struct MapToolController;
 struct PlayerAvatarVisuals;
-struct PlayerAvatar : UnityEngine::MonoBehaviour
+struct PlayerAvatar : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "PlayerAvatar");
-
-    PlayerAvatar() : UnityEngine::MonoBehaviour(nullptr) {}
-    PlayerAvatar(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() { return !null(); }
-    inline bool operator==(PlayerAvatar o) const { return GetPtr() == o.GetPtr(); }
 
     void PlayerDeath(int enemyIndex)
     {
         THROW_IF_NULL();
-        s_PlayerDeath.Invoke<void, PlayerAvatar, int>(*this, enemyIndex);
+        s_PlayerDeath.Call<void>(*this, enemyIndex);
     }
 
     void Revive(bool revivedByTruck = false)
     {
         THROW_IF_NULL();
-        s_Revive.Invoke<void, PlayerAvatar, bool>(*this, revivedByTruck);
+        s_Revive.Call<void>(*this, revivedByTruck);
     }
 
     STATIC_FIELD(instance, PlayerAvatar);
@@ -96,51 +83,45 @@ struct PlayerAvatar : UnityEngine::MonoBehaviour
     FIELD(playerName, System::String);
     FIELD(voiceChat, PlayerVoiceChat);
     FIELD(spawned, bool);
-    FIELD(photonView, Photon::PhotonView);
+    FIELD(photonView, Unity::Photon::PhotonView);
     FIELD(tumble, PlayerTumble);
     FIELD(upgradeMapPlayerCount, int);
     FIELD(isCrouching, bool);
     FIELD(isDisabled, bool);
-    FIELD(spectatePoint, UnityEngine::Transform);
+    FIELD(spectatePoint, Unity::Transform);
     FIELD(mapToolController, MapToolController);
-    FIELD(playerTransform, UnityEngine::Transform);
+    FIELD(playerTransform, Unity::Transform);
     FIELD(playerAvatarVisuals, PlayerAvatarVisuals);
     FIELD(voiceChatFetched, bool);
 
-    METHOD(OnDestroy);
-    METHOD(PlayerDeath);
-    METHOD(Revive);
+    METHOD_WRAPPER(OnDestroy);
+    METHOD_WRAPPER(PlayerDeath);
+    METHOD_WRAPPER(Revive);
 };
 
-struct PlayerVoiceChat : UnityEngine::MonoBehaviour
+struct PlayerVoiceChat : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "PlayerVoiceChat");
-
-    PlayerVoiceChat() : UnityEngine::MonoBehaviour(nullptr) {}
-    PlayerVoiceChat(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() const { return !null(); }
 
     FIELD(inLobbyMixer, bool);
 
     void ToggleMixer(bool toggle, bool distorted)
     {
         THROW_IF_NULL();
-        s_ToggleMixer.CallThunk<void, PlayerVoiceChat, bool, bool>(*this, toggle, distorted);
+        s_ToggleMixer.Call<void>(*this, toggle, distorted);
     }
 
 private:
-    METHOD(ToggleMixer);
+    METHOD_WRAPPER(ToggleMixer);
 };
 
-struct PlayerController : UnityEngine::MonoBehaviour
+struct PlayerController : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "PlayerController");
-
-    PlayerController() : UnityEngine::MonoBehaviour(nullptr) {}
-    PlayerController(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() { return !null(); }
 
     STATIC_FIELD(instance, PlayerController);
     FIELD(EnergyCurrent, float);
@@ -151,242 +132,221 @@ struct PlayerController : UnityEngine::MonoBehaviour
     FIELD(JumpExtra, int);
     FIELD(SprintSpeedUpgrades, float);
 
-    METHOD(FixedUpdate);
-    METHOD(Update);
+    METHOD_WRAPPER(FixedUpdate);
+    METHOD_WRAPPER(Update);
 };
 
-struct PlayerTumble : UnityEngine::MonoBehaviour
+struct PlayerTumble : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "PlayerTumble");
 
-    PlayerTumble() : UnityEngine::MonoBehaviour(nullptr) {}
-    PlayerTumble(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() { return !null(); }
-
-    void TumbleRequest(bool _isTumbling, bool _playerInput) { THROW_IF_NULL(); s_TumbleRequest.CallThunk<void, PlayerTumble, bool, bool>(*this, _isTumbling, _playerInput); }
+    void TumbleRequest(bool _isTumbling, bool _playerInput) 
+    { 
+        THROW_IF_NULL(); 
+        s_TumbleRequest.Call<void, PlayerTumble, bool, bool>(*this, _isTumbling, _playerInput); 
+    }
 
     FIELD(tumbleLaunch, int);
     FIELD(playerAvatar, PlayerAvatar);
 
-    METHOD(TumbleRequest);
+    METHOD_WRAPPER(TumbleRequest);
 };
 
-struct FlashlightController : UnityEngine::MonoBehaviour
+struct FlashlightController : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "FlashlightController");
 
-    FlashlightController() : UnityEngine::MonoBehaviour(nullptr) {}
-    FlashlightController(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() { return !null(); }
-
-    FIELD(spotlight, UnityEngine::Light);
+    FIELD(spotlight, Unity::Light);
     FIELD(baseIntensity, float);
 
-    METHOD(Update);
+    METHOD_WRAPPER(Update);
 };
 
-struct ItemToggle : UnityEngine::MonoBehaviour
+struct ItemToggle : Unity::MonoBehaviour
 {
-    META("Assembly-CSharp", "", "ItemToggle");
+    using Unity::MonoBehaviour::MonoBehaviour;
 
-    inline operator bool() const { return !null(); }
+    META("Assembly-CSharp", "", "ItemToggle");
 
     void ToggleItem(bool toggle, int player = -1)
     {
         THROW_IF_NULL();
-        s_ToggleItem.CallThunk<void, ItemToggle, bool, int>(*this, toggle, player);
+        s_ToggleItem.Call<void, ItemToggle, bool, int>(*this, toggle, player);
     }
 
     FIELD(toggleState, bool);
-    FIELD(photonView, Photon::PhotonView);
+    FIELD(photonView, Unity::Photon::PhotonView);
 
 private:
-    METHOD(ToggleItem);
+    METHOD_WRAPPER(ToggleItem);
 };
 
-struct ItemAttributes : UnityEngine::MonoBehaviour
+struct ItemAttributes : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "ItemAttributes");
-
-    ItemAttributes() : UnityEngine::MonoBehaviour(nullptr) {}
-    ItemAttributes(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() const { return !null(); }
 
     FIELD(itemAssetName, System::String);
 };
 
-struct ItemUpgrade : UnityEngine::MonoBehaviour
+struct ItemUpgrade : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "ItemUpgrade");
-
-    ItemUpgrade() = default;
-    ItemUpgrade(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() const { return !null(); }
 
     FIELD(upgradeDone, bool);
     FIELD(itemToggle, ItemToggle);
     FIELD(itemAttributes, ItemAttributes);
     FIELD(isPlayerUpgrade, bool);
-    FIELD(photonView, Photon::PhotonView);
+    FIELD(photonView, Unity::Photon::PhotonView);
 
-    METHOD(Update);
+    METHOD_WRAPPER(Update);
 };
 
-struct ItemHealthPack : UnityEngine::MonoBehaviour
+struct ItemHealthPack : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "ItemHealthPack");
-
-    ItemHealthPack() = default;
-    ItemHealthPack(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() const { return !null(); }
 
     FIELD(used, bool);
     FIELD(itemToggle, ItemToggle);
-    FIELD(photonView, Photon::PhotonView);
+    FIELD(photonView, Unity::Photon::PhotonView);
     FIELD(itemAttributes, ItemAttributes);
 
-    METHOD(Update);
+    METHOD_WRAPPER(Update);
 };
 
 struct SemiFunc
 {
     META("Assembly-CSharp", "", "SemiFunc");
 
-    static inline UnityEngine::Camera MainCamera() 
+    static inline Unity::Camera MainCamera() 
     { 
-        return s_MainCamera.CallThunk<UnityEngine::Camera>(); 
+        return s_MainCamera.Call<Unity::Camera>(); 
     }
 
-    static inline bool OnScreen(const UnityEngine::Vector3& pos, float paddWidth, float paddHeight) 
-    { 
-        return s_OnScreen.CallThunk<bool, const System::Boxed<UnityEngine::Vector3>&, float, float>(System::Boxed<UnityEngine::Vector3>(pos), paddWidth, paddHeight); 
+    static inline bool OnScreen(const Unity::Vector3& pos, float paddWidth, float paddHeight) 
+    {
+        return s_OnScreen.Call<bool>(System::Box(pos), paddWidth, paddHeight); 
     }
 
     static inline bool IsMasterClientOrSingleplayer()
     {
-        return s_IsMasterClientOrSingleplayer.CallThunk<bool>();
+        return s_IsMasterClientOrSingleplayer.Call<bool>();
     }
 
     static inline bool IsMultiplayer()
     {
-        return s_IsMultiplayer.CallThunk<bool>();
+        return s_IsMultiplayer.Call<bool>();
     }
 
     static inline bool IsMasterClient()
     {
-        return s_IsMasterClient.CallThunk<bool>();
+        return s_IsMasterClient.Call<bool>();
     }
 
     static inline System::String PlayerGetSteamID(PlayerAvatar player)
     {
-        return s_PlayerGetSteamID.CallThunk<System::String, PlayerAvatar>(player);
+        return s_PlayerGetSteamID.Call<System::String>(player);
     }
 
     static inline int StatSetRunCurrency(int value)
     {
-        return s_StatSetRunCurrency.CallThunk<int, int>(value);
+        return s_StatSetRunCurrency.Call<int, int>(value);
     }
 
     static inline int PhotonViewIDPlayerAvatarLocal()
     {
-        return s_PhotonViewIDPlayerAvatarLocal.CallThunk<int>();
+        return s_PhotonViewIDPlayerAvatarLocal.Call<int>();
     }
 
-    static inline int LayerMaskGetVisionObstruct()
+    static inline int LayerMaskGetVisionObstruct()//!
     {
-        return s_LayerMaskGetVisionObstruct.CallThunk<System::Boxed<UnityEngine::LayerMask>*>()->m_Value.m_Mask;
+        return s_LayerMaskGetVisionObstruct.Call<System::Boxed<Unity::LayerMask>>().Unbox().m_Mask;
     }
 
     static inline System::String PlayerGetName(PlayerAvatar player)
     {
-        return s_PlayerGetName.CallThunk<System::String, PlayerAvatar>(player);
+        return s_PlayerGetName.Call<System::String>(player);
     }
 
 private:
-    METHOD(OnScreen);
-    METHOD(MainCamera);
-    METHOD(IsMasterClientOrSingleplayer);
-    METHOD(IsMultiplayer);
-    METHOD(IsMasterClient);
-    METHOD(PlayerGetSteamID);
-    METHOD(StatSetRunCurrency);
-    METHOD(PhotonViewIDPlayerAvatarLocal);
-    METHOD(LayerMaskGetVisionObstruct);
-    METHOD(PlayerGetName);
+    METHOD_WRAPPER(OnScreen);
+    METHOD_WRAPPER(MainCamera);
+    METHOD_WRAPPER(IsMasterClientOrSingleplayer);
+    METHOD_WRAPPER(IsMultiplayer);
+    METHOD_WRAPPER(IsMasterClient);
+    METHOD_WRAPPER(PlayerGetSteamID);
+    METHOD_WRAPPER(StatSetRunCurrency);
+    METHOD_WRAPPER(PhotonViewIDPlayerAvatarLocal);
+    METHOD_WRAPPER(LayerMaskGetVisionObstruct);
+    METHOD_WRAPPER(PlayerGetName);
 };
 
 struct PhysGrabObjectImpactDetector;
-struct PhysGrabObject : UnityEngine::Behaviour
+struct PhysGrabObject : Unity::Behaviour
 {
+    using Unity::Behaviour::Behaviour;
+
     META("Assembly-CSharp", "", "PhysGrabObject");
 
-    PhysGrabObject() : UnityEngine::Behaviour(nullptr) {}
-    PhysGrabObject(UVM::Object* ptr) : UnityEngine::Behaviour(ptr) {}
-
-    inline operator bool() const { return !null(); }
-
     FIELD(grabbedLocal, bool);
-    FIELD(centerPoint, UnityEngine::Vector3);
-    FIELD(boundingBox, UnityEngine::Vector3);
-    FIELD(midPoint, UnityEngine::Vector3);
+    FIELD(centerPoint, Unity::Vector3);
+    FIELD(boundingBox, Unity::Vector3);
+    FIELD(midPoint, Unity::Vector3);
     FIELD(impactDetector, PhysGrabObjectImpactDetector);
 
-    METHOD(PhysicsGrabbingManipulation);
+    METHOD_WRAPPER(PhysicsGrabbingManipulation);
 };
 
-struct PhysGrabber : UnityEngine::MonoBehaviour
+struct PhysGrabber : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "PhysGrabber");
-
-    PhysGrabber() : UnityEngine::MonoBehaviour(nullptr) {}
-    PhysGrabber(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() const { return !null(); }
 
     void PhysGrabOverChargeImpact()
     {
         THROW_IF_NULL();
-        s_PhysGrabOverChargeImpact.CallThunk<void, PhysGrabber>(*this);
+        s_PhysGrabOverChargeImpact.Call<void, PhysGrabber>(*this);
     }
 
     FIELD(grabRange, float);
     FIELD(grabStrength, float);
     FIELD(throwStrength, float);
 
-    METHOD(PhysGrabLogic);
-    METHOD(RayCheck);
-    METHOD(PhysGrabOverChargeImpact);
-    METHOD(PhysGrabOverCharge);
+    METHOD_WRAPPER(PhysGrabLogic);
+    METHOD_WRAPPER(RayCheck);
+    METHOD_WRAPPER(PhysGrabOverChargeImpact);
+    METHOD_WRAPPER(PhysGrabOverCharge);
 };
 
-struct Level : UnityEngine::Object
+struct Level : Unity::Object
 {
+    using Unity::Object::Object;
+
     META("Assembly-CSharp", "", "Level");
-
-    Level() : UnityEngine::Object(nullptr) {}
-    Level(UVM::Object* ptr) : UnityEngine::Object(ptr) {}
-
-    inline operator bool() const { return !null(); }
-    inline bool operator==(const Level& o) const { return GetPtr() == o.GetPtr(); }
 
     FIELD(NarrativeName, System::String);
 };
 
-struct RunManager : UnityEngine::MonoBehaviour
+struct RunManager : Unity::MonoBehaviour
 {
-    META("Assembly-CSharp", "", "RunManager");
+    using Unity::MonoBehaviour::MonoBehaviour;
 
-    inline operator bool() const { return !null(); }
+    META("Assembly-CSharp", "", "RunManager");
 
     void ChangeLevel(bool completedLevel, bool levelFailed, int changeLevelType = 0)
     {
         THROW_IF_NULL();
-        s_ChangeLevel.CallThunk<void, RunManager, bool, bool, int>(*this, completedLevel, levelFailed, changeLevelType);
+        s_ChangeLevel.Call<void, RunManager, bool, bool, int>(*this, completedLevel, levelFailed, changeLevelType);
     }
 
     STATIC_FIELD(instance, RunManager);
@@ -399,18 +359,18 @@ struct RunManager : UnityEngine::MonoBehaviour
     FIELD(levelsCompleted, int);
     FIELD(levelIsShop, bool);
 
-    METHOD(ChangeLevel);
-    METHOD(SetRunLevel);
+    METHOD_WRAPPER(ChangeLevel);
+    METHOD_WRAPPER(SetRunLevel);
 };
 
-struct GameDirector : UnityEngine::MonoBehaviour
+struct GameDirector : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "GameDirector");
 
-    inline operator bool() { return !null(); }
-
     STATIC_FIELD(instance, GameDirector);
-    FIELD(MainCamera, UnityEngine::Camera);
+    FIELD(MainCamera, Unity::Camera);
     FIELD(currentState, int);
     FIELD(PlayerList, System::List<PlayerAvatar>);
 };
@@ -422,85 +382,67 @@ struct GameDirector_gameState
     ENUM_VALUE(Main);
 };
 
-struct SpectateCamera : UnityEngine::MonoBehaviour
+struct SpectateCamera : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "SpectateCamera");
-
-    SpectateCamera() : UnityEngine::MonoBehaviour(nullptr) {}
-    SpectateCamera(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() { return !null(); }
 
     STATIC_FIELD(instance, SpectateCamera);
     FIELD(headEnergy, float);
     FIELD(headEnergyEnough, bool);    
 
-    METHOD(HeadEnergyLogic);
+    METHOD_WRAPPER(HeadEnergyLogic);
 };
 
-struct PlayerHealthGrab : UnityEngine::MonoBehaviour
+struct PlayerHealthGrab : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "PlayerHealthGrab");
-
-    PlayerHealthGrab() : UnityEngine::MonoBehaviour(nullptr) {}
-    PlayerHealthGrab(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() { return !null(); }
 };
 
-struct PlayerAvatarVisuals : UnityEngine::MonoBehaviour
+struct PlayerAvatarVisuals : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "PlayerAvatarVisuals");
-
-    PlayerAvatarVisuals() : UnityEngine::MonoBehaviour(nullptr) {}
-    PlayerAvatarVisuals(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() { return !null(); }
 
     FIELD(playerAvatar, PlayerAvatar);
     FIELD(isMenuAvatar, bool);
-    FIELD(meshParent, UnityEngine::GameObject);
-    FIELD(animator, UnityEngine::Behaviour);
-    FIELD(headSideTransform, UnityEngine::Transform);
-    FIELD(legTwistTransform, UnityEngine::Transform);
+    FIELD(meshParent, Unity::GameObject);
+    FIELD(animator, Unity::Behaviour);
+    FIELD(headSideTransform, Unity::Transform);
+    FIELD(legTwistTransform, Unity::Transform);
     FIELD(showSelfOverrideTimer, float);
 
-    METHOD(Update);
+    METHOD_WRAPPER(Update);
 };
 
-struct GameManager : UnityEngine::MonoBehaviour
+struct GameManager : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "GameManager");
-
-    GameManager() : UnityEngine::MonoBehaviour(nullptr) {}
-    GameManager(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() { return !null(); }
 
     STATIC_FIELD(instance, GameManager);
     PROPERTY(gameMode, int);
 };
 
-struct MapToolController : UnityEngine::MonoBehaviour
+struct MapToolController : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "MapToolController");
-
-    MapToolController() : UnityEngine::MonoBehaviour(nullptr) {}
-    MapToolController(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() { return !null(); }
 
     FIELD(Active, bool);
 };
 
-struct EnemyRigidbody : UnityEngine::Behaviour
+struct EnemyRigidbody : Unity::Behaviour
 {
+    using Unity::Behaviour::Behaviour;
+
     META("Assembly-CSharp", "", "EnemyRigidbody");
-
-    EnemyRigidbody() : UnityEngine::Behaviour(nullptr) {}
-    EnemyRigidbody(UVM::Object* ptr) : UnityEngine::Behaviour(ptr) {}
-
-    inline operator bool() const { return !null(); }
 
     FIELD(physGrabObject, PhysGrabObject);
     FIELD(grabShakeReleaseTimer, float);
@@ -508,29 +450,26 @@ struct EnemyRigidbody : UnityEngine::Behaviour
     FIELD(grabStrengthTime, float);
     FIELD(grabTimeCurrent, float);
 
-    METHOD(FixedUpdate);
+    METHOD_WRAPPER(FixedUpdate);
 };
 
-struct EnemyHealth : UnityEngine::MonoBehaviour
+struct EnemyHealth : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "EnemyHealth");
 
-    EnemyHealth() : UnityEngine::MonoBehaviour(nullptr) {}
-    EnemyHealth(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() const { return !null(); }
-
-    void Hurt(int damage, const UnityEngine::Vector3& hurtDirection)
+    void Hurt(int damage, const Unity::Vector3& hurtDirection)
     {
         THROW_IF_NULL();
-        s_Hurt.CallThunk<void, EnemyHealth, int, const System::Boxed<UnityEngine::Vector3>&>(*this, damage, System::Boxed<UnityEngine::Vector3>(hurtDirection));
+        s_Hurt.Call<void>(*this, damage, System::Box(hurtDirection));
     }
 
     FIELD(healthCurrent, int);
     FIELD(health, int);
     FIELD(dead, bool);
 
-    METHOD(Hurt);
+    METHOD_WRAPPER(Hurt);
 };
 
 struct EnemyState
@@ -543,59 +482,42 @@ struct EnemyState
 };
 
 struct EnemyParent;
-struct Enemy : UnityEngine::Behaviour
+struct Enemy : Unity::Behaviour
 {
     META("Assembly-CSharp", "", "Enemy");
 
-    Enemy() : UnityEngine::Behaviour(nullptr) {}
-    Enemy(UVM::Object* ptr) : UnityEngine::Behaviour(ptr) {}
-
-    inline operator bool() const { return !null(); }
-
     FIELD(Rigidbody, EnemyRigidbody);
-    FIELD(CenterTransform, UnityEngine::Transform);
+    FIELD(CenterTransform, Unity::Transform);
     FIELD(Health, EnemyHealth);
     FIELD(CurrentState, int);
     FIELD_EX(enemyParent, "EnemyParent", EnemyParent);
 
-    METHOD(Update);
+    METHOD_WRAPPER(Update);
 };
 
-struct EnemyParent : UnityEngine::Behaviour
+struct EnemyParent : Unity::Behaviour
 {
     META("Assembly-CSharp", "", "EnemyParent");
-
-    EnemyParent() : UnityEngine::Behaviour(nullptr) {}
-    explicit EnemyParent(UVM::Object* ptr) : UnityEngine::Behaviour(ptr) {}
-
-    inline operator bool() const { return !null(); }
-    inline bool operator==(const EnemyParent& e) const { return GetPtr() == e.GetPtr(); }
 
     FIELD_EX(enemy, "Enemy", Enemy);
     FIELD(Spawned, bool);
     FIELD(enemyName, System::String);
 };
 
-struct EnemySetup : UnityEngine::Object
+struct EnemySetup : Unity::Object
 {
+    using Unity::Object::Object;
+
     META("Assembly-CSharp", "", "EnemySetup");
-
-    EnemySetup() : UnityEngine::Object(nullptr) {}
-    EnemySetup(UVM::Object* ptr) : UnityEngine::Object(ptr) {}
-
-    inline operator bool() const { return !null(); }
 
     FIELD(spawnObjects, System::List<PrefabRef>);
 };
 
-struct EnemyDirector : UnityEngine::Behaviour
+struct EnemyDirector : Unity::Behaviour
 {
+    using Unity::Behaviour::Behaviour;
+
     META("Assembly-CSharp", "", "EnemyDirector");
-
-    EnemyDirector() : UnityEngine::Behaviour(nullptr) {}
-    EnemyDirector(UVM::Object* ptr) : UnityEngine::Behaviour(ptr) {}
-
-    inline operator bool() const { return !null(); }
 
     STATIC_FIELD(instance, EnemyDirector);
     FIELD(enemiesSpawned, System::List<EnemyParent>);
@@ -607,50 +529,41 @@ struct EnemyDirector : UnityEngine::Behaviour
     FIELD(debugEasyGrab, bool);
 };
 
-struct RoomVolume : UnityEngine::MonoBehaviour
+struct RoomVolume : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "RoomVolume");
-
-    RoomVolume() : UnityEngine::MonoBehaviour(nullptr) {}
-    RoomVolume(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() const { return !null(); }
-
+        
     void SetExplored()
     {
         THROW_IF_NULL();
-        s_SetExplored.CallThunk<void, RoomVolume>(*this);
+        s_SetExplored.Call<void, RoomVolume>(*this);
     }
 
 private:
-    METHOD(SetExplored);
+    METHOD_WRAPPER(SetExplored);
 };
 
-struct LevelPoint : UnityEngine::MonoBehaviour
+struct LevelPoint : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "LevelPoint");
-
-    LevelPoint() : UnityEngine::MonoBehaviour(nullptr) {}
-    LevelPoint(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() const { return !null(); }
 
     FIELD(Room, RoomVolume);
 };
 
-struct LevelGenerator : UnityEngine::MonoBehaviour
+struct LevelGenerator : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "LevelGenerator");
 
-    LevelGenerator() : UnityEngine::MonoBehaviour(nullptr) {}
-    LevelGenerator(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() const { return !null(); }
-
-    void EnemySpawn(EnemySetup enemySetup, UnityEngine::Vector3 position)
+    void EnemySpawn(EnemySetup enemySetup, Unity::Vector3 position)
     {
         THROW_IF_NULL();
-        s_EnemySpawn.CallThunk<void, LevelGenerator, EnemySetup, const System::Boxed<UnityEngine::Vector3>&>(*this, enemySetup, System::Boxed<UnityEngine::Vector3>(position));
+        s_EnemySpawn.Call<void>(*this, enemySetup, System::Box(position));
     }
 
     STATIC_FIELD(Instance, LevelGenerator);
@@ -658,78 +571,66 @@ struct LevelGenerator : UnityEngine::MonoBehaviour
     FIELD(Generated, bool);
 
 private:
-    static inline System::MethodInfo s_EnemySpawn{{"Assembly-CSharp", "", "LevelGenerator"}, "EnemySpawn"};
+    METHOD_WRAPPER(EnemySpawn);
 };
 
-struct EnemySlowMouth : UnityEngine::MonoBehaviour
+struct EnemySlowMouth : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "EnemySlowMouth");
-
-    EnemySlowMouth() : UnityEngine::MonoBehaviour(nullptr) {}
-    EnemySlowMouth(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() { return !null(); }
 
     FIELD(attachedTimer, float);
 };
 
-struct MenuManager : UnityEngine::MonoBehaviour
+struct MenuManager : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "MenuManager");
-
-    MenuManager() : UnityEngine::MonoBehaviour(nullptr) {}
-    MenuManager(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() const { return !null(); }
 
     STATIC_FIELD(instance, MenuManager);
     FIELD(currentMenuPage, Component);
 };
 
-struct PhysGrabObjectImpactDetector : UnityEngine::MonoBehaviour
+struct PhysGrabObjectImpactDetector : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "PhysGrabObjectImpactDetector");
 
-    PhysGrabObjectImpactDetector() : UnityEngine::MonoBehaviour(nullptr) {}
-    PhysGrabObjectImpactDetector(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() const { return !null(); }
-
-    void HealLogic(float healAmount, const UnityEngine::Vector3& healingPoint)
+    void HealLogic(float healAmount, const Unity::Vector3& healingPoint)
     {
-        s_HealLogic.CallThunk<void, PhysGrabObjectImpactDetector, float, const System::Boxed<UnityEngine::Vector3>&>(*this, healAmount, System::Boxed<UnityEngine::Vector3>(healingPoint));
+        s_HealLogic.Call<void>(*this, healAmount, System::Box(healingPoint));
     }
 
     FIELD(isValuable, bool);
     FIELD(impactDisabledTimer, float);
-    FIELD(photonView, Photon::PhotonView);
+    FIELD(photonView, Unity::Photon::PhotonView);
 
-    METHOD(FixedUpdate);
-    METHOD(Break);
-    METHOD(DestroyObject);
+    METHOD_WRAPPER(FixedUpdate);
+    METHOD_WRAPPER(Break);
+    METHOD_WRAPPER(DestroyObject);
 private:
-    METHOD(HealLogic);
+    METHOD_WRAPPER(HealLogic);
 };
 
-struct ItemBattery : UnityEngine::MonoBehaviour
+struct ItemBattery : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "ItemBattery");
-
-    ItemBattery() : UnityEngine::MonoBehaviour(nullptr) {}
-    ItemBattery(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() const { return !null(); }
 
     void SetBatteryLife(int batteryLife)
     {
         THROW_IF_NULL();
-        s_SetBatteryLife.CallThunk<void, ItemBattery, int>(*this, batteryLife);
+        s_SetBatteryLife.Call<void, ItemBattery, int>(*this, batteryLife);
     }
 
     void BatteryFullPercentChange(int batteryLifeInt, bool charge = false)
     {
         THROW_IF_NULL();
-        s_BatteryFullPercentChange.CallThunk<void, ItemBattery, int, bool>(*this, batteryLifeInt, charge);
+        s_BatteryFullPercentChange.Call<void, ItemBattery, int, bool>(*this, batteryLifeInt, charge);
     }
 
     FIELD(batteryLife, float);
@@ -737,115 +638,97 @@ struct ItemBattery : UnityEngine::MonoBehaviour
     FIELD(batteryBars, int);
     FIELD(physGrabObject, PhysGrabObject);
 
-    METHOD(Update);
-    METHOD(SetBatteryLife);
-    METHOD(BatteryFullPercentChange);
+    METHOD_WRAPPER(Update);
+    METHOD_WRAPPER(SetBatteryLife);
+    METHOD_WRAPPER(BatteryFullPercentChange);
 };
 
-struct ValuableObject : UnityEngine::MonoBehaviour
+struct ValuableObject : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "ValuableObject");
-
-    ValuableObject() : UnityEngine::MonoBehaviour(nullptr) {}
-    ValuableObject(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() const { return !null(); }
 
     void Discover(int state)
     {
         THROW_IF_NULL();
-        s_Discover.CallThunk<void, ValuableObject, int>(*this, state);
+        s_Discover.Call<void, ValuableObject, int>(*this, state);
     }
 
     FIELD(physGrabObject, PhysGrabObject);
     FIELD(dollarValueCurrent, float);
 
 private:
-    METHOD(Discover);
+    METHOD_WRAPPER(Discover);
 };
 
 struct CosmeticWorldObjectSetup : System::Object
 {
+    using System::Object::Object;
+
     META("Assembly-CSharp", "", "ValuableDirector/CosmeticWorldObjectSetup");
-
-    CosmeticWorldObjectSetup() : System::Object(nullptr) {}
-    CosmeticWorldObjectSetup(UVM::Object* ptr) : System::Object(ptr) {}
-
-    inline operator bool() const { return !null(); }
 
     FIELD(prefab, PrefabRef);
 };
 
-struct ValuableDirector : UnityEngine::MonoBehaviour
+struct ValuableDirector : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "ValuableDirector");
-
-    ValuableDirector() : UnityEngine::MonoBehaviour(nullptr) {}
-    ValuableDirector(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() const { return !null(); }
 
     STATIC_FIELD(instance, ValuableDirector);
     FIELD(valuableList, System::List<ValuableObject>);
     FIELD(cosmeticWorldObjectSetups, System::List<CosmeticWorldObjectSetup>);
 };
 
-struct ItemGun : UnityEngine::MonoBehaviour
+struct ItemGun : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "ItemGun");
-
-    ItemGun() : UnityEngine::MonoBehaviour(nullptr) {}
-    ItemGun(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() const { return !null(); }
 
     FIELD(gunRandomSpread, float);
     FIELD(physGrabObject, PhysGrabObject);
-    FIELD(gunMuzzle, UnityEngine::Transform);
+    FIELD(gunMuzzle, Unity::Transform);
     FIELD(gunRange, float);
 
-    METHOD(Shoot);
-    METHOD(Update);
+    METHOD_WRAPPER(Shoot);
+    METHOD_WRAPPER(Update);
 };
 
-struct Item : UnityEngine::Object
+struct Item : Unity::Object
 {
+    using Unity::Object::Object;
+
     META("Assembly-CSharp", "", "Item");
 
-    Item() : UnityEngine::Object(nullptr) {}
-    Item(UVM::Object* ptr) : UnityEngine::Object(ptr) {}
-
-    inline operator bool() const { return !null(); }
-
     FIELD(prefab, PrefabRef);
+    FIELD(itemName, System::String);
 };
 
-struct StatsManager : UnityEngine::MonoBehaviour
+struct StatsManager : Unity::MonoBehaviour
 {
-    META("Assembly-CSharp", "", "StatsManager");
+    using Unity::MonoBehaviour::MonoBehaviour;
 
-    inline operator bool() const { return !null(); }
+    META("Assembly-CSharp", "", "StatsManager");
 
     void LoadItemsFromFolder()
     {
         THROW_IF_NULL();
-        s_LoadItemsFromFolder.CallThunk<void, StatsManager>(*this);
+        s_LoadItemsFromFolder.Call<void, StatsManager>(*this);
     }
 
     STATIC_FIELD(instance, StatsManager);
     FIELD(itemDictionary, System::Dictionary<System::String COMMA Item>);
-    METHOD(LoadItemsFromFolder);
+    METHOD_WRAPPER(LoadItemsFromFolder);
 };
 
-struct ExtractionPoint : UnityEngine::MonoBehaviour
+struct ExtractionPoint : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "ExtractionPoint");
-
-    ExtractionPoint() : UnityEngine::MonoBehaviour(nullptr) {}
-    ExtractionPoint(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() const { return !null(); }
-    inline bool operator==(const ExtractionPoint& o) const { return GetPtr() == o.GetPtr(); }
 
     FIELD(isLocked, bool);
     FIELD(currentState, int);
@@ -853,55 +736,49 @@ struct ExtractionPoint : UnityEngine::MonoBehaviour
     void HaulGoalSet(int value)
     {
         THROW_IF_NULL();
-        s_HaulGoalSet.CallThunk<void, ExtractionPoint, int>(*this, value);
+        s_HaulGoalSet.Call<void, ExtractionPoint, int>(*this, value);
     }
 
     void OnClick()
     {
         THROW_IF_NULL();
-        s_OnClick.CallThunk<void, ExtractionPoint>(*this);
+        s_OnClick.Call<void, ExtractionPoint>(*this);
     }
 
 private:
-    METHOD(HaulGoalSet);
-    METHOD(OnClick);
+    METHOD_WRAPPER(HaulGoalSet);
+    METHOD_WRAPPER(OnClick);
 };
 
-struct CosmeticWorldObject : UnityEngine::MonoBehaviour
+struct CosmeticWorldObject : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "CosmeticWorldObject");
-
-    CosmeticWorldObject() : UnityEngine::MonoBehaviour(nullptr) {}
-    CosmeticWorldObject(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() const { return !null(); }
 
     FIELD(rarity, int);
 };
 
-struct RoundDirector : UnityEngine::MonoBehaviour
+struct RoundDirector : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "RoundDirector");
-
-    RoundDirector() : UnityEngine::MonoBehaviour(nullptr) {}
-    RoundDirector(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() const { return !null(); }
 
     void ExtractionPointsUnlock()
     {
         THROW_IF_NULL();
-        s_ExtractionPointsUnlock.CallThunk<void, RoundDirector>(*this);
+        s_ExtractionPointsUnlock.Call<void>(*this);
     }
 
     STATIC_FIELD(instance, RoundDirector);
     FIELD(extractionPointActive, bool);
     FIELD(extractionPointCurrent, ExtractionPoint);
-    FIELD(extractionPointList, System::List<UnityEngine::GameObject>);
+    FIELD(extractionPointList, System::List<Unity::GameObject>);
     FIELD(cosmeticWorldObjects, System::List<CosmeticWorldObject>);
 
 private:
-    METHOD(ExtractionPointsUnlock);
+    METHOD_WRAPPER(ExtractionPointsUnlock);
 };
 
 struct ExtractionPoint_State
@@ -913,59 +790,79 @@ struct ExtractionPoint_State
     ENUM_VALUE(Idle);
 };
 
-struct TruckSafetySpawnPoint : UnityEngine::MonoBehaviour
+struct TruckSafetySpawnPoint : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "TruckSafetySpawnPoint");
-
-    TruckSafetySpawnPoint() : UnityEngine::MonoBehaviour(nullptr) {}
-    TruckSafetySpawnPoint(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() const { return !null(); }
 
     STATIC_FIELD(instance, TruckSafetySpawnPoint);
 };
 
-struct PlayerDeathHead : UnityEngine::MonoBehaviour
+struct PlayerDeathHead : Unity::MonoBehaviour
 {
+    using Unity::MonoBehaviour::MonoBehaviour;
+
     META("Assembly-CSharp", "", "PlayerDeathHead");
 
-    PlayerDeathHead() : UnityEngine::MonoBehaviour(nullptr) {}
-    PlayerDeathHead(UVM::Object* ptr) : UnityEngine::MonoBehaviour(ptr) {}
-
-    inline operator bool() const { return !null(); }
-
-    FIELD(colliders, System::Array<UnityEngine::Collider>);
-    FIELD(meshRenderers, System::List<UnityEngine::MeshRenderer>);
-    FIELD(eyeRenderers, System::Array<UnityEngine::MeshRenderer>);
+    FIELD(colliders, System::Array<Unity::Collider>);
+    FIELD(meshRenderers, System::List<Unity::MeshRenderer>);
+    FIELD(eyeRenderers, System::Array<Unity::MeshRenderer>);
 };
 
-struct MetaManager : UnityEngine::MonoBehaviour
+struct MetaManager : Unity::MonoBehaviour
 {
-    META("Assembly-CSharp", "", "MetaManager");
+    using Unity::MonoBehaviour::MonoBehaviour;
 
-    inline operator bool() const { return !null(); }
+    META("Assembly-CSharp", "", "MetaManager");
 
     bool CosmeticUnlockAll()
     {
         THROW_IF_NULL();
-        return s_CosmeticUnlockAll.CallThunk<bool, MetaManager>(*this);
+        return s_CosmeticUnlockAll.Call<bool, MetaManager>(*this);
     }
 
     void Reset()
     {
         THROW_IF_NULL();
-        s_Reset.CallThunk<void, MetaManager>(*this);
+        s_Reset.Call<void, MetaManager>(*this);
     }
 
     STATIC_FIELD(instance, MetaManager);
 private:
-    METHOD(CosmeticUnlockAll);
-    METHOD(Reset);
+    METHOD_WRAPPER(CosmeticUnlockAll);
+    METHOD_WRAPPER(Reset);
 };
 
-static inline System::MethodInfo EventSystem_Update{{"UnityEngine.UI", "UnityEngine.EventSystems", "EventSystem"}, "Update"};
-static inline System::MethodInfo Cursor_set_visible{{"UnityEngine.CoreModule", "UnityEngine", "Cursor"}, "set_visible"};
-static inline System::MethodInfo PostProcessLayer_BuildCommandBuffers{{"Unity.Postprocessing.Runtime", "UnityEngine.Rendering.PostProcessing", "PostProcessLayer"}, "BuildCommandBuffers"};
-static inline System::MethodInfo Physics_Raycast{{"UnityEngine.PhysicsModule", "UnityEngine", "Physics"}, "Raycast", "System.Boolean(UnityEngine.Vector3,UnityEngine.Vector3,UnityEngine.RaycastHit&,System.Single,System.Int32,UnityEngine.QueryTriggerInteraction)"};
-static inline System::MethodInfo PhotonNetwork_IsMasterClient{{"PhotonUnityNetworking", "Photon.Pun", "PhotonNetwork"}, "get_IsMasterClient"};
-static inline System::MethodInfo Camera_FireOnPreRender{{"UnityEngine.CoreModule", "UnityEngine", "Camera"}, "FireOnPreRender"};
+struct EventSystem : Unity::MonoBehaviour
+{
+    using Unity::MonoBehaviour::MonoBehaviour;
+
+    META("UnityEngine.UI", "UnityEngine.EventSystems", "EventSystem");
+
+    METHOD_WRAPPER(Update);
+};
+
+struct Cursor
+{
+    META("UnityEngine.CoreModule", "UnityEngine", "Cursor");
+    METHOD_WRAPPER(set_visible);
+};
+
+struct PostProcessLayer
+{
+    META("Unity.Postprocessing.Runtime", "UnityEngine.Rendering.PostProcessing", "PostProcessLayer");
+    METHOD_WRAPPER(BuildCommandBuffers);
+};
+
+struct Physics
+{
+    META("UnityEngine.PhysicsModule", "UnityEngine", "Physics");
+    METHOD_WRAPPER_EX(Raycast, "System.Boolean(UnityEngine.Vector3,UnityEngine.Vector3,UnityEngine.RaycastHit&,System.Single,System.Int32,UnityEngine.QueryTriggerInteraction)");
+};
+
+struct Camera
+{
+    META("UnityEngine.CoreModule", "UnityEngine", "Camera");
+    METHOD_WRAPPER(FireOnPreRender);
+};

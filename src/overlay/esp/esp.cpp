@@ -38,7 +38,7 @@ namespace Cheat
     static float IconFontSize() { return 14_px; }
     static void VertHealthBar(float x, float y, float width, float height, float cur, float max);
     static void VertHealthBar(float x, float y, float width, float height, int cur, int max);
-    static UnityEngine::Rect CalcBoundsInScreenSpace(const UnityEngine::Bounds& bigBounds, UnityEngine::Camera cam);
+    static Unity::Rect CalcBoundsInScreenSpace(const Unity::Bounds& bigBounds, Unity::Camera cam);
 
     void RenderEsp()
     {
@@ -110,7 +110,7 @@ namespace Cheat
 
     Hax::Optional<EnemyEspData> ParseEnemyEspData(Enemy enemy)
     {
-        UnityEngine::Camera mainCam = GameDirector::instance().MainCamera();
+        Unity::Camera mainCam = GameDirector::instance().MainCamera();
         if (!mainCam || !enemy)
             return {};
 
@@ -126,19 +126,19 @@ namespace Cheat
                 return {};
         }
 
-        UnityEngine::Bounds enemyBounds{enemy.CenterTransform().GetPosition(), UnityEngine::Vector3()};
+        Unity::Bounds enemyBounds{enemy.CenterTransform().GetPosition(), Unity::Vector3()};
         if (EnemyRigidbody rb = enemy.Rigidbody())
         {
             PhysGrabObject grabObj = rb.physGrabObject();
-            enemyBounds = UnityEngine::Bounds(grabObj.centerPoint(), grabObj.boundingBox());
+            enemyBounds = Unity::Bounds(grabObj.centerPoint(), grabObj.boundingBox());
         }
         else
         {
-            enemyBounds = enemy.GetTransform().GetChild(1).GetChild(0).GetComponent<UnityEngine::Collider>().GetBounds();
+            enemyBounds = enemy.GetTransform().GetChild(1).GetChild(0).GetComponent<Unity::Collider>().GetBounds();
         }
 
-        UnityEngine::Rect bounds = CalcBoundsInScreenSpace(enemyBounds, mainCam);
-        UnityEngine::Rect screenRect{0.f, 0.f, G->ScreenWidth, G->ScreenHeight};
+        Unity::Rect bounds = CalcBoundsInScreenSpace(enemyBounds, mainCam);
+        Unity::Rect screenRect{0.f, 0.f, G->ScreenWidth, G->ScreenHeight};
 
         if (!bounds.Overlaps(screenRect))
             return {};
@@ -147,8 +147,8 @@ namespace Cheat
 
         return EnemyEspData
         {
-            .Box = bounds.ToHax(),
-            .Name = enemy.enemyParent().enemyName().ToView(),
+            .Box = bounds,
+            .Name = enemy.enemyParent().enemyName().ToHaxView(),
             .Distance = dist,
             .CurHp = health.healthCurrent(),
             .MaxHp = health.health(),
@@ -160,7 +160,7 @@ namespace Cheat
         if (!obj || !obj.GetEnabled())
             return {};
 
-        UnityEngine::Camera cam = GameDirector::instance().MainCamera();
+        Unity::Camera cam = GameDirector::instance().MainCamera();
         float dist = cam.GetTransform().GetPosition().Distance(obj.GetTransform().GetPosition());
         if (dist < 2.f || dist > (float)G->ValuablesEspRange)
             return {};
@@ -169,30 +169,30 @@ namespace Cheat
         if (!physObject)
             return {};
 
-        UnityEngine::Vector3 worldPos = physObject.midPoint();
-        UnityEngine::Vector3 screenPos = cam.WorldToScreenPoint(worldPos);
-        UnityEngine::Rect screenRect{0.f, 0.f, G->ScreenWidth, G->ScreenHeight};
-        if (screenPos.z <= 0 || !screenRect.Contains(screenPos))
+        Unity::Vector3 worldPos = physObject.midPoint();
+        Unity::Vector3 screenPos = cam.WorldToScreenPoint(worldPos);
+        Unity::Rect screenRect{0.f, 0.f, G->ScreenWidth, G->ScreenHeight};
+        if (screenPos.Z <= 0 || !screenRect.Contains(screenPos))
             return {};
 
         float scaleX = G->ScreenWidth / G->PixelWidth;
         float scaleY = G->ScreenHeight / G->PixelHeight;
 
-        screenPos.x *= scaleX;
-        screenPos.y = G->ScreenHeight - screenPos.y * scaleY;
+        screenPos.X *= scaleX;
+        screenPos.Y = G->ScreenHeight - screenPos.Y * scaleY;
 
         return ValuableEspData
         {
-            .Name = obj.GetName().ToView(),
-            .Pos = screenPos.ToVector2().ToHax(),
+            .Name = obj.GetName().ToHaxView(),
+            .Pos = Unity::Vector2(screenPos),
             .Distance = dist,
             .Value = obj.dollarValueCurrent()
         };
     }
 
-    Hax::Optional<ExtrPointEspData> ParseExtrPointEspData(UnityEngine::GameObject obj)
+    Hax::Optional<ExtrPointEspData> ParseExtrPointEspData(Unity::GameObject obj)
     {
-        UnityEngine::Camera cam = GameDirector::instance().MainCamera();
+        Unity::Camera cam = GameDirector::instance().MainCamera();
 
         if (!obj || !cam)
             return {};
@@ -205,20 +205,20 @@ namespace Cheat
         if (dist < 1.f)
             return {};
 
-        UnityEngine::Vector3 screenPos = cam.WorldToScreenPoint(obj.GetTransform().GetPosition());
-        UnityEngine::Rect screenRect{0.f, 0.f, G->ScreenWidth, G->ScreenHeight};
-        if (screenPos.z <= 0 || !screenRect.Contains(screenPos))
+        Unity::Vector3 screenPos = cam.WorldToScreenPoint(obj.GetTransform().GetPosition());
+        Unity::Rect screenRect{0.f, 0.f, G->ScreenWidth, G->ScreenHeight};
+        if (screenPos.Z <= 0 || !screenRect.Contains(screenPos))
             return {};
 
         float scaleX = G->ScreenWidth / G->PixelWidth;
         float scaleY = G->ScreenHeight / G->PixelHeight;
 
-        screenPos.x *= scaleX;
-        screenPos.y = G->ScreenHeight - screenPos.y * scaleY;
+        screenPos.X *= scaleX;
+        screenPos.Y = G->ScreenHeight - screenPos.Y * scaleY;
 
         return ExtrPointEspData 
         {
-            .Pos = screenPos.ToVector2().ToHax(),
+            .Pos = Unity::Vector2(screenPos),
             .Distance = dist,
             .Completed = (point.currentState() == ExtractionPoint_State::Complete()),
             .Active = (point == RoundDirector::instance().extractionPointCurrent())
@@ -227,38 +227,38 @@ namespace Cheat
 
     Hax::Optional<TruckEspData> ParseTruckEspData(TruckSafetySpawnPoint truck)
     {
-        UnityEngine::Camera cam = GameDirector::instance().MainCamera();
+        Unity::Camera cam = GameDirector::instance().MainCamera();
 
         if (!truck || !cam)
             return {};
 
-        UnityEngine::Vector3 worldPos = truck.GetTransform().GetPosition();
+        Unity::Vector3 worldPos = truck.GetTransform().GetPosition();
 
         float dist = cam.GetTransform().GetPosition().Distance(worldPos);
         if (dist < 1.f)
             return {};
 
-        UnityEngine::Vector3 screenPos = cam.WorldToScreenPoint(worldPos);
-        UnityEngine::Rect screenRect{0.f, 0.f, G->ScreenWidth, G->ScreenHeight};
-        if (screenPos.z <= 0 || !screenRect.Contains(screenPos))
+        Unity::Vector3 screenPos = cam.WorldToScreenPoint(worldPos);
+        Unity::Rect screenRect{0.f, 0.f, G->ScreenWidth, G->ScreenHeight};
+        if (screenPos.Z <= 0 || !screenRect.Contains(screenPos))
             return {};
 
         float scaleX = G->ScreenWidth / G->PixelWidth;
         float scaleY = G->ScreenHeight / G->PixelHeight;
 
-        screenPos.x *= scaleX;
-        screenPos.y = G->ScreenHeight - screenPos.y * scaleY;
+        screenPos.X *= scaleX;
+        screenPos.Y = G->ScreenHeight - screenPos.Y * scaleY;
 
         return TruckEspData
         {
-            .Pos = screenPos.ToVector2().ToHax(),
+            .Pos = Unity::Vector2(screenPos),
             .Distance = dist
         };
     }
 
     Hax::Optional<PlayerEspData> ParsePlayerEspData(PlayerAvatar avatar)
     {
-        UnityEngine::Camera mainCam = GameDirector::instance().MainCamera();
+        Unity::Camera mainCam = GameDirector::instance().MainCamera();
         if (!mainCam || !avatar || avatar.isLocal())
             return {};
 
@@ -271,24 +271,24 @@ namespace Cheat
             PlayerDeathHead head = avatar.playerDeathHead();
             if (head && head.GetEnabled())
             {
-                System::Array<UnityEngine::Collider> colliders = head.colliders();
-                UnityEngine::Bounds bounds = colliders[0].GetBounds();
+                System::Array<Unity::Collider> colliders = head.colliders();
+                Unity::Bounds bounds = colliders[0].GetBounds();
                 for (auto col : colliders)
                     bounds.Encapsulate(col.GetBounds());
 
-                if (bounds.m_Extents == UnityEngine::Vector3::zero())
+                if (bounds.Extents == Unity::Vector3::zero())
                     return {};
 
-                UnityEngine::Rect rect = CalcBoundsInScreenSpace(bounds, mainCam);
-                UnityEngine::Rect screenRect{0.f, 0.f, G->ScreenWidth, G->ScreenHeight};
+                Unity::Rect rect = CalcBoundsInScreenSpace(bounds, mainCam);
+                Unity::Rect screenRect{0.f, 0.f, G->ScreenWidth, G->ScreenHeight};
 
                 if (!rect.Overlaps(screenRect))
                     return {};
 
                 PlayerEspData espData{};
-                espData.Box = rect.ToHax();
+                espData.Box = rect;
                 espData.Distance = dist;
-                espData.Name = SemiFunc::PlayerGetName(avatar).ToView();
+                espData.Name = SemiFunc::PlayerGetName(avatar).ToHaxView();
                 espData.CurHp = 0;
                 espData.MaxHp = 0;
                 espData.Dead = true;
@@ -303,25 +303,25 @@ namespace Cheat
             return {};
 
         PlayerAvatarVisuals visuals = avatar.playerAvatarVisuals();
-        UnityEngine::Bounds bounds2 = visuals.headSideTransform().GetComponent<UnityEngine::Collider>().GetBounds();
-        UnityEngine::Vector3 ext = bounds2.m_Extents;
-        for (UnityEngine::Collider col2 : visuals.legTwistTransform().GetComponentsInChildren<UnityEngine::Collider>())
+        Unity::Bounds bounds2 = visuals.headSideTransform().GetComponent<Unity::Collider>().GetBounds();
+        Unity::Vector3 ext = bounds2.Extents;
+        for (Unity::Collider col2 : visuals.legTwistTransform().GetComponentsInChildren<Unity::Collider>())
         {
             if (col2)
                 bounds2.Encapsulate(col2.GetBounds());
         }
-        if (bounds2.m_Extents == UnityEngine::Vector3::zero())
+        if (bounds2.Extents == Unity::Vector3::zero())
         {
             return {};
         }
 
-        ext.y = bounds2.m_Extents.y * 1.2f;
-        ext.z *= 1.5f;
-        ext.x *= 1.5f;
-        bounds2.m_Extents = ext;
-        UnityEngine::Rect rect = CalcBoundsInScreenSpace(bounds2, mainCam);
+        ext.Y = bounds2.Extents.Y * 1.2f;
+        ext.Z *= 1.5f;
+        ext.X *= 1.5f;
+        bounds2.Extents = ext;
+        Unity::Rect rect = CalcBoundsInScreenSpace(bounds2, mainCam);
 
-        UnityEngine::Rect screenRect{0.f, 0.f, G->ScreenWidth, G->ScreenHeight};
+        Unity::Rect screenRect{0.f, 0.f, G->ScreenWidth, G->ScreenHeight};
         if (!rect.Overlaps(screenRect))
             return {};
 
@@ -329,8 +329,8 @@ namespace Cheat
 
         return PlayerEspData
         {
-            .Box = rect.ToHax(),
-            .Name = SemiFunc::PlayerGetName(avatar).ToView(),
+            .Box = rect,
+            .Name = SemiFunc::PlayerGetName(avatar).ToHaxView(),
             .Distance = dist,
             .CurHp = health.health(),
             .MaxHp = health.maxHealth(),
@@ -340,31 +340,31 @@ namespace Cheat
 
     Hax::Optional<CosmeticBoxEspData> ParseCosmeticBoxEspData(CosmeticWorldObject box)
     {
-        UnityEngine::Camera cam = GameDirector::instance().MainCamera();
+        Unity::Camera cam = GameDirector::instance().MainCamera();
 
         if (!box || !cam)
             return {};
 
-        UnityEngine::Vector3 worldPos = box.GetTransform().GetPosition();
+        Unity::Vector3 worldPos = box.GetTransform().GetPosition();
 
         float dist = cam.GetTransform().GetPosition().Distance(worldPos);
         if (dist < 1.f)
             return {};
 
-        UnityEngine::Vector3 screenPos = cam.WorldToScreenPoint(worldPos);
-        UnityEngine::Rect screenRect{0.f, 0.f, G->ScreenWidth, G->ScreenHeight};
-        if (screenPos.z <= 0 || !screenRect.Contains(screenPos))
+        Unity::Vector3 screenPos = cam.WorldToScreenPoint(worldPos);
+        Unity::Rect screenRect{0.f, 0.f, G->ScreenWidth, G->ScreenHeight};
+        if (screenPos.Z <= 0 || !screenRect.Contains(screenPos))
             return {};
 
         float scaleX = G->ScreenWidth / G->PixelWidth;
         float scaleY = G->ScreenHeight / G->PixelHeight;
 
-        screenPos.x *= scaleX;
-        screenPos.y = G->ScreenHeight - screenPos.y * scaleY;
+        screenPos.X *= scaleX;
+        screenPos.Y = G->ScreenHeight - screenPos.Y * scaleY;
 
         return CosmeticBoxEspData
         {
-            .Pos = screenPos.ToVector2().ToHax(),
+            .Pos = Unity::Vector2(screenPos),
             .Distance = dist,
             .Rarity = box.rarity()
         };
@@ -489,28 +489,28 @@ namespace Cheat
         VertHealthBar(x, y, width, height, (float)cur, (float)max);
     }
 
-    static UnityEngine::Rect CalcBoundsInScreenSpace(const UnityEngine::Bounds& bigBounds, UnityEngine::Camera cam)
+    static Unity::Rect CalcBoundsInScreenSpace(const Unity::Bounds& bigBounds, Unity::Camera cam)
     {
         float scaleX = G->ScreenWidth / G->PixelWidth;
         float scaleY = G->ScreenHeight / G->PixelHeight;
 
-        UnityEngine::Vector3 screenSpaceCorners[8] =
+        Unity::Vector3 screenSpaceCorners[8] =
         {
-            {bigBounds.m_Center.x + bigBounds.m_Extents.x, bigBounds.m_Center.y + bigBounds.m_Extents.y, bigBounds.m_Center.z + bigBounds.m_Extents.z},
-            {bigBounds.m_Center.x + bigBounds.m_Extents.x, bigBounds.m_Center.y + bigBounds.m_Extents.y, bigBounds.m_Center.z - bigBounds.m_Extents.z},
-            {bigBounds.m_Center.x + bigBounds.m_Extents.x, bigBounds.m_Center.y - bigBounds.m_Extents.y, bigBounds.m_Center.z + bigBounds.m_Extents.z},
-            {bigBounds.m_Center.x + bigBounds.m_Extents.x, bigBounds.m_Center.y - bigBounds.m_Extents.y, bigBounds.m_Center.z - bigBounds.m_Extents.z},
-            {bigBounds.m_Center.x - bigBounds.m_Extents.x, bigBounds.m_Center.y + bigBounds.m_Extents.y, bigBounds.m_Center.z + bigBounds.m_Extents.z},
-            {bigBounds.m_Center.x - bigBounds.m_Extents.x, bigBounds.m_Center.y + bigBounds.m_Extents.y, bigBounds.m_Center.z - bigBounds.m_Extents.z},
-            {bigBounds.m_Center.x - bigBounds.m_Extents.x, bigBounds.m_Center.y - bigBounds.m_Extents.y, bigBounds.m_Center.z + bigBounds.m_Extents.z},
-            {bigBounds.m_Center.x - bigBounds.m_Extents.x, bigBounds.m_Center.y - bigBounds.m_Extents.y, bigBounds.m_Center.z - bigBounds.m_Extents.z}
+            {bigBounds.Center.X + bigBounds.Extents.X, bigBounds.Center.Y + bigBounds.Extents.Y, bigBounds.Center.Z + bigBounds.Extents.Z},
+            {bigBounds.Center.X + bigBounds.Extents.X, bigBounds.Center.Y + bigBounds.Extents.Y, bigBounds.Center.Z - bigBounds.Extents.Z},
+            {bigBounds.Center.X + bigBounds.Extents.X, bigBounds.Center.Y - bigBounds.Extents.Y, bigBounds.Center.Z + bigBounds.Extents.Z},
+            {bigBounds.Center.X + bigBounds.Extents.X, bigBounds.Center.Y - bigBounds.Extents.Y, bigBounds.Center.Z - bigBounds.Extents.Z},
+            {bigBounds.Center.X - bigBounds.Extents.X, bigBounds.Center.Y + bigBounds.Extents.Y, bigBounds.Center.Z + bigBounds.Extents.Z},
+            {bigBounds.Center.X - bigBounds.Extents.X, bigBounds.Center.Y + bigBounds.Extents.Y, bigBounds.Center.Z - bigBounds.Extents.Z},
+            {bigBounds.Center.X - bigBounds.Extents.X, bigBounds.Center.Y - bigBounds.Extents.Y, bigBounds.Center.Z + bigBounds.Extents.Z},
+            {bigBounds.Center.X - bigBounds.Extents.X, bigBounds.Center.Y - bigBounds.Extents.Y, bigBounds.Center.Z - bigBounds.Extents.Z}
         };
 
         for (int i = 0; i < 8; ++i)
         {
             screenSpaceCorners[i] = cam.WorldToScreenPoint(screenSpaceCorners[i]);
-            screenSpaceCorners[i].x *= scaleX;
-            screenSpaceCorners[i].y = G->ScreenHeight - screenSpaceCorners[i].y * scaleY;
+            screenSpaceCorners[i].X *= scaleX;
+            screenSpaceCorners[i].Y = G->ScreenHeight - screenSpaceCorners[i].Y * scaleY;
         }
 
         float x = FLT_MAX;
@@ -518,20 +518,20 @@ namespace Cheat
         float x2 = FLT_MIN;
         float y2 = FLT_MIN;
 
-        for (const UnityEngine::Vector3& v : screenSpaceCorners)
+        for (const Unity::Vector3& v : screenSpaceCorners)
         {
-            if (v.z <= 0.f)
+            if (v.Z <= 0.f)
                 continue;
 
-            x = Hax::Min(v.x, x);
-            y = Hax::Min(v.y, y);
-            x2 = Hax::Max(v.x, x2);
-            y2 = Hax::Max(v.y, y2);
+            x = Hax::Min(v.X, x);
+            y = Hax::Min(v.Y, y);
+            x2 = Hax::Max(v.X, x2);
+            y2 = Hax::Max(v.Y, y2);
         }
 
         if (y2 - y < 15.f)
             y2 = y + 15.f;
 
-        return UnityEngine::Rect::MinMaxRect(x, y, x2, y2);
+        return Unity::Rect::MinMaxRect(x, y, x2, y2);
     }
 }

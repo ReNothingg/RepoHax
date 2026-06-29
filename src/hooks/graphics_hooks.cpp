@@ -94,7 +94,7 @@ namespace Cheat
             Hax::Gui::Initialize((Hax::Handle)sd.OutputWindow, G->Device);
             PrepareMenu();
             ToggleMenuVisibility();
-            G->UvmThread = &UVM::ThreadAttach();
+            G->UvmThread = Hax::Unity::AttachThread();
         }
 
         if (G->RenderTarget == nullptr)
@@ -121,8 +121,8 @@ namespace Cheat
         }
         catch (System::Exception& ex)
         {
-            System::String message = ex.GetMessage();
-            Hax::LogError(G->Logger, L"%d: %ls", __LINE__, message ? message.begin() : L"Exception without message");
+            System::String message = ex.Message();
+            Hax::LogError(G->Logger, L"%d: %s", __LINE__, message != null ? message.ToString().GetRawStringData() : L"Exception without message");
         }
 
         return ((HRESULT(WINAPI*)(IDXGISwapChain*, UINT, UINT))G->PresentOrig)(swapChain, a1, a2);

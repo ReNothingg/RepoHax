@@ -5,13 +5,16 @@
 #include <src/resource.h>
 #include <src/overlay/esp/esp.h>
 
+using namespace System;
+using namespace Unity;
+
 namespace Cheat
 {
     extern void Hook(void* ptr, void* detour, SafetyHookInline& out, const char* name);
     extern void HookModuleProc(HMODULE module, const char* procName, void* procHook, SafetyHookInline& out);
 
-    static void* Hooked_MonoRuntimeInvoke(UVM::Method* a1, void* a2, void* a3, void* a4);
-    static void Hooked__EventSystem_Update(UnityEngine::EventSystem __this);
+    static void* Hooked_MonoRuntimeInvoke(void* a1, void* a2, void* a3, void* a4);
+    static void Hooked__EventSystem_Update(Unity::EventSystem __this);
     static void Hooked__PlayerHealth_Hurt(PlayerHealth __this, int damage, bool savingGrace, int enemyIndex);
     static void Hooked__PlayerAvatar_PlayerDeath(PlayerAvatar __this, int enemyIndex);
     static void Hooked__PlayerController_FixedUpdate(PlayerController __this);
@@ -22,7 +25,7 @@ namespace Cheat
     static void Hooked__ItemHealthPack_Update(ItemHealthPack __this);
     static void Hooked__UpdateLoop();
     static void Hooked__PhysGrabObject_PhysicsGrabbingManipulation(PhysGrabObject __this);
-    static void Hooked__PostProcessLayer_BuildCommandBuffers(UnityEngine::PostProcessLayer __this);
+    static void Hooked__PostProcessLayer_BuildCommandBuffers(Unity::PostProcessLayer __this);
     static void Hooked__PlayerAvatarVisuals_Update(PlayerAvatarVisuals __this);
     static void Hooked__PhysGrabber_PhysGrabLogic(PhysGrabber __this);
     static void Hooked__PhysGrabber_RayCheck(PhysGrabber __this, bool grab);
@@ -31,7 +34,7 @@ namespace Cheat
     static void Hooked__PhysGrabObjectImpactDetector_DestroyObject(PhysGrabObjectImpactDetector __this, bool a1);
     static bool Hooked__PhotonNetwork_IsMasterClient();
     static void Hooked__ItemBattery_Update(ItemBattery __this);
-    static void Hooked__Camera_FireOnPreRender(UnityEngine::Camera __this);
+    static void Hooked__Camera_FireOnPreRender(Unity::Camera __this);
     static void Hooked__ItemGun_Update(ItemGun __this);
     static void Hooked__RunManager_SetRunLevel(RunManager __this);
     static void Hooked__PhysGrabber_PhysGrabOverCharge(PhysGrabber __this, float _amount, float _multiplier);
@@ -48,11 +51,13 @@ namespace Cheat
     static void ParseEnemies();
     static void ParseItems();
     static void ParseLevels();
-    static void DrawPlayerChams(PlayerAvatar player, UnityEngine::CommandBuffer cb, UnityEngine::Material aliveMat, UnityEngine::Material deadMat);
+    static void DrawPlayerChams(PlayerAvatar player, Unity::CommandBuffer cb, Unity::Material aliveMat, Unity::Material deadMat);
 
     void HookMonoRuntimeInvoke()
     {
         HookModuleProc((HMODULE)Hax::Unity::GetUvmHandle(), "mono_runtime_invoke", Hooked_MonoRuntimeInvoke, G->MonoRuntimeInvokeHook);
+        ::FlushInstructionCache(::GetCurrentProcess(), nullptr, 0);
+        ::Sleep(20);
     }
 
     void HookGameFuncs()
@@ -60,33 +65,35 @@ namespace Cheat
         Hax::LogDebug(G->Logger, L"Installing game hooks...");
 
         #define HOOK(ptr, n) Hook(ptr, Hooked__ ## n, G-> ## n ## _Hook, #n)
-        HOOK(EventSystem_Update.m_Pointer, EventSystem_Update);
-        HOOK(PlayerHealth::s_Hurt.m_Pointer, PlayerHealth_Hurt);
-        HOOK(PlayerAvatar::s_PlayerDeath.m_Pointer, PlayerAvatar_PlayerDeath);
-        HOOK(PlayerController::s_FixedUpdate.m_Pointer, PlayerController_FixedUpdate);
-        HOOK(PlayerController::s_Update.m_Pointer, PlayerController_Update);
-        HOOK(PlayerTumble::s_TumbleRequest.m_Pointer, PlayerTumble_TumbleRequest);
-        HOOK(FlashlightController::s_Update.m_Pointer, FlashlightController_Update);
-        HOOK(ItemUpgrade::s_Update.m_Pointer, ItemUpgrade_Update);
-        HOOK(ItemHealthPack::s_Update.m_Pointer, ItemHealthPack_Update);
+        HOOK(::EventSystem::s_Update.Address, EventSystem_Update);
+        HOOK(PlayerHealth::s_Hurt.Address, PlayerHealth_Hurt);
+        HOOK(PlayerAvatar::s_PlayerDeath.Address, PlayerAvatar_PlayerDeath);
+        HOOK(PlayerController::s_FixedUpdate.Address, PlayerController_FixedUpdate);
+        HOOK(PlayerController::s_Update.Address, PlayerController_Update);
+        HOOK(PlayerTumble::s_TumbleRequest.Address, PlayerTumble_TumbleRequest);
+        HOOK(FlashlightController::s_Update.Address, FlashlightController_Update);
+        HOOK(ItemUpgrade::s_Update.Address, ItemUpgrade_Update);
+        HOOK(ItemHealthPack::s_Update.Address, ItemHealthPack_Update);
 
-        HOOK(PhysGrabObject::s_PhysicsGrabbingManipulation.m_Pointer, PhysGrabObject_PhysicsGrabbingManipulation);
-        HOOK(PostProcessLayer_BuildCommandBuffers.m_Pointer, PostProcessLayer_BuildCommandBuffers);
-        HOOK(PlayerAvatarVisuals::s_Update.m_Pointer, PlayerAvatarVisuals_Update);
-        HOOK(PhysGrabber::s_PhysGrabLogic.m_Pointer, PhysGrabber_PhysGrabLogic);
-        HOOK(PhysGrabber::s_RayCheck.m_Pointer, PhysGrabber_RayCheck);
-        HOOK(Physics_Raycast.m_Pointer, Physics_Raycast);
-        HOOK(PhysGrabObjectImpactDetector::s_Break.m_Pointer, PhysGrabObjectImpactDetector_Break);
-        HOOK(PhysGrabObjectImpactDetector::s_DestroyObject.m_Pointer, PhysGrabObjectImpactDetector_DestroyObject);
-        HOOK(PhotonNetwork_IsMasterClient.m_Pointer, PhotonNetwork_IsMasterClient);
-        HOOK(ItemBattery::s_Update.m_Pointer, ItemBattery_Update);
-        HOOK(Camera_FireOnPreRender.m_Pointer, Camera_FireOnPreRender);
-        HOOK(ItemGun::s_Update.m_Pointer, ItemGun_Update);
-        HOOK(RunManager::s_SetRunLevel.m_Pointer, RunManager_SetRunLevel);
-        HOOK(PhysGrabber::s_PhysGrabOverCharge.m_Pointer, PhysGrabber_PhysGrabOverCharge);
-        HOOK(SpectateCamera::s_HeadEnergyLogic.m_Pointer, SpectateCamera_HeadEnergyLogic);
-        HOOK(EnemyRigidbody::s_FixedUpdate.m_Pointer, EnemyRigidbody_FixedUpdate);
+        HOOK(PhysGrabObject::s_PhysicsGrabbingManipulation.Address, PhysGrabObject_PhysicsGrabbingManipulation);
+        HOOK(::PostProcessLayer::s_BuildCommandBuffers.Address, PostProcessLayer_BuildCommandBuffers);
+        HOOK(PlayerAvatarVisuals::s_Update.Address, PlayerAvatarVisuals_Update);
+        HOOK(PhysGrabber::s_PhysGrabLogic.Address, PhysGrabber_PhysGrabLogic);
+        HOOK(PhysGrabber::s_RayCheck.Address, PhysGrabber_RayCheck);
+        HOOK(::Physics::s_Raycast.Address, Physics_Raycast);
+        HOOK(PhysGrabObjectImpactDetector::s_Break.Address, PhysGrabObjectImpactDetector_Break);
+        HOOK(PhysGrabObjectImpactDetector::s_DestroyObject.Address, PhysGrabObjectImpactDetector_DestroyObject);
+        //HOOK(::PhotonNetwork::s_IsMasterClient.Address, PhotonNetwork_IsMasterClient);
+        HOOK(ItemBattery::s_Update.Address, ItemBattery_Update);
+        HOOK(::Camera::s_FireOnPreRender.Address, Camera_FireOnPreRender);
+        HOOK(ItemGun::s_Update.Address, ItemGun_Update);
+        HOOK(RunManager::s_SetRunLevel.Address, RunManager_SetRunLevel);
+        HOOK(PhysGrabber::s_PhysGrabOverCharge.Address, PhysGrabber_PhysGrabOverCharge);
+        HOOK(SpectateCamera::s_HeadEnergyLogic.Address, SpectateCamera_HeadEnergyLogic);
+        HOOK(EnemyRigidbody::s_FixedUpdate.Address, EnemyRigidbody_FixedUpdate);
         #undef HOOK
+
+        ::FlushInstructionCache(::GetCurrentProcess(), nullptr, 0);
     }
 
     void HookPlayerLoop()
@@ -98,13 +105,16 @@ namespace Cheat
         Hook(G->PlayerLoop.PresentAfterDrawPtr, Hooked__PresentAfterDrawLoop, G->PresentAfterDrawHook, "LoopSystem.PresentAfterDrawLoop");
     }
 
-    static void* Hooked_MonoRuntimeInvoke(UVM::Method* a1, void* a2, void* a3, void* a4)
+    static void* Hooked_MonoRuntimeInvoke(void* a1, void* a2, void* a3, void* a4)
     {
-        void* ret = G->MonoRuntimeInvokeHook.unsafe_ccall<void*, void*, void*, void*, void*>(a1, a2, a3, a4);
+        void* ret = G->MonoRuntimeInvokeHook.unsafe_call<void*>(a1, a2, a3, a4);
 
         if (G->UnityLoadedEvent != nullptr)
         {
-            Hax::StringView methodName = UVM::MethodGetName(*a1);
+            using Func = const char*(*)(void*);
+            static Func mono_method_get_name = (Func)::GetProcAddress((HMODULE)Hax::Unity::GetUvmHandle(), "mono_method_get_name");
+
+            Hax::StringView methodName = mono_method_get_name(a1);
             if (methodName == "Update")
             {
                 ::SetEvent(G->UnityLoadedEvent);
@@ -115,11 +125,11 @@ namespace Cheat
         return ret;
     }
 
-    static void Hooked__EventSystem_Update(UnityEngine::EventSystem __this)
+    static void Hooked__EventSystem_Update(Unity::EventSystem __this)
     {
         try
         {
-            if (__this != UnityEngine::EventSystem::GetCurrent())
+            if (__this != Unity::EventSystem::GetCurrent())
                 return;
 
             PlayerAvatar avatar = PlayerAvatar::instance();
@@ -130,13 +140,13 @@ namespace Cheat
 
             if (!G->PlayerLoop.ReadyToHook)
             {
-                G->PlayerLoop.UpdatePtr = GetPlayerLoopPtr(UnityEngine::PlayerLoop::Update::typeof(), UnityEngine::PlayerLoop::ScriptRunBehaviourUpdate::typeof());
+                G->PlayerLoop.UpdatePtr = GetPlayerLoopPtr(Unity::PlayerLoop::Update::typeof(), Unity::PlayerLoop::ScriptRunBehaviourUpdate::typeof());
                 Hax::LogDebug(G->Logger, L"m_UpdatePtr ptr = %p", G->PlayerLoop.UpdatePtr);
 
-                G->PlayerLoop.PostLateUpdatePtr = GetPlayerLoopPtr(UnityEngine::PlayerLoop::PostLateUpdate::typeof(), UnityEngine::PlayerLoop::PlayerSendFrameStarted::typeof());
+                G->PlayerLoop.PostLateUpdatePtr = GetPlayerLoopPtr(Unity::PlayerLoop::PostLateUpdate::typeof(), Unity::PlayerLoop::PlayerSendFrameStarted::typeof());
                 Hax::LogDebug(G->Logger, L"m_PostLateUpdatePtr ptr = %p", G->PlayerLoop.PostLateUpdatePtr);
 
-                G->PlayerLoop.PresentAfterDrawPtr = GetPlayerLoopPtr(UnityEngine::PlayerLoop::PostLateUpdate::typeof(), UnityEngine::PlayerLoop::PresentAfterDraw::typeof());
+                G->PlayerLoop.PresentAfterDrawPtr = GetPlayerLoopPtr(Unity::PlayerLoop::PostLateUpdate::typeof(), Unity::PlayerLoop::PresentAfterDraw::typeof());
                 Hax::LogDebug(G->Logger, L"m_PresentAfterDrawPtr ptr = %p", G->PlayerLoop.PresentAfterDrawPtr);
 
                 G->PlayerLoop.ReadyToHook = true;
@@ -187,12 +197,12 @@ namespace Cheat
             if (G->EnemyToSpawn)
             {
                 EnemySetup enemy = G->EnemyToSpawn;
-                G->EnemyToSpawn = nullptr;
+                G->EnemyToSpawn = null;
 
                 if (LevelGenerator gen = LevelGenerator::Instance())
                 {
                     System::List<LevelPoint> points = gen.LevelPathPoints();
-                    if (points && points.GetCount() > 0)
+                    if (points != null && points.Count() > 0)
                     {
                         LevelPoint point = points[0];
                         if (point)
@@ -201,45 +211,45 @@ namespace Cheat
                 }
             }
 
-            if (!G->CommandBuffer)
+            if (G->CommandBuffer == null)
             {
-                G->CommandBuffer = UnityEngine::CommandBuffer::New();
-                UVM::GCHandleNew(*G->CommandBuffer.GetPtr(), true);
+                G->CommandBuffer = CommandBuffer::New();
+                System::GCHandle::Alloc(G->CommandBuffer, true);
             }
 
-            if (!G->Bundle)
+            if (G->Bundle == null)
             {
                 auto ptr = Hax::Gui::GetResourceData((Hax::Handle)G->Handle, IDR_BUNDLE1, L"BUNDLE");
 
-                System::Array<char> bundleRaw{UVM::ArrayNew(UVM::TypeGetClass(*System::Char::typeof().GetPtr()->Type), ptr.Size())};
+                auto bundleRaw = Array<Char>::CreateInstance(ptr.Size());
 
-                memcpy(bundleRaw.GetPtr()->begin(), ptr.Data(), ptr.Size());
-                G->Bundle = UnityEngine::AssetBundle::LoadFromMemory(bundleRaw);
-                G->Bundle.SetHideFlags(UnityEngine::HideFlags::DontUnloadUnusedAsset);
+                memcpy(bundleRaw.begin(), ptr.Data(), ptr.Size());
+                G->Bundle = AssetBundle::LoadFromMemory(bundleRaw);
+                G->Bundle.SetHideFlags(HideFlags::DontUnloadUnusedAsset);
 
                 Hax::LogDebug(G->Logger, L"Bundle loaded");
             }
 
             if (!G->ItemsChamsMat && G->Bundle)
             {
-                UnityEngine::Shader shader{G->Bundle.LoadAsset(System::String::New("assets/myshader.shader"), UnityEngine::Shader::typeof()).GetPtr()};
+                Shader shader = As<Shader>(G->Bundle.LoadAsset(String::New("assets/myshader.shader"), Shader::typeof()));
 
-                G->ItemsChamsMat = UnityEngine::Material::New(shader);
-                G->ItemsChamsMat.SetHideFlags(UnityEngine::HideFlags::DontUnloadUnusedAsset);
-                G->ItemsChamsMat.SetColor(UnityEngine::Color(1.f, 1.f, 0.9f, 1.f));
-                UVM::GCHandleNew(*G->ItemsChamsMat.GetPtr(), true);
+                G->ItemsChamsMat = Material::New(shader);
+                G->ItemsChamsMat.SetHideFlags(HideFlags::DontUnloadUnusedAsset);
+                G->ItemsChamsMat.SetColor(Color(1.f, 1.f, 0.9f, 1.f));
+                GCHandle::Alloc(G->ItemsChamsMat, true);
                 Hax::LogDebug(G->Logger, L"Items chams mat loaded");
 
-                G->PlayerChamsMat = UnityEngine::Material::New(shader);
-                G->PlayerChamsMat.SetHideFlags(UnityEngine::HideFlags::DontUnloadUnusedAsset);
-                G->PlayerChamsMat.SetColor(UnityEngine::Color::green());
-                UVM::GCHandleNew(*G->PlayerChamsMat.GetPtr(), true);
+                G->PlayerChamsMat = Material::New(shader);
+                G->PlayerChamsMat.SetHideFlags(HideFlags::DontUnloadUnusedAsset);
+                G->PlayerChamsMat.SetColor(Color::green());
+                GCHandle::Alloc(G->PlayerChamsMat, true);
                 Hax::LogDebug(G->Logger, L"Player chams mat loaded");
 
-                G->HeadChamsMat = UnityEngine::Material::New(shader);
-                G->HeadChamsMat.SetHideFlags(UnityEngine::HideFlags::DontUnloadUnusedAsset);
-                G->HeadChamsMat.SetColor(UnityEngine::Color(0x54 / 255.f, 0x54 / 255.f, 0x54 / 255.f, 1.f));
-                UVM::GCHandleNew(*G->HeadChamsMat.GetPtr(), true);
+                G->HeadChamsMat = Material::New(shader);
+                G->HeadChamsMat.SetHideFlags(HideFlags::DontUnloadUnusedAsset);
+                G->HeadChamsMat.SetColor(Color(0x54 / 255.f, 0x54 / 255.f, 0x54 / 255.f, 1.f));
+                GCHandle::Alloc(G->HeadChamsMat, true);
                 Hax::LogDebug(G->Logger, L"Head chams mat loaded");
             }
 
@@ -288,7 +298,7 @@ namespace Cheat
                 G->ActivateNextPoint = false;
                 if (RoundDirector dir = RoundDirector::instance())
                 {
-                    for (UnityEngine::GameObject go : dir.extractionPointList())
+                    for (Unity::GameObject go : dir.extractionPointList())
                     {
                         ExtractionPoint point = go.GetComponent<ExtractionPoint>();
                         if (point && point.currentState() == ExtractionPoint_State::Idle() && !point.isLocked())
@@ -362,13 +372,13 @@ namespace Cheat
                 SpawnCosmeticBox(rarity - 1);
             }
         }
-        catch (System::Exception& ex)
+        catch (Exception& ex)
         {
-            System::String message = ex.GetMessage();
-            Hax::LogError(G->Logger, L"%d: %ls", __LINE__, message ? message.begin() : L"Exception without message");
+            String message = ex.Message();
+            Hax::LogError(G->Logger, L"%d: %ls", __LINE__, message != null ? message.ToString().GetRawStringData() : L"Exception without message");
         }
 
-        G->EventSystem_Update_Hook.unsafe_call<void, UnityEngine::EventSystem>(__this);
+        G->EventSystem_Update_Hook.unsafe_call<void, Unity::EventSystem>(__this);
     }
 
     static void Hooked__PlayerHealth_Hurt(PlayerHealth __this, int damage, bool savingGrace, int enemyIndex)
@@ -412,8 +422,8 @@ namespace Cheat
         }
         catch (System::Exception& ex)
         {
-            System::String message = ex.GetMessage();
-            Hax::LogError(G->Logger, L"%d: %ls", __LINE__, message ? message.begin() : L"Exception without message");
+            System::String message = ex.Message();
+            Hax::LogError(G->Logger, L"%d: %ls", __LINE__, message != null ? message.ToString().GetRawStringData() : L"Exception without message");
 
             G->PlayerController_FixedUpdate_Hook.unsafe_call<void, PlayerController>(__this);
         }
@@ -457,7 +467,7 @@ namespace Cheat
             if (G->Flashlight.InCrouch && avatar)
                 avatar.isCrouching() = wasCrouching;
 
-            UnityEngine::Light spotLight = __this.spotlight();
+            Unity::Light spotLight = __this.spotlight();
             if ((float)G->Flashlight.Angle != spotLight.GetSpotAngle())
             {
                 spotLight.SetSpotAngle((float)G->Flashlight.Angle);
@@ -467,8 +477,8 @@ namespace Cheat
         }
         catch (System::Exception& ex)
         {
-            System::String message = ex.GetMessage();
-            Hax::LogError(G->Logger, L"%d: %ls", __LINE__, message ? message.begin() : L"Exception without message");
+            System::String message = ex.Message();
+            Hax::LogError(G->Logger, L"%d: %ls", __LINE__, message != null ? message.ToString().GetRawStringData() : L"Exception without message");
 
             G->FlashlightController_Update_Hook.unsafe_call<void, FlashlightController>(__this);
         }
@@ -478,7 +488,7 @@ namespace Cheat
     {
         for (int i = 0; i < (int)UpgradeType::N; ++i)
         {
-            if (name.ToView().EndsWith(G->UpgradesData[i].InternalNameEnd))
+            if (name.ToHaxView().EndsWith(G->UpgradesData[i].InternalNameEnd))
                 return &G->UpgradesData[i];
         }
         return nullptr;
@@ -492,7 +502,7 @@ namespace Cheat
 
             if (G->AutoUseUpgrs)
             {
-                UpgradeData* data = GetUpgradeInfoFromName(__this.itemAttributes().itemAssetName().GetPtr());
+                UpgradeData* data = GetUpgradeInfoFromName(__this.itemAttributes().itemAssetName());
                 if (data != nullptr && data->AutoUse)
                 {
                     ItemToggle toggle = __this.itemToggle();
@@ -506,8 +516,8 @@ namespace Cheat
         }
         catch (System::Exception& ex)
         {
-            System::String message = ex.GetMessage();
-            Hax::LogError(G->Logger, L"%d: %ls", __LINE__, message ? message.begin() : L"Exception without message");
+            System::String message = ex.Message();
+            Hax::LogError(G->Logger, L"%d: %ls", __LINE__, message != null ? message.ToString().GetRawStringData() : L"Exception without message");
         }
 
         G->ItemUpgrade_Update_Hook.unsafe_call<void, ItemUpgrade>(__this);
@@ -534,25 +544,25 @@ namespace Cheat
 
     static void SetThirdPerson()
     {
-        static System::String playerTag;
-        if (!playerTag)
+        static String playerTag = null;
+        if (playerTag == null)
         {
             playerTag = System::String::New("Player");
-            UVM::GCHandleNew(*playerTag.GetPtr(), true);
+            GCHandle::Alloc(playerTag, true);
         }
 
         PlayerAvatar avatar = PlayerAvatar::instance();
 
         float dist = 3.f;
-        UnityEngine::Transform normalTransformPivot = avatar.spectatePoint();
+        Transform normalTransformPivot = avatar.spectatePoint();
         static int layerMask = SemiFunc::LayerMaskGetVisionObstruct();
-        auto hits = UnityEngine::Physics::SphereCastAll(normalTransformPivot.GetPosition(), 0.1f, normalTransformPivot.GetForward() * -1.f, 3.f, layerMask);
+        auto hits = Unity::Physics::SphereCastAll(normalTransformPivot.GetPosition(), 0.1f, normalTransformPivot.GetForward() * -1.f, 3.f, layerMask);
         bool isMapOpen = avatar.mapToolController() && avatar.mapToolController().Active();
-        if (hits && !isMapOpen)
+        if (hits != null && !isMapOpen)
         {
-            for (UnityEngine::RaycastHit& hit : hits)
+            for (RaycastHit& hit : hits)
             {
-                UnityEngine::Transform transform = hit.GetTransform();
+                Transform transform = hit.GetTransform();
                 if (!transform.GetComponent<PlayerHealthGrab>() && !transform.GetGameObject().CompareTag(playerTag) && !transform.GetComponent<PlayerTumble>() && !transform.GetComponent<EnemyRigidbody>())
                     dist = Hax::Min(Hax::Max(1.f, hit.m_Distance), 3.f);
             }
@@ -560,7 +570,7 @@ namespace Cheat
         else if (isMapOpen)
             dist = 1.f;
 
-        SemiFunc::MainCamera().GetTransform().SetLocalPosition(UnityEngine::Vector3(0.f, 0.f, -dist));
+        SemiFunc::MainCamera().GetTransform().SetLocalPosition(Unity::Vector3(0.f, 0.f, -dist));
     }
 
     static bool ShouldDrawEsp()
@@ -574,7 +584,7 @@ namespace Cheat
     {
         try
         {
-            UnityEngine::Camera mainCam = SemiFunc::MainCamera();
+            Unity::Camera mainCam = SemiFunc::MainCamera();
             PlayerAvatar avatar = PlayerAvatar::instance();
             if (mainCam && G->IsInGame && avatar)
             {
@@ -596,8 +606,8 @@ namespace Cheat
                 {
                     G->PixelHeight = (float)mainCam.GetPixelHeight();
                     G->PixelWidth = (float)mainCam.GetPixelWidth();
-                    G->ScreenHeight = (float)UnityEngine::Screen::GetHeight();
-                    G->ScreenWidth = (float)UnityEngine::Screen::GetWidth();
+                    G->ScreenHeight = (float)Unity::Screen::GetHeight();
+                    G->ScreenWidth = (float)Unity::Screen::GetWidth();
 
                     if (G->EnemiesEsp)
                     {
@@ -641,7 +651,7 @@ namespace Cheat
                         back.Clear();
                         if (RoundDirector dir = RoundDirector::instance())
                         {
-                            for (UnityEngine::GameObject go : dir.extractionPointList())
+                            for (Unity::GameObject go : dir.extractionPointList())
                             {
                                 Hax::Optional<ExtrPointEspData> data = ParseExtrPointEspData(go);
                                 if (data.HasValue())
@@ -700,8 +710,8 @@ namespace Cheat
         }
         catch (System::Exception& ex)
         {
-            System::String message = ex.GetMessage();
-            Hax::LogError(G->Logger, L"%d: %ls", __LINE__, message ? message.begin() : L"Exception without message");
+            System::String message = ex.Message();
+            Hax::LogError(G->Logger, L"%d: %ls", __LINE__, message != null ? message.ToString().GetRawStringData() : L"Exception without message");
         }
 
         G->PostLateUpdateHook.unsafe_call<void>();
@@ -711,7 +721,7 @@ namespace Cheat
     {
         try
         {
-            UnityEngine::Camera mainCam = SemiFunc::MainCamera();
+            Unity::Camera mainCam = SemiFunc::MainCamera();
             if (mainCam && G->IsInGame)
             {
                 if (G->BetterVision)
@@ -720,13 +730,13 @@ namespace Cheat
                 mainCam.SetFieldOfView(prevFov);
 
                 if (G->ThirdPerson && !SpectateCamera::instance())
-                    mainCam.GetTransform().SetLocalPosition(UnityEngine::Vector3::zero());
+                    mainCam.GetTransform().SetLocalPosition(Unity::Vector3::zero());
             }
         }
         catch (System::Exception& ex)
         {
-            System::String message = ex.GetMessage();
-            Hax::LogError(G->Logger, L"%d: %ls", __LINE__, message ? message.begin() : L"Exception without message");
+            System::String message = ex.Message();
+            Hax::LogError(G->Logger, L"%d: %ls", __LINE__, message != null ? message.ToString().GetRawStringData() : L"Exception without message");
         }
 
         G->PresentAfterDrawHook.unsafe_call<void>();
@@ -753,14 +763,14 @@ namespace Cheat
         }
         catch (System::Exception& ex)
         {
-            System::String message = ex.GetMessage();
-            Hax::LogError(G->Logger, L"%d: %ls", __LINE__, message ? message.begin() : L"Exception without message");
+            System::String message = ex.Message();
+            Hax::LogError(G->Logger, L"%d: %ls", __LINE__, message != null ? message.ToString().GetRawStringData() : L"Exception without message");
         }
 
         G->PhysGrabObject_PhysicsGrabbingManipulation_Hook.unsafe_call<void, PhysGrabObject>(__this);
     }
 
-    static void Hooked__PostProcessLayer_BuildCommandBuffers(UnityEngine::PostProcessLayer __this)
+    static void Hooked__PostProcessLayer_BuildCommandBuffers(Unity::PostProcessLayer __this)
     {
         try
         {
@@ -775,11 +785,11 @@ namespace Cheat
         }
         catch (System::Exception& ex)
         {
-            System::String message = ex.GetMessage();
-            Hax::LogError(G->Logger, L"%d: %ls", __LINE__, message ? message.begin() : L"Exception without message");
+            System::String message = ex.Message();
+            Hax::LogError(G->Logger, L"%d: %ls", __LINE__, message != null ? message.ToString().GetRawStringData() : L"Exception without message");
         }
 
-        G->PostProcessLayer_BuildCommandBuffers_Hook.unsafe_call<void, UnityEngine::PostProcessLayer>(__this);
+        G->PostProcessLayer_BuildCommandBuffers_Hook.unsafe_call<void, Unity::PostProcessLayer>(__this);
     }
 
     void Hooked__PlayerAvatarVisuals_Update(PlayerAvatarVisuals __this)
@@ -797,8 +807,8 @@ namespace Cheat
         }
         catch (System::Exception& ex)
         {
-            System::String message = ex.GetMessage();
-            Hax::LogError(G->Logger, L"%d: %ls", __LINE__, message ? message.begin() : L"Exception without message");
+            System::String message = ex.Message();
+            Hax::LogError(G->Logger, L"%d: %ls", __LINE__, message != null ? message.ToString().GetRawStringData() : L"Exception without message");
         }
 
         G->PlayerAvatarVisuals_Update_Hook.unsafe_call<void, PlayerAvatarVisuals>(__this);
@@ -885,26 +895,26 @@ namespace Cheat
         }
         catch (System::Exception& ex)
         {
-            System::String message = ex.GetMessage();
-            Hax::LogError(G->Logger, L"%d: %ls", __LINE__, message ? message.begin() : L"Exception without message");
+            System::String message = ex.Message();
+            Hax::LogError(G->Logger, L"%d: %ls", __LINE__, message != null ? message.ToString().GetRawStringData() : L"Exception without message");
         }
 
         G->ItemBattery_Update_Hook.unsafe_call<void, ItemBattery>(__this);
     }
 
-    static void Hooked__Camera_FireOnPreRender(UnityEngine::Camera __this)
+    static void Hooked__Camera_FireOnPreRender(Unity::Camera __this)
     {
         try
         {
-            if (IsInGame() && __this == GameDirector::instance().MainCamera() && G->ItemsChamsMat && G->CommandBuffer)
+            if (IsInGame() && __this == GameDirector::instance().MainCamera() && G->ItemsChamsMat != null && G->CommandBuffer != null)
             {
                 G->CommandBuffer.Clear();
 
-                static void* s_PrevCam;
-                if (__this && __this.GetPtr()->m_CachedPtr != s_PrevCam)
+                static Unity::Camera s_PrevCam = null;
+                if (__this && __this != s_PrevCam)
                 {
-                    s_PrevCam = __this.GetPtr()->m_CachedPtr;
-                    __this.AddCommandBuffer(UnityEngine::CameraEvent::AfterEverything, G->CommandBuffer);
+                    s_PrevCam = __this;
+                    __this.AddCommandBuffer(Unity::CameraEvent::AfterEverything, G->CommandBuffer);
                 }
 
                 if (G->ValuablesChams && ValuableDirector::instance())
@@ -913,7 +923,7 @@ namespace Cheat
                     {
                         if (obj && obj.GetEnabled())
                         {
-                            for (UnityEngine::MeshRenderer renderer : obj.GetTransform().GetChild(0).GetComponentsInChildren<UnityEngine::MeshRenderer>(true))
+                            for (Unity::MeshRenderer renderer : obj.GetTransform().GetChild(0).GetComponentsInChildren<Unity::MeshRenderer>(true))
                             {
                                 G->CommandBuffer.DrawRenderer(renderer, G->ItemsChamsMat);
                             }
@@ -932,34 +942,34 @@ namespace Cheat
         }
         catch (System::Exception& ex)
         {
-            System::String message = ex.GetMessage();
-            Hax::LogError(G->Logger, L"%d: %ls", __LINE__, message ? message.begin() : L"Exception without message");
+            System::String message = ex.Message();
+            Hax::LogError(G->Logger, L"%d: %ls", __LINE__, message != null ? message.ToString().GetRawStringData() : L"Exception without message");
         }
 
-        G->Camera_FireOnPreRender_Hook.unsafe_call<void, UnityEngine::Camera>(__this);
+        G->Camera_FireOnPreRender_Hook.unsafe_call<void, Unity::Camera>(__this);
     }
 
     static void Hooked__ItemGun_Update(ItemGun __this)
     {
         try
         {
-            UnityEngine::LineRenderer laser = __this.GetComponent<UnityEngine::LineRenderer>();
+            Unity::LineRenderer laser = __this.GetComponent<Unity::LineRenderer>();
 
             if (__this.physGrabObject().grabbedLocal() && G->UseLaser)
             {
                 if (!laser)
                 {
-                    laser = __this.GetGameObject().AddComponent<UnityEngine::LineRenderer>();
+                    laser = __this.GetGameObject().AddComponent<Unity::LineRenderer>();
                     laser.SetStartWidth(0.02f);
                     laser.SetEndWidth(0.02f);
                     laser.SetSortingOrder(1);
-                    UnityEngine::Material mat = UnityEngine::Material::New(UnityEngine::Shader::Find(System::String::New("Sprites/Default")));
-                    mat.SetColor(UnityEngine::Color::red());
+                    Unity::Material mat = Unity::Material::New(Unity::Shader::Find(System::String::New("Sprites/Default")));
+                    mat.SetColor(Unity::Color::red());
                     laser.SetMaterial(mat);
                     laser.SetPositionCount(2);
                 }
 
-                UnityEngine::Transform transform = __this.gunMuzzle();
+                Unity::Transform transform = __this.gunMuzzle();
                 laser.SetEnabled(true);
                 laser.SetPosition(0, transform.GetPosition());
                 laser.SetPosition(1, transform.GetPosition() + transform.GetForward() * __this.gunRange());
@@ -971,8 +981,8 @@ namespace Cheat
         }
         catch (System::Exception& ex)
         {
-            System::String message = ex.GetMessage();
-            Hax::LogError(G->Logger, L"%d: %ls", __LINE__, message ? message.begin() : L"Exception without message");
+            System::String message = ex.Message();
+            Hax::LogError(G->Logger, L"%d: %ls", __LINE__, message != null ? message.ToString().GetRawStringData() : L"Exception without message");
         }
 
         G->ItemGun_Update_Hook.unsafe_call<void, ItemGun>(__this);
@@ -984,7 +994,7 @@ namespace Cheat
         {
             if (G->LevelBans.Size() > 0)
             {
-                System::List<Level> levels = RunManager::instance().levels();
+                List<Level> levels = RunManager::instance().levels();
 
                 LevelBan* levelBan = &G->LevelBans[0];
                 Level prevLevel = __this.previousRunLevel();
@@ -996,10 +1006,10 @@ namespace Cheat
                 return;
             }
         }
-        catch (System::Exception& ex)
+        catch (Exception& ex)
         {
-            System::String message = ex.GetMessage();
-            Hax::LogError(G->Logger, L"%d: %ls", __LINE__, message ? message.begin() : L"Exception without message");
+            String message = ex.Message();
+            Hax::LogError(G->Logger, L"%d: %ls", __LINE__, message != null ? message.ToString().GetRawStringData() : L"Exception without message");
         }
 
         G->RunManager_SetRunLevel_Hook.unsafe_call<void, RunManager>(__this);
@@ -1047,13 +1057,13 @@ namespace Cheat
 
     static void* GetPlayerLoopPtr(System::Type type, System::Type subType)
     {
-        auto mainLoop = UnityEngine::LowLevel::PlayerLoop::GetDefaultPlayerLoop();
-        for (UnityEngine::PlayerLoopSystem& loop : mainLoop.m_SubSystemList)
+        auto mainLoop = LowLevel::PlayerLoop::GetDefaultPlayerLoop();
+        for (PlayerLoopSystem& loop : mainLoop.m_SubSystemList)
         {
             if (loop.m_Type != type)
                 continue;
 
-            for (UnityEngine::PlayerLoopSystem& subLoop : loop.m_SubSystemList)
+            for (PlayerLoopSystem& subLoop : loop.m_SubSystemList)
                 if (subLoop.m_Type == subType)
                     return *subLoop.m_UpdateFunction;
         }
@@ -1064,38 +1074,36 @@ namespace Cheat
     {
         if (SemiFunc::IsMultiplayer())
         {
-            System::Array<System::Object> arr = UVM::ArrayNew(UVM::TypeGetClass(*System::Object::typeof().GetPtr()->Type), 2);
-            System::Boxed<System::Single> p1 = System::Single(value); arr[0] = System::Object(&p1);
-            System::Boxed<UnityEngine::Vector3> p2{}; arr[1] = System::Object(&p2);
-            obj.photonView().RPC(System::String::New("HealRPC"), Photon::RpcTarget::All,  arr);
+            Array<System::Object> params = { Single(value), Vector3() };
+            obj.photonView().RPC(String::New("HealRPC"), Photon::RpcTarget::All, params);
         }
         else
         {
-            obj.HealLogic(value, UnityEngine::Vector3::zero());
+            obj.HealLogic(value, Vector3::zero());
         }
     }
 
     static void SpawnItem(Item item)
     {
-        UnityEngine::Camera camera = SemiFunc::MainCamera();
+        Unity::Camera camera = SemiFunc::MainCamera();
         if (!camera)
             return;
 
         if (!item)
             return;
 
-        UnityEngine::Transform transform = camera.GetTransform();
-        UnityEngine::Vector3 pos = transform.GetPosition() + transform.GetForward() * 2.f - transform.GetUp();
+        Unity::Transform transform = camera.GetTransform();
+        Unity::Vector3 pos = transform.GetPosition() + transform.GetForward() * 2.f - transform.GetUp();
 
         if (SemiFunc::IsMasterClient())
-            Photon::PhotonNetwork::InstantiateRoomObject(item.prefab().resourcePath(), pos, UnityEngine::Quaternion::identity());
+            Photon::PhotonNetwork::InstantiateRoomObject(item.prefab().resourcePath(), pos, Unity::Quaternion::identity());
         if (!SemiFunc::IsMultiplayer())
-            UnityEngine::Object::Instantiate<UnityEngine::GameObject>(item.prefab().Prefab(), pos, UnityEngine::Quaternion::identity());
+            Unity::Object::Instantiate<Unity::GameObject>(item.prefab().Prefab(), pos, Unity::Quaternion::identity());
     }
 
     static void SpawnCosmeticBox(int rarity)
     {
-        UnityEngine::Camera camera = SemiFunc::MainCamera();
+        Unity::Camera camera = SemiFunc::MainCamera();
         if (!camera)
             return;
 
@@ -1104,20 +1112,20 @@ namespace Cheat
             return;
 
         auto setups = dir.cosmeticWorldObjectSetups();
-        if (!setups || rarity < 1 || rarity >= setups.GetCount())
+        if (setups == null || rarity < 1 || rarity >= setups.Count())
             return;
 
         CosmeticWorldObjectSetup setup = setups[rarity];
-        if (!setup || !setup.prefab())
+        if (setup == null || setup.prefab() == null)
             return;
 
-        UnityEngine::Transform transform = camera.GetTransform();
-        UnityEngine::Vector3 pos = transform.GetPosition() + transform.GetForward() * 2.f - transform.GetUp();
+        Transform transform = camera.GetTransform();
+        Vector3 pos = transform.GetPosition() + transform.GetForward() * 2.f - transform.GetUp();
 
         if (GameManager::instance().gameMode() == 0)
-            UnityEngine::Object::Instantiate<UnityEngine::GameObject>(setup.prefab().Prefab(), pos, UnityEngine::Quaternion::identity());
+            Unity::Object::Instantiate<Unity::GameObject>(setup.prefab().Prefab(), pos, Quaternion::identity());
         else
-            Photon::PhotonNetwork::InstantiateRoomObject(setup.prefab().resourcePath(), pos, UnityEngine::Quaternion::identity());
+            Photon::PhotonNetwork::InstantiateRoomObject(setup.prefab().resourcePath(), pos, Quaternion::identity());
     }
 
     static void ParseEnemies()
@@ -1129,7 +1137,7 @@ namespace Cheat
         Hax::LogDebug(G->Logger, L"Parsing enemies");
         //G->LoadRequests.reserve(50);
 
-        System::List<EnemySetup> setups[3] = {dir.enemiesDifficulty1(), dir.enemiesDifficulty2(), dir.enemiesDifficulty3()};
+        List<EnemySetup> setups[3] = {dir.enemiesDifficulty1(), dir.enemiesDifficulty2(), dir.enemiesDifficulty3()};
         for (size_t i = 0; i < 3; ++i)
         {
             for (EnemySetup setup : setups[i])
@@ -1137,13 +1145,13 @@ namespace Cheat
                 if (!setup)
                     continue;
 
-                System::String name = setup.GetName();
+                String name = setup.GetName();
                 if (name.Contains(L"Bang") || name.Contains(L"Gnome"))
                     continue;
 
                 for (PrefabRef ref : setup.spawnObjects())
                 {
-                    auto req = UnityEngine::Resources::LoadAsync(ref.resourcePath());
+                    auto req = Unity::Resources::LoadAsync(ref.resourcePath());
                     //G->LoadRequests.push_back(new LoadRequest(setup, req));
 
                     Hax::WStringView enemyName = ref.prefabName().begin() + 8;
@@ -1152,7 +1160,7 @@ namespace Cheat
                     if (!entry)
                     {
                         entry = setup;
-                        UVM::GCHandleNew(*name.GetPtr(), true);
+                        GCHandle::Alloc(name, true);
                         Hax::LogDebug(G->Logger, L"Enemy parsed %ls", enemyName.begin());
                     }
                 }
@@ -1167,32 +1175,22 @@ namespace Cheat
             auto itemDict = manager.itemDictionary();
             int nItems = itemDict.Count();
 
-            if (nItems == 0)
+            if (itemDict.Count() == 0)
                 manager.LoadItemsFromFolder();
 
-            for (int i = 0; i < itemDict.Count(); ++i)
+            for (auto& entry : itemDict)
             {
-                auto entry = itemDict.begin() + i;
-                System::String itemName = entry->Key;
+                if (!entry.Value)
+                    continue;
 
-                Hax::char16* ptr = itemName.begin();
-                if (wcsncmp(ptr, L"Item ", 5) == 0)
-                    ptr += 5;
-
-                Hax::WStringView name = ptr;
+                Hax::WStringView name = entry.Value.itemName().ToHaxView();
 
                 if (!G->ItemsPool.Contains(name))
                 {
-                    if (entry->Value)
-                    {
-                        G->ItemsPool.Insert(name, i);
-                        auto req = UnityEngine::Resources::LoadAsync(entry->Value.prefab().resourcePath());
+                    G->ItemsPool.Insert(name, entry.Value);
+                    auto req = Resources::LoadAsync(entry.Value.prefab().resourcePath());
 
-                        UVM::GCHandleNew(*itemName.GetPtr(), true);
-                        Hax::LogDebug(G->Logger, L"Item parsed %ls", ptr);
-                    }
-                    else
-                        Hax::LogError(G->Logger, L"Unable to parse item %s", ptr);
+                    Hax::LogDebug(G->Logger, L"Item parsed %s", name.begin());
                 }
             }
         }
@@ -1205,26 +1203,26 @@ namespace Cheat
             Hax::LogDebug(G->Logger, L"Parsing levels");
 
             System::List<Level> levels = manager.levels();
-            G->LevelBans.Reserve(levels.GetCount());
+            G->LevelBans.Reserve(levels.Count());
 
-            for (int i = 0; i < levels.GetCount(); ++i)
+            for (int i = 0; i < levels.Count(); ++i)
             {
                 System::String levelName = levels[i].NarrativeName();
 
-                LevelBan ban = {levelName.ToView(), i, true};
+                LevelBan ban = {levelName.ToHaxView(), i, true};
                 G->LevelBans.PushBack(ban);
 
-                UVM::GCHandleNew(*levelName.GetPtr(), true);
-                Hax::LogDebug(G->Logger, L"Parsed level %ls", levelName.begin());
+                GCHandle::Alloc(levelName, true);
+                Hax::LogDebug(G->Logger, L"Parsed level %s", levelName.begin());
             }
 
             std::sort(G->LevelBans.begin(), G->LevelBans.end(), [](const LevelBan& o1, const LevelBan& o2) { return o1.Name < o2.Name; });
         }
     }
 
-    static void DrawPlayerChams(PlayerAvatar player, UnityEngine::CommandBuffer cb, UnityEngine::Material aliveMat, UnityEngine::Material deadMat)
+    static void DrawPlayerChams(PlayerAvatar player, Unity::CommandBuffer cb, Unity::Material aliveMat, Unity::Material deadMat)
     {
-        if (!cb || !aliveMat || !deadMat || !player || player.isLocal())
+        if (cb == null || !aliveMat || !deadMat || !player || player.isLocal())
             return;
 
         if (player.deadSet())
@@ -1232,7 +1230,7 @@ namespace Cheat
             PlayerDeathHead head = player.playerDeathHead();
             if (head && head.GetEnabled())
             {
-                for (UnityEngine::MeshRenderer r : head.meshRenderers())
+                for (Unity::MeshRenderer r : head.meshRenderers())
                     cb.DrawRenderer(r, deadMat);
             }
             return;
@@ -1240,7 +1238,7 @@ namespace Cheat
 
         if (!player.isDisabled())
         {
-            for (UnityEngine::MeshRenderer renderer : player.playerHealth().renderers())
+            for (Unity::MeshRenderer renderer : player.playerHealth().renderers())
             {
                 if (renderer && renderer.GetEnabled())
                     cb.DrawRenderer(renderer, aliveMat);

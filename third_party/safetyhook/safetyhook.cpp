@@ -288,37 +288,6 @@ Allocator::Memory::~Memory() {
 // Source file: easy.cpp
 //
 
-
-namespace safetyhook {
-InlineHook create_inline(void* target, void* destination, InlineHook::Flags flags) {
-    if (auto hook = InlineHook::create(target, destination, flags)) {
-        return std::move(*hook);
-    } else {
-        return {};
-    }
-}
-
-MidHook create_mid(void* target, MidHookFn destination, MidHook::Flags flags) {
-    if (auto hook = MidHook::create(target, destination, flags)) {
-        return std::move(*hook);
-    } else {
-        return {};
-    }
-}
-
-VmtHook create_vmt(void* object) {
-    if (auto hook = VmtHook::create(object)) {
-        return std::move(*hook);
-    } else {
-        return {};
-    }
-}
-} // namespace safetyhook
-
-//
-// Source file: inline_hook.cpp
-//
-
 #include <iterator>
 
 #if __has_include("Zydis/Zydis.h")
@@ -430,27 +399,26 @@ static bool decode(ZydisDecodedInstruction* ix, uint8_t* ip) {
     return ZYAN_SUCCESS(ZydisDecoderDecodeInstruction(&decoder, nullptr, ip, 15, ix));
 }
 
-std::expected<InlineHook, InlineHook::Error> InlineHook::create(void* target, void* destination, Flags flags) {
-    return create(Allocator::global(), target, destination, flags);
+std::optional<InlineHook::Error> InlineHook::create(void* target, void* destination, InlineHook& out) {
+    return create(Allocator::global(), target, destination, out);
 }
 
-std::expected<InlineHook, InlineHook::Error> InlineHook::create(
-    const std::shared_ptr<Allocator>& allocator, void* target, void* destination, Flags flags) {
-    InlineHook hook{};
+std::optional<InlineHook::Error> InlineHook::create(
+    const std::shared_ptr<Allocator>& allocator, void* target, void* destination, InlineHook& out) {
 
     if (const auto setup_result =
-            hook.setup(allocator, reinterpret_cast<uint8_t*>(target), reinterpret_cast<uint8_t*>(destination));
+            out.setup(allocator, reinterpret_cast<uint8_t*>(target), reinterpret_cast<uint8_t*>(destination));
         !setup_result) {
-        return std::unexpected{setup_result.error()};
+        return setup_result.error();
     }
 
-    if (!(flags & StartDisabled)) {
-        if (auto enable_result = hook.enable(); !enable_result) {
-            return std::unexpected{enable_result.error()};
+    if (true) {
+        if (auto enable_result = out.enable(); !enable_result) {
+            return enable_result.error();
         }
     }
 
-    return hook;
+    return {};
 }
 
 InlineHook::InlineHook(InlineHook&& other) noexcept {
@@ -825,108 +793,9 @@ constexpr std::array<uint8_t, 171> asm_data = {0xFF, 0x35, 0xA7, 0x00, 0x00, 0x0
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 #endif
 
-std::expected<MidHook, MidHook::Error> MidHook::create(void* target, MidHookFn destination, Flags flags) {
-    return create(Allocator::global(), target, destination, flags);
-}
 
-std::expected<MidHook, MidHook::Error> MidHook::create(
-    const std::shared_ptr<Allocator>& allocator, void* target, MidHookFn destination, Flags flags) {
-    MidHook hook{};
 
-    if (const auto setup_result = hook.setup(allocator, reinterpret_cast<uint8_t*>(target), destination);
-        !setup_result) {
-        return std::unexpected{setup_result.error()};
-    }
 
-    if (!(flags & StartDisabled)) {
-        if (auto enable_result = hook.enable(); !enable_result) {
-            return std::unexpected{enable_result.error()};
-        }
-    }
-
-    return hook;
-}
-
-MidHook::MidHook(MidHook&& other) noexcept {
-    *this = std::move(other);
-}
-
-MidHook& MidHook::operator=(MidHook&& other) noexcept {
-    if (this != &other) {
-        m_hook = std::move(other.m_hook);
-        m_target = other.m_target;
-        m_stub = std::move(other.m_stub);
-        m_destination = other.m_destination;
-
-        other.m_target = 0;
-        other.m_destination = nullptr;
-    }
-
-    return *this;
-}
-
-void MidHook::reset() {
-    *this = {};
-}
-
-std::expected<void, MidHook::Error> MidHook::setup(
-    const std::shared_ptr<Allocator>& allocator, uint8_t* target, MidHookFn destination_fn) {
-    m_target = target;
-    m_destination = destination_fn;
-
-    auto stub_allocation = allocator->allocate(asm_data.size());
-
-    if (!stub_allocation) {
-        return std::unexpected{Error::bad_allocation(stub_allocation.error())};
-    }
-
-    m_stub = std::move(*stub_allocation);
-
-    std::copy(asm_data.begin(), asm_data.end(), m_stub.data());
-
-#if SAFETYHOOK_ARCH_X86_64
-    store(m_stub.data() + sizeof(asm_data) - 16, m_destination);
-#elif SAFETYHOOK_ARCH_X86_32
-    store(m_stub.data() + sizeof(asm_data) - 8, m_destination);
-
-    // 32-bit has some relocations we need to fix up as well.
-    store(m_stub.data() + 0x02, m_stub.data() + m_stub.size() - 4);
-    store(m_stub.data() + 0x59, m_stub.data() + m_stub.size() - 8);
-#endif
-
-    auto hook_result = InlineHook::create(allocator, m_target, m_stub.data(), InlineHook::StartDisabled);
-
-    if (!hook_result) {
-        m_stub.free();
-        return std::unexpected{Error::bad_inline_hook(hook_result.error())};
-    }
-
-    m_hook = std::move(*hook_result);
-
-#if SAFETYHOOK_ARCH_X86_64
-    store(m_stub.data() + sizeof(asm_data) - 8, m_hook.trampoline().data());
-#elif SAFETYHOOK_ARCH_X86_32
-    store(m_stub.data() + sizeof(asm_data) - 4, m_hook.trampoline().data());
-#endif
-
-    return {};
-}
-
-std::expected<void, MidHook::Error> MidHook::enable() {
-    if (auto enable_result = m_hook.enable(); !enable_result) {
-        return std::unexpected{Error::bad_inline_hook(enable_result.error())};
-    }
-
-    return {};
-}
-
-std::expected<void, MidHook::Error> MidHook::disable() {
-    if (auto disable_result = m_hook.disable(); !disable_result) {
-        return std::unexpected{Error::bad_inline_hook(disable_result.error())};
-    }
-
-    return {};
-}
 } // namespace safetyhook
 
 //
@@ -1513,150 +1382,4 @@ std::optional<UnprotectMemory> unprotect(uint8_t* address, size_t size) {
     return UnprotectMemory{address, size, old_protection.value()};
 }
 
-} // namespace safetyhook
-
-//
-// Source file: vmt_hook.cpp
-//
-
-
-
-namespace safetyhook {
-VmHook::VmHook(VmHook&& other) noexcept {
-    *this = std::move(other);
-}
-
-VmHook& VmHook::operator=(VmHook&& other) noexcept {
-    destroy();
-    m_original_vm = other.m_original_vm;
-    m_new_vm = other.m_new_vm;
-    m_vmt_entry = other.m_vmt_entry;
-    m_new_vmt_allocation = std::move(other.m_new_vmt_allocation);
-    other.m_original_vm = nullptr;
-    other.m_new_vm = nullptr;
-    other.m_vmt_entry = nullptr;
-    return *this;
-}
-
-VmHook::~VmHook() {
-    destroy();
-}
-
-void VmHook::reset() {
-    *this = {};
-}
-
-void VmHook::destroy() {
-    if (m_original_vm != nullptr) {
-        *m_vmt_entry = m_original_vm;
-        m_original_vm = nullptr;
-        m_new_vm = nullptr;
-        m_vmt_entry = nullptr;
-        m_new_vmt_allocation.reset();
-    }
-}
-
-std::expected<VmtHook, VmtHook::Error> VmtHook::create(void* object) {
-    VmtHook hook{};
-
-    const auto original_vmt = *reinterpret_cast<uint8_t***>(object);
-    hook.m_objects.emplace(object, original_vmt);
-
-    // Count the number of virtual method pointers. We start at one to account for the RTTI pointer.
-    auto num_vmt_entries = 1;
-
-    for (auto vm = original_vmt; is_executable(*vm); ++vm) {
-        ++num_vmt_entries;
-    }
-
-    // Allocate memory for the new VMT.
-    auto allocation = Allocator::global()->allocate(num_vmt_entries * sizeof(uint8_t*));
-
-    if (!allocation) {
-        return std::unexpected{Error::bad_allocation(allocation.error())};
-    }
-
-    hook.m_new_vmt_allocation = std::make_shared<Allocation>(std::move(*allocation));
-    hook.m_new_vmt = reinterpret_cast<uint8_t**>(hook.m_new_vmt_allocation->data());
-
-    // Copy pointer to RTTI.
-    hook.m_new_vmt[0] = original_vmt[-1];
-
-    // Copy virtual method pointers.
-    for (auto i = 0; i < num_vmt_entries - 1; ++i) {
-        hook.m_new_vmt[i + 1] = original_vmt[i];
-    }
-
-    *reinterpret_cast<uint8_t***>(object) = &hook.m_new_vmt[1];
-
-    return hook;
-}
-
-VmtHook::VmtHook(VmtHook&& other) noexcept {
-    *this = std::move(other);
-}
-
-VmtHook& VmtHook::operator=(VmtHook&& other) noexcept {
-    destroy();
-    m_objects = std::move(other.m_objects);
-    m_new_vmt_allocation = std::move(other.m_new_vmt_allocation);
-    m_new_vmt = other.m_new_vmt;
-    other.m_new_vmt = nullptr;
-    return *this;
-}
-
-VmtHook::~VmtHook() {
-    destroy();
-}
-
-void VmtHook::apply(void* object) {
-    m_objects.emplace(object, *reinterpret_cast<uint8_t***>(object));
-    *reinterpret_cast<uint8_t***>(object) = &m_new_vmt[1];
-}
-
-void VmtHook::remove(void* object) {
-    const auto search = m_objects.find(object);
-
-    if (search == m_objects.end()) {
-        return;
-    }
-
-    const auto original_vmt = search->second;
-
-    if (!vm_is_writable(reinterpret_cast<uint8_t*>(object), sizeof(void*))) {
-        m_objects.erase(search);
-        return;
-    }
-
-    if (*reinterpret_cast<uint8_t***>(object) != &m_new_vmt[1]) {
-        m_objects.erase(search);
-        return;
-    }
-
-    *reinterpret_cast<uint8_t***>(object) = original_vmt;
-
-    m_objects.erase(search);
-}
-
-void VmtHook::reset() {
-    *this = {};
-}
-
-void VmtHook::destroy() {
-    for (const auto [object, original_vmt] : m_objects) {
-        if (!vm_is_writable(reinterpret_cast<uint8_t*>(object), sizeof(void*))) {
-            continue;
-        }
-
-        if (*reinterpret_cast<uint8_t***>(object) != &m_new_vmt[1]) {
-            continue;
-        }
-
-        *reinterpret_cast<uint8_t***>(object) = original_vmt;
-    }
-
-    m_objects.clear();
-    m_new_vmt_allocation.reset();
-    m_new_vmt = nullptr;
-}
 } // namespace safetyhook

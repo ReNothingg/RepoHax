@@ -50,7 +50,7 @@ namespace Cheat
             BeginPanel(LINE_ID);
             PanelHeader(G->Loc[LocKey_SPAWN], G->Loc[LocKey_AvailableIfHost]);
             {
-                static size_t s_SelectedItem;
+                static Item s_SelectedItem;
 
                 const float spacing2 = 5_px;
                 Hax::Vector2 sz = CalcButtonSize(G->Loc[LocKey_Spawn]);
@@ -63,8 +63,8 @@ namespace Cheat
                     Hax::Gui::BeginVertical(3_px);
                     {
                         Hax::WStringView preview = L"-";
-                        if (s_SelectedItem < nItems)
-                            preview = G->ItemsPool.begin()[s_SelectedItem].key;
+                        if (s_SelectedItem != null)
+                            preview = s_SelectedItem.itemName().ToHaxView();
 
                         if (DropdownBtn(LINE_ID, preview, dropListW))
                             OpenPopup(dropListId, Hax::Gui::GetCursorPos());
@@ -77,9 +77,10 @@ namespace Cheat
                     {
                         for (size_t i = 0; i < nItems; ++i)
                         {
-                            if (Selectable(LINE_ID + i * 10000, G->ItemsPool.begin()[i].key, s_SelectedItem == i, {.MinW = dropListW}))
+                            const auto& p = G->ItemsPool.begin()[i];
+                            if (Selectable(LINE_ID + i * 10000, p.key, s_SelectedItem == p.value, {.MinW = dropListW}))
                             {
-                                s_SelectedItem = i;
+                                s_SelectedItem = p.value;
                                 ClosePopup(dropListId);
                             }
                         }
@@ -88,7 +89,7 @@ namespace Cheat
 
                     bool enabled = !G->IsClient && s_SelectedItem < G->ItemsPool.Size() && G->IsInGame;
                     if (Button(LINE_ID, G->Loc[LocKey_Spawn], {}, {.Enabled = enabled}))
-                        G->ItemToSpawn = (StatsManager::instance().itemDictionary().begin() + s_SelectedItem)->Value;
+                        G->ItemToSpawn = s_SelectedItem;
                 }
                 Hax::Gui::EndHorizontal();
             }

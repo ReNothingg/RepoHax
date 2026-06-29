@@ -116,7 +116,7 @@ namespace Cheat
                     constexpr size_t dropListId = Hax::Hash(L"PlayerSelect");
                     Hax::Gui::BeginVertical(3_px);
                     {
-                        Hax::WStringView preview = s_SelectedPlayer ? SemiFunc::PlayerGetName(s_SelectedPlayer).ToView() : L"-";
+                        Hax::WStringView preview = s_SelectedPlayer ? SemiFunc::PlayerGetName(s_SelectedPlayer).ToHaxView() : L"-";
                         if (DropdownBtn(LINE_ID, preview, w))
                             OpenPopup(dropListId, Hax::Gui::GetCursorPos());
                     }
@@ -143,7 +143,7 @@ namespace Cheat
                     }
                     Hax::Gui::EndVertical();
 
-                    const size_t nPlayers = players ? players.GetCount() : 0;
+                    const size_t nPlayers = (players != null) ? players.Count() : 0;
                     const float selectableH = CalcButtonHeight();
                     const float dropListH = selectableH * Hax::Max(1ULL, Hax::Min(nPlayers, 5ULL)) + 5_px * 2.f + 1.f;
                     if (BeginDropList(dropListId, { w, dropListH }))
@@ -151,7 +151,7 @@ namespace Cheat
                         for (size_t j = 0; j < nPlayers; ++j)
                         {
                             PlayerAvatar player = players[j];
-                            if (Selectable(LINE_ID + j * 10000, SemiFunc::PlayerGetName(player).ToView(), player == s_SelectedPlayer, { .MinW = w }))
+                            if (Selectable(LINE_ID + j * 10000, SemiFunc::PlayerGetName(player).ToHaxView(), player == s_SelectedPlayer, { .MinW = w }))
                             {
                                 s_SelectedPlayer = player;
                                 ClosePopup(dropListId);

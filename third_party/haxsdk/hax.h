@@ -1,5 +1,9 @@
 #pragma once
 
+#if !defined(_M_X64)
+#error Only x64 supported
+#endif
+
 #include <crtdbg.h>
 #include <type_traits>
 #include <cmath>
@@ -8,7 +12,6 @@
 #include <bit>
 #include <initializer_list>
 #include <stdio.h>
-#include <cstdint>
 
 #define HAX_ASSERT(expr) _ASSERTE(expr)
 #define HAX_PANIC(expr, logFile, fmt, ...) do { if (!(expr)) Hax::Panic(logFile, fmt, ##__VA_ARGS__); } while (0)
@@ -367,6 +370,12 @@ namespace Hax
         __builtin_zero_non_value_bits(&tmp);
 
         return Hash(&tmp, sizeof(T));
+    }
+
+    template <typename T>
+    inline size_t Hash(T* v)
+    {
+        return (size_t)((uintptr_t)v >> 3);
     }
 
     inline constexpr size_t Hash(int v)             { return static_cast<size_t>(v); }
