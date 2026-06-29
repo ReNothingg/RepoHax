@@ -82,7 +82,7 @@ Write-Host ('-' * 60)
 Write-Host ("Elapsed      : {0:N2}s" -f $sw.Elapsed.TotalSeconds)
 
 if ($exit -eq 0) {
-    $dll = Join-Path $projectRoot ("build\$Configuration\bin\version.dll")
+    $dll = Join-Path $projectRoot ("build\$Configuration\bin\dwmapi.dll")
     if (Test-Path $dll) {
         $size = (Get-Item $dll).Length / 1KB
         Write-Host ("Output       : {0} ({1:N1} KB)" -f $dll, $size) -ForegroundColor Green
