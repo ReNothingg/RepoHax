@@ -27,6 +27,39 @@ namespace Cheat
         return health.health() >= health.maxHealth();
     }
 
+    static void DrawPlayerUpgradeRow(size_t id, PlayerUpgradeType type, Hax::WStringView label)
+    {
+        int level = G->PlayerUpgradeLevels[(int)type];
+        bool ready = G->IsInGame && G->PlayerUpgradeToChange == PlayerUpgradeType::N;
+
+        const Hax::Vector2 buttonSize = CalcRepeatBtnSize(L"+");
+        constexpr float valueWidth = 38.f;
+
+        Hax::Gui::BeginHorizontal(5_px);
+        {
+            MainLabelAlignedByH(label, buttonSize.Y);
+            const float controlsWidth = buttonSize.X * 2.f + valueWidth + 10_px;
+            Hax::Gui::Space(Hax::Max(0.f, Hax::Gui::GetContentRegionAvail().X - controlsWidth));
+
+            if (RepeatBtn(id, L"-", ready && level > 0))
+            {
+                G->PlayerUpgradeToChange = type;
+                G->PlayerUpgradeDelta = -1;
+            }
+
+            Hax::char16 value[16]{};
+            swprintf_s(value, _countof(value), L"%d", level);
+            MainLabelAlignedByH(value, buttonSize.Y);
+
+            if (RepeatBtn(id + 1, L"+", ready))
+            {
+                G->PlayerUpgradeToChange = type;
+                G->PlayerUpgradeDelta = 1;
+            }
+        }
+        Hax::Gui::EndHorizontal();
+    }
+
     void DrawStatsTab()
     {
         const Hax::Vector2 mainAreaSize = Hax::Gui::GetContentRegionAvail();
@@ -38,7 +71,7 @@ namespace Cheat
 
         // Column 1
         Hax::Gui::Space(spacing);
-        Hax::Gui::BeginContainer(0, {.W = columnSize.X, .H = columnSize.Y});
+        Hax::Gui::BeginContainer(Hax::Hash("StatsColumnLeft"), {.W = columnSize.X, .FitY = true});
         Hax::Gui::BeginVertical(spacing);
         Hax::Gui::Dummy({0.f, 0.f});
         {
@@ -115,7 +148,7 @@ namespace Cheat
 
         // Column 2
         Hax::Gui::Space(spacing);
-        Hax::Gui::BeginContainer(0, {.W = columnSize.X, .H = columnSize.Y});
+        Hax::Gui::BeginContainer(Hax::Hash("StatsColumnRight"), {.W = columnSize.X, .FitY = true});
         Hax::Gui::BeginVertical(spacing);
         Hax::Gui::Dummy({0.f, 0.f});
         {
@@ -131,6 +164,35 @@ namespace Cheat
                 HorizontalLine(1_px);
 
                 ToggleEx(LINE_ID, G->NoOvercharge, G->Loc[LocKey_NoOvercharge]);
+            }
+            EndPanel();
+
+            BeginPanel(LINE_ID);
+            PanelHeader(G->Loc[LocKey_PlayerUpgrades]);
+            {
+                static const Hax::WStringView labels[(int)PlayerUpgradeType::N] =
+                {
+                    L"Health Upgrade",
+                    L"Stamina Upgrade",
+                    L"Extra Jump Upgrade",
+                    L"Map Player Count Upgrade",
+                    L"Tumble Launch Upgrade",
+                    L"Tumble Climb Upgrade",
+                    L"Death Head Battery Upgrade",
+                    L"Tumble Wings Upgrade",
+                    L"Sprint Speed Upgrade",
+                    L"Crouch Rest Upgrade",
+                    L"Strength Upgrade",
+                    L"Throw Strength Upgrade",
+                    L"Range Upgrade"
+                };
+
+                for (int i = 0; i < (int)PlayerUpgradeType::N; ++i)
+                {
+                    if (i > 0)
+                        HorizontalLine(1_px);
+                    DrawPlayerUpgradeRow(LINE_ID + (size_t)i * 10, (PlayerUpgradeType)i, labels[i]);
+                }
             }
             EndPanel();
 

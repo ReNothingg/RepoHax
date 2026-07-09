@@ -14,6 +14,11 @@ namespace Cheat
     enum class AidType { Small, Medium, Large, N };
     enum class ChatPref { None = -1, Alive = 0, Dead = 1 };
     enum class CosmeticRarity { Common, Uncommon, Rare, UltraRare, N };
+    enum class PlayerUpgradeType
+    {
+        Health, Stamina, ExtraJump, MapPlayerCount, Launch, Climb, HeadBattery,
+        Wings, SprintSpeed, CrouchRest, GrabStrength, ThrowStrength, GrabRange, N
+    };
 
     struct UpgradeData
     {
@@ -76,6 +81,9 @@ namespace Cheat
         ItemHealthPack                      AidToToggle = null;
         Hax::TripleBuffer<ItemHealthPack>   AidsPool{24};
         Hax::TripleBuffer<ItemUpgrade>      UpgradesPool{24};
+        int                                 PlayerUpgradeLevels[(int)PlayerUpgradeType::N]{};
+        PlayerUpgradeType                   PlayerUpgradeToChange = PlayerUpgradeType::N;
+        int                                 PlayerUpgradeDelta;
 
         UpgradeData UpgradesData[(int)UpgradeType::N + 1] =
         {

@@ -52,6 +52,8 @@ namespace Cheat
     static void ParseEnemies();
     static void ParseItems();
     static void ParseLevels();
+    static void UpdatePlayerUpgradeLevels(PlayerAvatar avatar);
+    static void ApplyPlayerUpgradeChange(PlayerAvatar avatar);
     static void DrawPlayerChams(PlayerAvatar player, Unity::CommandBuffer cb, Unity::Material aliveMat, Unity::Material deadMat);
 
     void HookMonoRuntimeInvoke()
@@ -127,6 +129,81 @@ namespace Cheat
         return ret;
     }
 
+    static int ReadPlayerUpgradeLevel(System::Dictionary<System::String, System::Int32> levels, System::String steamId)
+    {
+        System::Int32 value(0);
+        if (levels != null)
+            levels.TryGetValue(steamId, &value);
+        return Hax::Max(0, (int)value);
+    }
+
+    static void UpdatePlayerUpgradeLevels(PlayerAvatar avatar)
+    {
+        StatsManager stats = StatsManager::instance();
+        if (!avatar || !stats)
+            return;
+
+        System::String steamId = SemiFunc::PlayerGetSteamID(avatar);
+        if (steamId == null)
+            return;
+
+        G->PlayerUpgradeLevels[(int)PlayerUpgradeType::Health]         = ReadPlayerUpgradeLevel(stats.playerUpgradeHealth(), steamId);
+        G->PlayerUpgradeLevels[(int)PlayerUpgradeType::Stamina]        = ReadPlayerUpgradeLevel(stats.playerUpgradeStamina(), steamId);
+        G->PlayerUpgradeLevels[(int)PlayerUpgradeType::ExtraJump]      = ReadPlayerUpgradeLevel(stats.playerUpgradeExtraJump(), steamId);
+        G->PlayerUpgradeLevels[(int)PlayerUpgradeType::MapPlayerCount] = ReadPlayerUpgradeLevel(stats.playerUpgradeMapPlayerCount(), steamId);
+        G->PlayerUpgradeLevels[(int)PlayerUpgradeType::Launch]         = ReadPlayerUpgradeLevel(stats.playerUpgradeLaunch(), steamId);
+        G->PlayerUpgradeLevels[(int)PlayerUpgradeType::Climb]          = ReadPlayerUpgradeLevel(stats.playerUpgradeTumbleClimb(), steamId);
+        G->PlayerUpgradeLevels[(int)PlayerUpgradeType::HeadBattery]    = ReadPlayerUpgradeLevel(stats.playerUpgradeDeathHeadBattery(), steamId);
+        G->PlayerUpgradeLevels[(int)PlayerUpgradeType::Wings]          = ReadPlayerUpgradeLevel(stats.playerUpgradeTumbleWings(), steamId);
+        G->PlayerUpgradeLevels[(int)PlayerUpgradeType::SprintSpeed]    = ReadPlayerUpgradeLevel(stats.playerUpgradeSpeed(), steamId);
+        G->PlayerUpgradeLevels[(int)PlayerUpgradeType::CrouchRest]     = ReadPlayerUpgradeLevel(stats.playerUpgradeCrouchRest(), steamId);
+        G->PlayerUpgradeLevels[(int)PlayerUpgradeType::GrabStrength]   = ReadPlayerUpgradeLevel(stats.playerUpgradeStrength(), steamId);
+        G->PlayerUpgradeLevels[(int)PlayerUpgradeType::ThrowStrength]  = ReadPlayerUpgradeLevel(stats.playerUpgradeThrow(), steamId);
+        G->PlayerUpgradeLevels[(int)PlayerUpgradeType::GrabRange]      = ReadPlayerUpgradeLevel(stats.playerUpgradeRange(), steamId);
+    }
+
+    static void ApplyPlayerUpgradeChange(PlayerAvatar avatar)
+    {
+        PlayerUpgradeType type = G->PlayerUpgradeToChange;
+        if (type == PlayerUpgradeType::N)
+            return;
+
+        int delta = G->PlayerUpgradeDelta;
+        G->PlayerUpgradeToChange = PlayerUpgradeType::N;
+        G->PlayerUpgradeDelta = 0;
+
+        PunManager manager = PunManager::instance();
+        if (!avatar || !manager || (delta != -1 && delta != 1))
+            return;
+
+        int& current = G->PlayerUpgradeLevels[(int)type];
+        if (delta < 0 && current <= 0)
+            return;
+
+        System::String steamId = SemiFunc::PlayerGetSteamID(avatar);
+        if (steamId == null)
+            return;
+
+        switch (type)
+        {
+            case PlayerUpgradeType::Health:         current = manager.UpgradePlayerHealth(steamId, delta); break;
+            case PlayerUpgradeType::Stamina:        current = manager.UpgradePlayerEnergy(steamId, delta); break;
+            case PlayerUpgradeType::ExtraJump:      current = manager.UpgradePlayerExtraJump(steamId, delta); break;
+            case PlayerUpgradeType::MapPlayerCount: current = manager.UpgradeMapPlayerCount(steamId, delta); break;
+            case PlayerUpgradeType::Launch:         current = manager.UpgradePlayerTumbleLaunch(steamId, delta); break;
+            case PlayerUpgradeType::Climb:          current = manager.UpgradePlayerTumbleClimb(steamId, delta); break;
+            case PlayerUpgradeType::HeadBattery:    current = manager.UpgradeDeathHeadBattery(steamId, delta); break;
+            case PlayerUpgradeType::Wings:          current = manager.UpgradePlayerTumbleWings(steamId, delta); break;
+            case PlayerUpgradeType::SprintSpeed:    current = manager.UpgradePlayerSprintSpeed(steamId, delta); break;
+            case PlayerUpgradeType::CrouchRest:     current = manager.UpgradePlayerCrouchRest(steamId, delta); break;
+            case PlayerUpgradeType::GrabStrength:   current = manager.UpgradePlayerGrabStrength(steamId, delta); break;
+            case PlayerUpgradeType::ThrowStrength:  current = manager.UpgradePlayerThrowStrength(steamId, delta); break;
+            case PlayerUpgradeType::GrabRange:      current = manager.UpgradePlayerGrabRange(steamId, delta); break;
+            default: break;
+        }
+        current = Hax::Max(0, current);
+    }
+
     static void Hooked__EventSystem_Update(Unity::EventSystem __this)
     {
         try
@@ -139,6 +216,12 @@ namespace Cheat
 
             G->IsClient = !SemiFunc::IsMasterClientOrSingleplayer();
             G->IsInGame = IsInGame();
+
+            if (G->IsInGame)
+            {
+                ApplyPlayerUpgradeChange(avatar);
+                UpdatePlayerUpgradeLevels(avatar);
+            }
 
             if (!G->PlayerLoop.ReadyToHook)
             {

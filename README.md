@@ -39,6 +39,7 @@
 
 **Upgrades**
 - Apply purchased upgrades (or shop upgrades) to self
+- Increase or decrease each local player upgrade level independently
 
 **Medkits**
 - Apply purchased medkit to self

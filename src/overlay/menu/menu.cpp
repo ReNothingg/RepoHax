@@ -42,8 +42,8 @@ namespace Cheat
     static const TabGroup g_TabGroups[] =
     {
         {LocKey_PlayerCategory, L'\ue473', {0, 2, 6}, 3},
-        {LocKey_WorldCategory,  L'\uf57d', {1, 3, 5}, 3},
-        {LocKey_ToolsCategory,  L'\uf7d9', {4, 7, 0}, 2},
+        {LocKey_WorldCategory,  L'\uf5fd', {1, 3, 5}, 3},
+        {LocKey_ToolsCategory,  L'\uf468', {4, 7, 0}, 2},
         {LocKey_Settings,       L'\uf013', {8, 0, 0}, 1}
     };
 

@@ -733,7 +733,52 @@ struct StatsManager : Unity::MonoBehaviour
 
     STATIC_FIELD(instance, StatsManager);
     FIELD(itemDictionary, System::Dictionary<System::String COMMA Item>);
+    FIELD(playerUpgradeHealth, System::Dictionary<System::String COMMA System::Int32>);
+    FIELD(playerUpgradeStamina, System::Dictionary<System::String COMMA System::Int32>);
+    FIELD(playerUpgradeExtraJump, System::Dictionary<System::String COMMA System::Int32>);
+    FIELD(playerUpgradeMapPlayerCount, System::Dictionary<System::String COMMA System::Int32>);
+    FIELD(playerUpgradeLaunch, System::Dictionary<System::String COMMA System::Int32>);
+    FIELD(playerUpgradeTumbleClimb, System::Dictionary<System::String COMMA System::Int32>);
+    FIELD(playerUpgradeDeathHeadBattery, System::Dictionary<System::String COMMA System::Int32>);
+    FIELD(playerUpgradeTumbleWings, System::Dictionary<System::String COMMA System::Int32>);
+    FIELD(playerUpgradeSpeed, System::Dictionary<System::String COMMA System::Int32>);
+    FIELD(playerUpgradeCrouchRest, System::Dictionary<System::String COMMA System::Int32>);
+    FIELD(playerUpgradeStrength, System::Dictionary<System::String COMMA System::Int32>);
+    FIELD(playerUpgradeThrow, System::Dictionary<System::String COMMA System::Int32>);
+    FIELD(playerUpgradeRange, System::Dictionary<System::String COMMA System::Int32>);
     METHOD_WRAPPER(LoadItemsFromFolder);
+};
+
+struct PunManager : Unity::MonoBehaviour
+{
+    using Unity::MonoBehaviour::MonoBehaviour;
+
+    META("Assembly-CSharp", "", "PunManager");
+
+    #define PLAYER_UPGRADE_METHOD(name) \
+        int name(System::String steamId, int value) \
+        { \
+            THROW_IF_NULL(); \
+            return s_##name.Call<int, PunManager, System::String, int>(*this, steamId, value); \
+        } \
+        METHOD_WRAPPER(name)
+
+    STATIC_FIELD(instance, PunManager);
+    PLAYER_UPGRADE_METHOD(UpgradePlayerHealth);
+    PLAYER_UPGRADE_METHOD(UpgradePlayerEnergy);
+    PLAYER_UPGRADE_METHOD(UpgradePlayerExtraJump);
+    PLAYER_UPGRADE_METHOD(UpgradeMapPlayerCount);
+    PLAYER_UPGRADE_METHOD(UpgradePlayerTumbleLaunch);
+    PLAYER_UPGRADE_METHOD(UpgradePlayerTumbleClimb);
+    PLAYER_UPGRADE_METHOD(UpgradeDeathHeadBattery);
+    PLAYER_UPGRADE_METHOD(UpgradePlayerTumbleWings);
+    PLAYER_UPGRADE_METHOD(UpgradePlayerSprintSpeed);
+    PLAYER_UPGRADE_METHOD(UpgradePlayerCrouchRest);
+    PLAYER_UPGRADE_METHOD(UpgradePlayerGrabStrength);
+    PLAYER_UPGRADE_METHOD(UpgradePlayerThrowStrength);
+    PLAYER_UPGRADE_METHOD(UpgradePlayerGrabRange);
+
+    #undef PLAYER_UPGRADE_METHOD
 };
 
 struct ExtractionPoint : Unity::MonoBehaviour

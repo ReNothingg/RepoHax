@@ -37,6 +37,7 @@ X(LocKey_AvailableIfHost, L"Available if you are host", L"Доступно ес�
 X(LocKey_UnlimitedRange, L"Unlimited range", L"Неограниченная дальность") \
 X(LocKey_NoOvercharge, L"No overcharge", L"Нет перегрузки") \
 X(LocKey_POWERUPS, L"POWERUPS", L"УЛУЧШЕНИЯ") \
+X(LocKey_PlayerUpgrades, L"PLAYER UPGRADE LEVELS", L"УРОВНИ УЛУЧШЕНИЙ ИГРОКА") \
 X(LocKey_AutoApplyUpgrades, L"Automatically apply upgrades", L"Автоматически применять улучшения") \
 X(LocKey_ManualApplication, L"Manual application", L"Ручное применение") \
 X(LocKey_HEALTHPACKS, L"HEALTH PACKS", L"АПТЕЧКИ") \
