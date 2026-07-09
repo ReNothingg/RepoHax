@@ -106,6 +106,7 @@ namespace Cheat
 
         Hax::IniAddEntry(ini, "Items",      "InfBattery",          &G->InfBattery,          Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Items",      "UseLaser",            &G->UseLaser,            Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Items",      "VkSpawnItem",         &G->VkSpawnItem,         Hax::IniFileWrite_Int,  IniFileRead_IntClamped<VK_F6, 0, 255>);
 
         Hax::IniAddEntry(ini, "Misc",       "TruckEsp",            &G->TruckEsp,            Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
 

@@ -50,8 +50,6 @@ namespace Cheat
             BeginPanel(LINE_ID);
             PanelHeader(G->Loc[LocKey_SPAWN], G->Loc[LocKey_AvailableIfHost]);
             {
-                static Item s_SelectedItem;
-
                 const float spacing2 = 5_px;
                 Hax::Vector2 sz = CalcButtonSize(G->Loc[LocKey_Spawn]);
                 Hax::Gui::BeginHorizontal(spacing2);
@@ -63,8 +61,8 @@ namespace Cheat
                     Hax::Gui::BeginVertical(3_px);
                     {
                         Hax::WStringView preview = L"-";
-                        if (s_SelectedItem != null)
-                            preview = s_SelectedItem.itemName().ToHaxView();
+                        if (G->SelectedItem != null)
+                            preview = G->SelectedItem.itemName().ToHaxView();
 
                         if (DropdownBtn(LINE_ID, preview, dropListW))
                             OpenPopup(dropListId, Hax::Gui::GetCursorPos());
@@ -78,20 +76,23 @@ namespace Cheat
                         for (size_t i = 0; i < nItems; ++i)
                         {
                             const auto& p = G->ItemsPool.begin()[i];
-                            if (Selectable(LINE_ID + i * 10000, p.key, s_SelectedItem == p.value, {.MinW = dropListW}))
+                            if (Selectable(LINE_ID + i * 10000, p.key, G->SelectedItem == p.value, {.MinW = dropListW}))
                             {
-                                s_SelectedItem = p.value;
+                                G->SelectedItem = p.value;
                                 ClosePopup(dropListId);
                             }
                         }
                         EndDropList();
                     }
 
-                    bool enabled = !G->IsClient && s_SelectedItem < G->ItemsPool.Size() && G->IsInGame;
+                    bool enabled = !G->IsClient && G->SelectedItem && G->IsInGame;
                     if (Button(LINE_ID, G->Loc[LocKey_Spawn], {}, {.Enabled = enabled}))
-                        G->ItemToSpawn = s_SelectedItem;
+                        G->ItemToSpawn = G->SelectedItem;
                 }
                 Hax::Gui::EndHorizontal();
+
+                HorizontalLine(1_px);
+                HotkeyEx(Hax::Hash(L"SpawnItemHotkeyEditor"), G->VkSpawnItem, G->Loc[LocKey_Hotkey], G->Loc[LocKey_Spawn]);
             }
             EndPanel();
         }

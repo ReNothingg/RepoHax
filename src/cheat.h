@@ -141,6 +141,8 @@ namespace Cheat
         // Items
         bool                                InfBattery;
         bool                                UseLaser;
+        int                                 VkSpawnItem = VK_F6;
+        Item                                SelectedItem = null;
         Item                                ItemToSpawn = null;
 
         // Levels

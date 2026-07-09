@@ -17,6 +17,16 @@ namespace Cheat
         if (IsKeyJustDown(HAX_LINE, G->VkOpenClose))
             ToggleMenuVisibility();
 
+        constexpr size_t spawnItemHotkeyId = Hax::Hash(L"SpawnItemHotkeyAction");
+        if (G->VkSpawnItem != 0 &&
+            IsKeyJustDown(spawnItemHotkeyId, (Hax::uint8)G->VkSpawnItem) &&
+            G->IsInGame &&
+            !G->IsClient &&
+            G->SelectedItem)
+        {
+            G->ItemToSpawn = G->SelectedItem;
+        }
+
         Hax::Gui::SwitchLayer(L"Background");
         RenderEsp();
         if (G->MenuVisible && G->DarkenBackground)

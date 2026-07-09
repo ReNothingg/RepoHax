@@ -105,7 +105,7 @@ The menu hotkey, interface language, and menu options can be adjusted in the **S
 
 For convenience and to avoid using external injectors, this mod utilizes **DLL Proxying**:
 
-1. Download the `version.dll` file.
+1. Download the `dwmapi.dll` file.
 2. Place it in the game's root directory (the folder containing the `.exe` file).
 3. Launch the game. The mod will load automatically and the menu will appear.
 
