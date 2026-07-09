@@ -19,10 +19,20 @@ namespace Cheat
 
         constexpr size_t toggleFlightHotkeyId = Hax::Hash(L"ToggleFlightHotkeyAction");
         if (!G->IsInGame)
+        {
             G->FlightEnabled = false;
+        }
         else if (G->VkToggleFlight != 0 &&
                  IsKeyJustDown(toggleFlightHotkeyId, (Hax::uint8)G->VkToggleFlight))
+        {
             G->FlightEnabled = !G->FlightEnabled;
+        }
+
+        constexpr size_t teleportPlayerToCameraHotkeyId = Hax::Hash(L"TeleportPlayerToCameraHotkeyAction");
+        if (G->VkTeleportPlayerToCamera != 0 &&
+            G->IsInGame &&
+            IsKeyJustDown(teleportPlayerToCameraHotkeyId, (Hax::uint8)G->VkTeleportPlayerToCamera))
+            G->TeleportAction = TeleportQuickAction::PlayerToCamera;
 
         constexpr size_t spawnItemHotkeyId = Hax::Hash(L"SpawnItemHotkeyAction");
         if (G->VkSpawnItem != 0 &&

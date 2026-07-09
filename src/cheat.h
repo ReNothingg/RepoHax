@@ -20,6 +20,25 @@ namespace Cheat
         Wings, SprintSpeed, CrouchRest, GrabStrength, ThrowStrength, GrabRange, N
     };
 
+    enum class TeleportQuickAction
+    {
+        None,
+        ToTruck,
+        ToExtraction,
+        ToNearestValuable,
+        ToSelectedPlayer,
+        SelectedPlayerToMe,
+        PanicSafe,
+        PlayerToCamera
+    };
+
+    struct SavedPositionSlot
+    {
+        bool                                Active;
+        Unity::Vector3                      Position;
+        int                                 LevelsCompleted;
+    };
+
     struct UpgradeData
     {
         Hax::Gui::TextureHandle Icon;
@@ -66,6 +85,8 @@ namespace Cheat
         bool                                FlightEnabled;
         int                                 VkToggleFlight = VK_F7;
         int                                 FlightSpeed = 10;
+        int                                 FlightSprintBoost = 3;
+        int                                 VkTeleportPlayerToCamera = VK_F9;
         bool                                EasyGrab;
         bool                                UnlimGrabRange;
         bool                                NoOvercharge;
@@ -174,6 +195,20 @@ namespace Cheat
         bool                                TruckEsp;
         bool                                TeleportToTruck;
         bool                                PreserveSaveOnDeath = true;
+        bool                                SessionSafetyEnabled = true;
+        bool                                AutoCancelClientUnsafe = true;
+        bool                                DisableAllPlayersDeadCheck;
+        bool                                ResetSessionSafety;
+        bool                                SaveWorldNow;
+        bool                                ReloadCurrentLevel;
+        bool                                UnlockExtractionPoints;
+        TeleportQuickAction                 TeleportAction = TeleportQuickAction::None;
+        PlayerAvatar                        SelectedTeleportPlayer = null;
+        int                                 SavePositionSlot = -1;
+        int                                 TeleportSavedPositionSlot = -1;
+        int                                 ClearSavedPositionSlot = -1;
+        SavedPositionSlot                   SavedPositions[8]{};
+        Hax::char16                         SessionLastAction[128] = L"Idle";
 
         // Events
         HANDLE                              UnityLoadedEvent;

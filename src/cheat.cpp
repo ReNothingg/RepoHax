@@ -73,6 +73,8 @@ namespace Cheat
         Hax::IniAddEntry(ini, "Stats",      "NoTumble",            &G->NoTumble,            Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Stats",      "VkToggleFlight",      &G->VkToggleFlight,      Hax::IniFileWrite_Int,  IniFileRead_IntClamped<VK_F7, 0, 255>);
         Hax::IniAddEntry(ini, "Stats",      "FlightSpeed",         &G->FlightSpeed,         Hax::IniFileWrite_Int,  IniFileRead_IntClamped<10, 1, 30>);
+        Hax::IniAddEntry(ini, "Stats",      "FlightSprintBoost",    &G->FlightSprintBoost,   Hax::IniFileWrite_Int,  IniFileRead_IntClamped<3, 1, 6>);
+        Hax::IniAddEntry(ini, "Stats",      "VkTeleportPlayerToCamera", &G->VkTeleportPlayerToCamera, Hax::IniFileWrite_Int, IniFileRead_IntClamped<VK_F9, 0, 255>);
         Hax::IniAddEntry(ini, "Stats",      "EasyGrab",            &G->EasyGrab,            Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Stats",      "UnlimitedGrabRange",  &G->UnlimGrabRange,      Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Stats",      "NoOverCharge",        &G->NoOvercharge,        Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
@@ -115,6 +117,9 @@ namespace Cheat
 
         Hax::IniAddEntry(ini, "Misc",       "TruckEsp",            &G->TruckEsp,            Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Misc",       "PreserveSaveOnDeath", &G->PreserveSaveOnDeath, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Misc",       "SessionSafetyEnabled", &G->SessionSafetyEnabled, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Misc",       "AutoCancelClientUnsafe", &G->AutoCancelClientUnsafe, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Misc",       "DisableAllPlayersDeadCheck", &G->DisableAllPlayersDeadCheck, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
 
         Hax::IniLoad(G->Config);
         G->Loc = g_LocDict[G->Language];

@@ -350,7 +350,26 @@ struct RunManager : Unity::MonoBehaviour
         s_ChangeLevel.Call<void, RunManager, bool, bool, int>(*this, completedLevel, levelFailed, changeLevelType);
     }
 
+    void RestartScene()
+    {
+        THROW_IF_NULL();
+        s_RestartScene.Call<void, RunManager>(*this);
+    }
+
+    void ResetProgress()
+    {
+        THROW_IF_NULL();
+        s_ResetProgress.Call<void, RunManager>(*this);
+    }
+
+    void AllPlayersDeadSet(bool set)
+    {
+        THROW_IF_NULL();
+        s_AllPlayersDeadSet.Call<void, RunManager, bool>(*this, set);
+    }
+
     STATIC_FIELD(instance, RunManager);
+    FIELD(runStarted, bool);
     FIELD(levels, System::List<Level>);
     FIELD(levelCurrent, Level);
     FIELD(levelMainMenu, Level);
@@ -360,9 +379,18 @@ struct RunManager : Unity::MonoBehaviour
     FIELD(levelsCompleted, int);
     FIELD(levelIsShop, bool);
     FIELD(allPlayersDead, bool);
+    FIELD(allPlayersDeadCheckDisabled, bool);
+    FIELD(gameOver, bool);
+    FIELD(restarting, bool);
+    FIELD(saveLevel, int);
+    FIELD(loadLevel, int);
 
     METHOD_WRAPPER(ChangeLevel);
     METHOD_WRAPPER(SetRunLevel);
+private:
+    METHOD_WRAPPER(RestartScene);
+    METHOD_WRAPPER(ResetProgress);
+    METHOD_WRAPPER(AllPlayersDeadSet);
 };
 
 struct DataDirector : Unity::MonoBehaviour
@@ -580,7 +608,10 @@ struct LevelGenerator : Unity::MonoBehaviour
 
     STATIC_FIELD(Instance, LevelGenerator);
     FIELD(LevelPathPoints, System::List<LevelPoint>);
+    FIELD(LevelPathTruck, LevelPoint);
     FIELD(Generated, bool);
+    FIELD(ModulesSpawned, int);
+    FIELD(ModuleAmount, int);
 
 private:
     METHOD_WRAPPER(EnemySpawn);
@@ -731,8 +762,19 @@ struct StatsManager : Unity::MonoBehaviour
         s_LoadItemsFromFolder.Call<void, StatsManager>(*this);
     }
 
+    void SaveFileSave()
+    {
+        THROW_IF_NULL();
+        s_SaveFileSave.Call<void, StatsManager>(*this);
+    }
+
     STATIC_FIELD(instance, StatsManager);
     FIELD(itemDictionary, System::Dictionary<System::String COMMA Item>);
+    FIELD(teamName, System::String);
+    FIELD(timePlayed, float);
+    FIELD(saveVersion, int);
+    FIELD(saveFileCurrent, System::String);
+    FIELD(saveFileReady, bool);
     FIELD(playerUpgradeHealth, System::Dictionary<System::String COMMA System::Int32>);
     FIELD(playerUpgradeStamina, System::Dictionary<System::String COMMA System::Int32>);
     FIELD(playerUpgradeExtraJump, System::Dictionary<System::String COMMA System::Int32>);
@@ -747,6 +789,8 @@ struct StatsManager : Unity::MonoBehaviour
     FIELD(playerUpgradeThrow, System::Dictionary<System::String COMMA System::Int32>);
     FIELD(playerUpgradeRange, System::Dictionary<System::String COMMA System::Int32>);
     METHOD_WRAPPER(LoadItemsFromFolder);
+private:
+    METHOD_WRAPPER(SaveFileSave);
 };
 
 struct PunManager : Unity::MonoBehaviour

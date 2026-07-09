@@ -5,6 +5,8 @@
 #include <src/resource.h>
 #include <src/overlay/esp/esp.h>
 
+#include <float.h>
+
 using namespace System;
 using namespace Unity;
 
@@ -54,6 +56,9 @@ namespace Cheat
     static void ParseLevels();
     static void UpdatePlayerUpgradeLevels(PlayerAvatar avatar);
     static void ApplyPlayerUpgradeChange(PlayerAvatar avatar);
+    static void UpdateSessionSafety(PlayerAvatar avatar);
+    static void ProcessWorldSessionCommands(PlayerAvatar avatar);
+    static void ProcessTeleportCommands(PlayerAvatar avatar);
     static void DrawPlayerChams(PlayerAvatar player, Unity::CommandBuffer cb, Unity::Material aliveMat, Unity::Material deadMat);
 
     void HookMonoRuntimeInvoke()
@@ -204,6 +209,434 @@ namespace Cheat
         current = Hax::Max(0, current);
     }
 
+    static void SetSessionAction(const wchar_t* text)
+    {
+        if (!text)
+            text = L"";
+
+        wcsncpy_s(G->SessionLastAction, _countof(G->SessionLastAction), text, _TRUNCATE);
+        Hax::Log(G->Logger, L"Session: %ls", G->SessionLastAction);
+    }
+
+    static void SetSessionActionF(const wchar_t* fmt, ...)
+    {
+        va_list args;
+        va_start(args, fmt);
+        vswprintf_s(G->SessionLastAction, _countof(G->SessionLastAction), fmt, args);
+        va_end(args);
+
+        Hax::Log(G->Logger, L"Session: %ls", G->SessionLastAction);
+    }
+
+    static bool IsPlayerUsable(PlayerAvatar avatar)
+    {
+        return avatar && !avatar.deadSet() && !avatar.isDisabled();
+    }
+
+    static Unity::Transform GetPlayerTransformSafe(PlayerAvatar avatar)
+    {
+        if (!avatar)
+            return null;
+
+        Unity::Transform transform = avatar.playerTransform();
+        if (!transform)
+            transform = avatar.GetTransform();
+
+        return transform;
+    }
+
+    static bool TeleportAvatar(PlayerAvatar avatar, const Unity::Vector3& position)
+    {
+        Unity::Transform transform = GetPlayerTransformSafe(avatar);
+        if (!avatar || !transform)
+            return false;
+
+        transform.SetPosition(position);
+
+        if (avatar.isLocal())
+        {
+            if (PlayerController controller = PlayerController::instance())
+            {
+                controller.GetTransform().SetPosition(position);
+                if (Unity::Rigidbody body = controller.GetComponent<Unity::Rigidbody>())
+                    body.SetVelocity(Unity::Vector3::zero());
+            }
+        }
+
+        if (Unity::Rigidbody body = avatar.GetComponent<Unity::Rigidbody>())
+            body.SetVelocity(Unity::Vector3::zero());
+
+        return true;
+    }
+
+    static bool GetTruckPosition(Unity::Vector3& out)
+    {
+        if (TruckSafetySpawnPoint truck = TruckSafetySpawnPoint::instance())
+        {
+            out = truck.GetTransform().GetPosition() + Unity::Vector3::up() * 0.35f;
+            return true;
+        }
+
+        return false;
+    }
+
+    static bool GetExtractionPosition(Unity::Vector3& out)
+    {
+        RoundDirector dir = RoundDirector::instance();
+        if (!dir)
+            return false;
+
+        if (ExtractionPoint current = dir.extractionPointCurrent())
+        {
+            out = current.GetTransform().GetPosition() + Unity::Vector3::up() * 0.35f;
+            return true;
+        }
+
+        System::List<Unity::GameObject> points = dir.extractionPointList();
+        if (points != null)
+        {
+            for (Unity::GameObject go : points)
+            {
+                ExtractionPoint point = go ? go.GetComponent<ExtractionPoint>() : null;
+                if (point && !point.isLocked())
+                {
+                    out = point.GetTransform().GetPosition() + Unity::Vector3::up() * 0.35f;
+                    return true;
+                }
+            }
+
+            for (Unity::GameObject go : points)
+            {
+                if (go)
+                {
+                    out = go.GetTransform().GetPosition() + Unity::Vector3::up() * 0.35f;
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    static bool GetNearestValuablePosition(const Unity::Vector3& origin, Unity::Vector3& out)
+    {
+        ValuableDirector dir = ValuableDirector::instance();
+        if (!dir || dir.valuableList() == null)
+            return false;
+
+        float bestDistance = FLT_MAX;
+        bool found = false;
+        for (ValuableObject obj : dir.valuableList())
+        {
+            if (!obj || !obj.GetEnabled())
+                continue;
+
+            Unity::Vector3 pos = obj.GetTransform().GetPosition();
+            float dist = Unity::Vector3::Distance(origin, pos);
+            if (dist < bestDistance)
+            {
+                bestDistance = dist;
+                out = pos + Unity::Vector3::up() * 0.5f;
+                found = true;
+            }
+        }
+
+        return found;
+    }
+
+    static bool GetSafePosition(Unity::Vector3& out)
+    {
+        if (GetTruckPosition(out))
+            return true;
+
+        if (GetExtractionPosition(out))
+            return true;
+
+        if (LevelGenerator gen = LevelGenerator::Instance())
+        {
+            if (LevelPoint truck = gen.LevelPathTruck())
+            {
+                out = truck.GetTransform().GetPosition() + Unity::Vector3::up() * 0.5f;
+                return true;
+            }
+
+            System::List<LevelPoint> points = gen.LevelPathPoints();
+            if (points != null && points.Count() > 0 && points[0])
+            {
+                out = points[0].GetTransform().GetPosition() + Unity::Vector3::up() * 0.5f;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    static void ClearOneShotCommands()
+    {
+        G->EnemyToSpawn = null;
+        G->ItemToSpawn = null;
+        G->RarityToSpawn = 0;
+        G->ForceNextLevel = false;
+        G->SaveWorldNow = false;
+        G->ReloadCurrentLevel = false;
+        G->UnlockExtractionPoints = false;
+        G->TeleportToTruck = false;
+        G->TeleportAction = TeleportQuickAction::None;
+        G->PlayerToTumble = null;
+        G->PlayerToKill = null;
+        G->PlayerToRevive = null;
+        G->SetToZero = false;
+        G->SetToMax = false;
+        G->ActivateNextPoint = false;
+        G->PlayerUpgradeToChange = PlayerUpgradeType::N;
+        G->PlayerUpgradeDelta = 0;
+        G->SavePositionSlot = -1;
+        G->TeleportSavedPositionSlot = -1;
+        G->ClearSavedPositionSlot = -1;
+    }
+
+    static void ResetSessionState()
+    {
+        G->FlightEnabled = false;
+        G->ThirdPerson = false;
+        G->DisableOcclusionCulling = false;
+        G->NoFog = false;
+        G->NoTumble = false;
+        G->DisableAllPlayersDeadCheck = false;
+        ClearOneShotCommands();
+        SetSessionAction(L"Safety reset applied");
+    }
+
+    static void UpdateSessionSafety(PlayerAvatar avatar)
+    {
+        if (G->ResetSessionSafety)
+        {
+            G->ResetSessionSafety = false;
+            ResetSessionState();
+        }
+
+        if (!G->SessionSafetyEnabled)
+            return;
+
+        if (!G->IsInGame)
+        {
+            G->FlightEnabled = false;
+            G->TeleportAction = TeleportQuickAction::None;
+            G->TeleportToTruck = false;
+            return;
+        }
+
+        if (!IsPlayerUsable(avatar))
+        {
+            G->FlightEnabled = false;
+        }
+
+        if (RunManager manager = RunManager::instance())
+        {
+            manager.allPlayersDeadCheckDisabled() = G->DisableAllPlayersDeadCheck;
+            if (G->DisableAllPlayersDeadCheck && manager.allPlayersDead())
+                manager.AllPlayersDeadSet(false);
+        }
+
+        if (G->AutoCancelClientUnsafe && G->IsClient)
+        {
+            bool hadUnsafe = false;
+            if (G->EnemyToSpawn || G->ItemToSpawn || G->RarityToSpawn || G->ForceNextLevel ||
+                G->ReloadCurrentLevel || G->UnlockExtractionPoints || G->PlayerToKill ||
+                G->PlayerToRevive || G->PlayerToTumble ||
+                G->TeleportAction == TeleportQuickAction::SelectedPlayerToMe)
+            {
+                hadUnsafe = true;
+            }
+
+            G->EnemyToSpawn = null;
+            G->ItemToSpawn = null;
+            G->RarityToSpawn = 0;
+            G->ForceNextLevel = false;
+            G->ReloadCurrentLevel = false;
+            G->UnlockExtractionPoints = false;
+            G->PlayerToKill = null;
+            G->PlayerToRevive = null;
+            G->PlayerToTumble = null;
+            if (G->TeleportAction == TeleportQuickAction::SelectedPlayerToMe)
+                G->TeleportAction = TeleportQuickAction::None;
+
+            if (hadUnsafe)
+                SetSessionAction(L"Unsafe host-only action cancelled on client");
+        }
+    }
+
+    static void ProcessWorldSessionCommands(PlayerAvatar avatar)
+    {
+        if (G->SaveWorldNow)
+        {
+            G->SaveWorldNow = false;
+            if (StatsManager stats = StatsManager::instance())
+            {
+                stats.SaveFileSave();
+                SetSessionAction(L"SaveFileSave() executed");
+            }
+            else
+                SetSessionAction(L"Save failed: StatsManager is not ready");
+        }
+
+        if (G->ReloadCurrentLevel)
+        {
+            G->ReloadCurrentLevel = false;
+            RunManager manager = RunManager::instance();
+            if (!G->IsInGame || !manager)
+                SetSessionAction(L"Reload skipped: not in game");
+            else if (G->IsClient)
+                SetSessionAction(L"Reload skipped: host only");
+            else
+            {
+                G->FlightEnabled = false;
+                manager.RestartScene();
+                SetSessionAction(L"RestartScene() requested");
+            }
+        }
+
+        if (G->UnlockExtractionPoints)
+        {
+            G->UnlockExtractionPoints = false;
+            RoundDirector dir = RoundDirector::instance();
+            if (!G->IsInGame || !dir)
+                SetSessionAction(L"Extraction unlock skipped: round is not ready");
+            else if (G->IsClient)
+                SetSessionAction(L"Extraction unlock skipped: host only");
+            else
+            {
+                dir.ExtractionPointsUnlock();
+                SetSessionAction(L"Extraction points unlocked");
+            }
+        }
+    }
+
+    static void ProcessTeleportCommands(PlayerAvatar avatar)
+    {
+        if (G->TeleportToTruck)
+        {
+            G->TeleportToTruck = false;
+            G->TeleportAction = TeleportQuickAction::ToTruck;
+        }
+
+        if (G->ClearSavedPositionSlot >= 0)
+        {
+            int slot = G->ClearSavedPositionSlot;
+            G->ClearSavedPositionSlot = -1;
+            if (slot >= 0 && slot < (int)_countof(G->SavedPositions))
+            {
+                G->SavedPositions[slot].Active = false;
+                SetSessionActionF(L"Position slot %d cleared", slot + 1);
+            }
+        }
+
+        if (G->SavePositionSlot >= 0)
+        {
+            int slot = G->SavePositionSlot;
+            G->SavePositionSlot = -1;
+            Unity::Transform transform = GetPlayerTransformSafe(avatar);
+            if (slot >= 0 && slot < (int)_countof(G->SavedPositions) && transform)
+            {
+                G->SavedPositions[slot].Active = true;
+                G->SavedPositions[slot].Position = transform.GetPosition();
+                G->SavedPositions[slot].LevelsCompleted = RunManager::instance() ? RunManager::instance().levelsCompleted() : -1;
+                SetSessionActionF(L"Position saved to slot %d", slot + 1);
+            }
+            else
+                SetSessionAction(L"Position save failed: player is not ready");
+        }
+
+        if (G->TeleportSavedPositionSlot >= 0)
+        {
+            int slot = G->TeleportSavedPositionSlot;
+            G->TeleportSavedPositionSlot = -1;
+            if (slot >= 0 && slot < (int)_countof(G->SavedPositions) && G->SavedPositions[slot].Active && TeleportAvatar(avatar, G->SavedPositions[slot].Position))
+                SetSessionActionF(L"Teleported to saved slot %d", slot + 1);
+            else
+                SetSessionAction(L"Saved slot teleport failed");
+        }
+
+        TeleportQuickAction action = G->TeleportAction;
+        if (action == TeleportQuickAction::None)
+            return;
+        G->TeleportAction = TeleportQuickAction::None;
+
+        if (!IsPlayerUsable(avatar))
+        {
+            SetSessionAction(L"Teleport skipped: local player is not ready");
+            return;
+        }
+
+        Unity::Transform avatarTransform = GetPlayerTransformSafe(avatar);
+        Unity::Vector3 target{};
+
+        switch (action)
+        {
+            case TeleportQuickAction::ToTruck:
+                if (GetTruckPosition(target) && TeleportAvatar(avatar, target))
+                    SetSessionAction(L"Teleported to truck");
+                else
+                    SetSessionAction(L"Truck teleport failed");
+                break;
+
+            case TeleportQuickAction::ToExtraction:
+                if (GetExtractionPosition(target) && TeleportAvatar(avatar, target))
+                    SetSessionAction(L"Teleported to extraction point");
+                else
+                    SetSessionAction(L"Extraction teleport failed");
+                break;
+
+            case TeleportQuickAction::ToNearestValuable:
+                if (avatarTransform && GetNearestValuablePosition(avatarTransform.GetPosition(), target) && TeleportAvatar(avatar, target))
+                    SetSessionAction(L"Teleported to nearest valuable");
+                else
+                    SetSessionAction(L"Valuable teleport failed");
+                break;
+
+            case TeleportQuickAction::ToSelectedPlayer:
+                if (G->SelectedTeleportPlayer && GetPlayerTransformSafe(G->SelectedTeleportPlayer) &&
+                    TeleportAvatar(avatar, GetPlayerTransformSafe(G->SelectedTeleportPlayer).GetPosition() + Unity::Vector3::up() * 0.35f))
+                    SetSessionAction(L"Teleported to selected player");
+                else
+                    SetSessionAction(L"Player teleport failed");
+                break;
+
+            case TeleportQuickAction::SelectedPlayerToMe:
+                if (G->IsClient)
+                    SetSessionAction(L"Player-to-me skipped: host only");
+                else if (G->SelectedTeleportPlayer && avatarTransform &&
+                    TeleportAvatar(G->SelectedTeleportPlayer, avatarTransform.GetPosition() + Unity::Vector3::up() * 0.35f))
+                    SetSessionAction(L"Selected player teleported to you");
+                else
+                    SetSessionAction(L"Player-to-me failed");
+                break;
+
+            case TeleportQuickAction::PanicSafe:
+                if (GetSafePosition(target) && TeleportAvatar(avatar, target))
+                    SetSessionAction(L"Panic teleport completed");
+                else
+                    SetSessionAction(L"Panic teleport failed");
+                break;
+
+            case TeleportQuickAction::PlayerToCamera:
+                if (Unity::Camera camera = SemiFunc::MainCamera())
+                {
+                    target = camera.GetTransform().GetPosition() + camera.GetTransform().GetForward() * 0.75f;
+                    if (TeleportAvatar(avatar, target))
+                        SetSessionAction(L"Player moved to camera");
+                    else
+                        SetSessionAction(L"Camera teleport failed");
+                }
+                else
+                    SetSessionAction(L"Camera teleport failed: camera is not ready");
+                break;
+
+            default:
+                break;
+        }
+    }
+
     static void Hooked__EventSystem_Update(Unity::EventSystem __this)
     {
         try
@@ -216,6 +649,10 @@ namespace Cheat
 
             G->IsClient = !SemiFunc::IsMasterClientOrSingleplayer();
             G->IsInGame = IsInGame();
+
+            UpdateSessionSafety(avatar);
+            ProcessWorldSessionCommands(avatar);
+            ProcessTeleportCommands(avatar);
 
             if (G->IsInGame)
             {
@@ -393,13 +830,6 @@ namespace Cheat
                         }
                     }
                 }
-            }
-
-            if (G->TeleportToTruck)
-            {
-                G->TeleportToTruck = false;
-                if (avatar && !avatar.deadSet())
-                    avatar.playerTransform().SetPosition(TruckSafetySpawnPoint::instance().GetTransform().GetPosition());
             }
 
             if (G->PlayerToTumble)
@@ -630,6 +1060,7 @@ namespace Cheat
     {
         static bool s_NoclipPositionInitialized = false;
         static Unity::Vector3 s_NoclipPosition;
+        static float s_NoclipCurrentSpeed = 0.f;
 
         int& jumps = __this.JumpExtra();
         int cachedJumps = jumps;
@@ -643,6 +1074,7 @@ namespace Cheat
         if (!G->FlightEnabled || !G->IsInGame)
         {
             s_NoclipPositionInitialized = false;
+            s_NoclipCurrentSpeed = 0.f;
             return;
         }
 
@@ -655,6 +1087,7 @@ namespace Cheat
             {
                 G->FlightEnabled = false;
                 s_NoclipPositionInitialized = false;
+                s_NoclipCurrentSpeed = 0.f;
                 return;
             }
 
@@ -681,10 +1114,18 @@ namespace Cheat
 
             if (direction.GetMagnitude() > 0.001f)
             {
-                float speed = (float)G->FlightSpeed;
+                float targetSpeed = (float)G->FlightSpeed;
                 if (__this.sprinting())
-                    speed *= 3.f;
-                s_NoclipPosition = s_NoclipPosition + direction.GetNormalized() * speed * Unity::Time::GetDeltaTime();
+                    targetSpeed *= (float)G->FlightSprintBoost;
+
+                float dt = Unity::Time::GetDeltaTime();
+                s_NoclipCurrentSpeed = Hax::Lerp(s_NoclipCurrentSpeed, targetSpeed, Hax::Clamp(dt * 8.f, 0.f, 1.f));
+                s_NoclipPosition = s_NoclipPosition + direction.GetNormalized() * s_NoclipCurrentSpeed * dt;
+            }
+            else
+            {
+                float dt = Unity::Time::GetDeltaTime();
+                s_NoclipCurrentSpeed = Hax::Lerp(s_NoclipCurrentSpeed, 0.f, Hax::Clamp(dt * 12.f, 0.f, 1.f));
             }
 
             playerTransform.SetPosition(s_NoclipPosition);
@@ -695,6 +1136,7 @@ namespace Cheat
             Hax::LogError(G->Logger, L"Noclip position: %ls", message != null ? message.ToString().GetRawStringData() : L"Exception without message");
             G->FlightEnabled = false;
             s_NoclipPositionInitialized = false;
+            s_NoclipCurrentSpeed = 0.f;
         }
     }
 

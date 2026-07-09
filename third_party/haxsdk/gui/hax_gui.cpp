@@ -525,7 +525,6 @@ namespace Hax::Gui
         }
 
         UpdateKeyboardInputs();
-
         {
             Timer& timer = g_Context->Timer;
             G.Time = timer.Time;

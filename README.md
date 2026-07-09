@@ -15,9 +15,9 @@
 
 > [!CAUTION]
 > To ensure your security, only download the mod from these official sources:
-> 1. [This GitHub Repository] https://github.com/Sacracia/RepoHax
-> 2. [Nexus Mods] https://www.nexusmods.com/repo/mods/214
-> 3. [Playground] https://users.playground.ru/3241576/posts
+> 1. [This GitHub Repository](https://github.com/Sacracia/RepoHax)
+> 2. [Nexus Mods](https://www.nexusmods.com/repo/mods/214)
+> 3. [Playground](https://users.playground.ru/3241576/posts)
 
 ---
 
