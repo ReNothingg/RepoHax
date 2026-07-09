@@ -93,6 +93,9 @@ namespace Cheat
         Hax::IniAddEntry(ini, "Entities",   "PlayersChams",        &G->PlayersChams,        Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
 
         Hax::IniAddEntry(ini, "Vision",     "BetterVision",        &G->BetterVision,        Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Vision",     "NoFog",               &G->NoFog,               Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Vision",     "DisableOcclusion",    &G->DisableOcclusionCulling, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Vision",     "RenderDistance",      &G->RenderDistance,      Hax::IniFileWrite_Int,  IniFileRead_IntClamped<200, 32, 500>);
         Hax::IniAddEntry(ini, "Vision",     "ThirdPerson",         &G->ThirdPerson,         Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Vision",     "Fov",                 &G->Fov,                 Hax::IniFileWrite_Int,  IniFileRead_IntClamped<60, 60, 140>);
         Hax::IniAddEntry(ini, "Vision",     "FlashlightIntensity", &G->Flashlight.Intensity,Hax::IniFileWrite_Int,  IniFileRead_IntClamped<10, 10, 20>);
@@ -111,6 +114,7 @@ namespace Cheat
         Hax::IniAddEntry(ini, "Items",      "VkSpawnItem",         &G->VkSpawnItem,         Hax::IniFileWrite_Int,  IniFileRead_IntClamped<VK_F6, 0, 255>);
 
         Hax::IniAddEntry(ini, "Misc",       "TruckEsp",            &G->TruckEsp,            Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Misc",       "PreserveSaveOnDeath", &G->PreserveSaveOnDeath, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
 
         Hax::IniLoad(G->Config);
         G->Loc = g_LocDict[G->Language];

@@ -478,6 +478,8 @@ namespace Unity
         Matrix4x4                       GetWorldToCameraMatrix();
         float                           GetFarClipPlane();
         void                            SetFarClipPlane(float value);
+        bool                            GetUseOcclusionCulling();
+        void                            SetUseOcclusionCulling(bool value);
         float                           GetNearClipPlane();
         float                           GetFieldOfView();
         void                            SetFieldOfView(float value);

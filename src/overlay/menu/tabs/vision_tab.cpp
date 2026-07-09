@@ -31,6 +31,22 @@ namespace Cheat
                 HorizontalLine(1_px);
 
                 {
+                    ToggleEx(LINE_ID, G->NoFog, G->Loc[LocKey_NoFog], G->Loc[LocKey_NoFogDesc]);
+                }
+
+                HorizontalLine(1_px);
+
+                {
+                    ToggleEx(LINE_ID, G->DisableOcclusionCulling, G->Loc[LocKey_DisableOcclusion], G->Loc[LocKey_DisableOcclusionDesc]);
+
+                    Hax::char16 buf[32] = {};
+                    swprintf_s(buf, _countof(buf), G->Loc[LocKey_Meters].Data(), G->RenderDistance);
+                    SliderEx(LINE_ID, G->Loc[LocKey_RenderDistance], buf, &G->RenderDistance, 32, 500, SliderConvertInt);
+                }
+
+                HorizontalLine(1_px);
+
+                {
                     ToggleEx(LINE_ID, G->ThirdPerson, G->Loc[LocKey_ThirdPerson]);
                 }
 

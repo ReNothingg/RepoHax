@@ -42,6 +42,7 @@ namespace Cheat
     static void Hooked__PostLateUpdateLoop();
     static void Hooked__PresentAfterDrawLoop();
     static void Hooked__EnemyRigidbody_FixedUpdate(EnemyRigidbody __this);
+    static void Hooked__DataDirector_SaveDeleteCheck(DataDirector __this, bool leaveGame);
 
     static bool IsInGame();
     static void* GetPlayerLoopPtr(System::Type type, System::Type subType);
@@ -91,6 +92,7 @@ namespace Cheat
         HOOK(PhysGrabber::s_PhysGrabOverCharge.Address, PhysGrabber_PhysGrabOverCharge);
         HOOK(SpectateCamera::s_HeadEnergyLogic.Address, SpectateCamera_HeadEnergyLogic);
         HOOK(EnemyRigidbody::s_FixedUpdate.Address, EnemyRigidbody_FixedUpdate);
+        HOOK(DataDirector::s_SaveDeleteCheck.Address, DataDirector_SaveDeleteCheck);
         #undef HOOK
 
         ::FlushInstructionCache(::GetCurrentProcess(), nullptr, 0);
@@ -595,7 +597,12 @@ namespace Cheat
             }
 
             if (direction.GetMagnitude() > 0.001f)
-                s_NoclipPosition = s_NoclipPosition + direction.GetNormalized() * (float)G->FlightSpeed * Unity::Time::GetDeltaTime();
+            {
+                float speed = (float)G->FlightSpeed;
+                if (__this.sprinting())
+                    speed *= 3.f;
+                s_NoclipPosition = s_NoclipPosition + direction.GetNormalized() * speed * Unity::Time::GetDeltaTime();
+            }
 
             playerTransform.SetPosition(s_NoclipPosition);
         }
@@ -750,6 +757,9 @@ namespace Cheat
 
     static float prevPlane;
     static float prevFov;
+    static bool prevOcclusionCulling;
+    static bool restoreClipPlane;
+    static bool restoreOcclusionCulling;
     static void Hooked__PostLateUpdateLoop()
     {
         try
@@ -758,11 +768,26 @@ namespace Cheat
             PlayerAvatar avatar = PlayerAvatar::instance();
             if (mainCam && G->IsInGame && avatar)
             {
-                if (G->BetterVision)
+                restoreClipPlane = false;
+                restoreOcclusionCulling = false;
+                if (G->BetterVision || G->DisableOcclusionCulling)
                 {
                     prevPlane = mainCam.GetFarClipPlane();
+                    restoreClipPlane = true;
+                }
+
+                if (G->BetterVision)
+                {
                     if (prevPlane < 32.f)
                         mainCam.SetFarClipPlane(32.f);
+                }
+
+                if (G->DisableOcclusionCulling)
+                {
+                    prevOcclusionCulling = mainCam.GetUseOcclusionCulling();
+                    restoreOcclusionCulling = true;
+                    mainCam.SetUseOcclusionCulling(false);
+                    mainCam.SetFarClipPlane((float)G->RenderDistance);
                 }
 
                 prevFov = mainCam.GetFieldOfView();
@@ -885,6 +910,32 @@ namespace Cheat
         }
 
         G->PostLateUpdateHook.unsafe_call<void>();
+
+        static bool s_FogOverridden = false;
+        static bool s_PreviousFog = true;
+        try
+        {
+            if (G->NoFog && G->IsInGame)
+            {
+                if (!s_FogOverridden)
+                {
+                    s_PreviousFog = Unity::RenderSettings::GetFog();
+                    s_FogOverridden = true;
+                }
+                Unity::RenderSettings::SetFog(false);
+            }
+            else if (s_FogOverridden)
+            {
+                Unity::RenderSettings::SetFog(s_PreviousFog);
+                s_FogOverridden = false;
+            }
+        }
+        catch (System::Exception& ex)
+        {
+            System::String message = ex.Message();
+            Hax::LogError(G->Logger, L"Fog override: %ls", message != null ? message.ToString().GetRawStringData() : L"Exception without message");
+            s_FogOverridden = false;
+        }
     }
 
     static void Hooked__PresentAfterDrawLoop()
@@ -894,8 +945,17 @@ namespace Cheat
             Unity::Camera mainCam = SemiFunc::MainCamera();
             if (mainCam && G->IsInGame)
             {
-                if (G->BetterVision)
+                if (restoreClipPlane)
+                {
                     mainCam.SetFarClipPlane(prevPlane);
+                    restoreClipPlane = false;
+                }
+
+                if (restoreOcclusionCulling)
+                {
+                    mainCam.SetUseOcclusionCulling(prevOcclusionCulling);
+                    restoreOcclusionCulling = false;
+                }
 
                 mainCam.SetFieldOfView(prevFov);
 
@@ -1213,6 +1273,20 @@ namespace Cheat
         }
 
         G->EnemyRigidbody_FixedUpdate_Hook.unsafe_call<void, EnemyRigidbody>(__this);
+    }
+
+    static void Hooked__DataDirector_SaveDeleteCheck(DataDirector __this, bool leaveGame)
+    {
+        if (G->PreserveSaveOnDeath)
+        {
+            if (RunManager manager = RunManager::instance(); manager && manager.allPlayersDead())
+            {
+                Hax::Log(G->Logger, L"Save deletion after player death was prevented");
+                return;
+            }
+        }
+
+        G->DataDirector_SaveDeleteCheck_Hook.unsafe_call<void, DataDirector, bool>(__this, leaveGame);
     }
 
     static bool IsInGame()

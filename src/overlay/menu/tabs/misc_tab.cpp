@@ -39,6 +39,13 @@ namespace Cheat
                 }
             }
             EndPanel();
+
+            BeginPanel(LINE_ID);
+            PanelHeader(G->Loc[LocKey_SAVE]);
+            {
+                ToggleEx(LINE_ID, G->PreserveSaveOnDeath, G->Loc[LocKey_PreserveSaveOnDeath], G->Loc[LocKey_PreserveSaveOnDeathDesc]);
+            }
+            EndPanel();
         }
         Hax::Gui::Dummy({0.f, 0.f});
         Hax::Gui::EndVertical();

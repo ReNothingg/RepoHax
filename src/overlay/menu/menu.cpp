@@ -30,6 +30,24 @@ namespace Cheat
         {DrawMiscTab, LocKey_Misc, L'\uf86d'},
         {DrawSettingsTab, LocKey_Settings, L'\uf013'}
     };
+
+    struct TabGroup
+    {
+        LocKey Loc;
+        Hax::char16 Icon;
+        size_t Tabs[3];
+        size_t Count;
+    };
+
+    static const TabGroup g_TabGroups[] =
+    {
+        {LocKey_PlayerCategory, L'\ue473', {0, 2, 6}, 3},
+        {LocKey_WorldCategory,  L'\uf57d', {1, 3, 5}, 3},
+        {LocKey_ToolsCategory,  L'\uf7d9', {4, 7, 0}, 2},
+        {LocKey_Settings,       L'\uf013', {8, 0, 0}, 1}
+    };
+
+    static size_t g_ActiveGroup = 0;
     static size_t g_ActiveTab = 0;
 
     void ToggleMenuVisibility()
@@ -101,20 +119,20 @@ namespace Cheat
             {
                 const float sidePanelWidth = Hax::Gui::GetContentRegionAvail().X;
 
-                Hax::Gui::Space(30_px);
+                Hax::Gui::Space(24_px);
 
                 // Logo
                 {
                     Hax::Gui::BeginHorizontal();
                     {
-                        Hax::Vector2 customSize = Hax::Gui::GetImageSize(G->Logo) * (0.5f * Hax::Gui::G.ScaleFactor);
+                        Hax::Vector2 customSize = Hax::Gui::GetImageSize(G->Logo) * (0.38f * Hax::Gui::G.ScaleFactor);
                         Hax::Gui::Space((sidePanelWidth - customSize.X) / 2.f);
                         Image(G->Logo, customSize);
                     }
                     Hax::Gui::EndHorizontal();
                 }
 
-                Hax::Gui::Space(30_px);
+                Hax::Gui::Space(24_px);
 
                 const float padding = 12_px;
                 Hax::Gui::BeginHorizontal();
@@ -124,24 +142,21 @@ namespace Cheat
                     {
                         Hax::Gui::BeginVertical(5_px);
                         {
-                            for (size_t i = 0; i < 3; ++i)
-                                if (TabButton(HAX_LINE + i, G->Loc[g_Tabs[i].Loc], g_Tabs[i].Icon, g_ActiveTab == i))
-                                    g_ActiveTab = i;
+                            DescLabel(G->Loc[LocKey_Navigation]);
+                            Hax::Gui::Space(5_px);
 
-                            Hax::Gui::Space(7_px);
-                            Hax::Gui::HorizontalLine(1_px, 0x2F3033FF);
-                            Hax::Gui::Space(7_px);
-
-                            for (size_t i = 3; i < 8; ++i)
-                                if (TabButton(HAX_LINE + i, G->Loc[g_Tabs[i].Loc], g_Tabs[i].Icon, g_ActiveTab == i))
-                                    g_ActiveTab = i;
-
-                            Hax::Gui::Space(7_px);
-                            Hax::Gui::HorizontalLine(1_px, 0x2F3033FF);
-                            Hax::Gui::Space(7_px);
-
-                            if (TabButton(HAX_LINE + 8, G->Loc[g_Tabs[8].Loc], g_Tabs[8].Icon, g_ActiveTab == 8))
-                                g_ActiveTab = 8;
+                            for (size_t i = 0; i < _countof(g_TabGroups); ++i)
+                            {
+                                const TabGroup& group = g_TabGroups[i];
+                                if (TabButton(HAX_LINE + i, G->Loc[group.Loc], group.Icon, g_ActiveGroup == i))
+                                {
+                                    if (g_ActiveGroup != i)
+                                    {
+                                        g_ActiveGroup = i;
+                                        g_ActiveTab = group.Tabs[0];
+                                    }
+                                }
+                            }
                         }
                         Hax::Gui::EndVertical();
                     }
@@ -153,13 +168,41 @@ namespace Cheat
             }
 
             // Main area
-            Hax::Gui::BeginContainer(Hax::Hash("Main area"), {.Clip = true, .ScrollY = true});
+            Hax::Gui::BeginVertical();
             {
-                Hax::Gui::BeginHorizontal();
-                g_Tabs[g_ActiveTab].DrawFunc();
-                Hax::Gui::EndHorizontal();
+                const TabGroup& activeGroup = g_TabGroups[g_ActiveGroup];
+                Hax::Gui::BeginContainer(Hax::Hash("Sub navigation"), {.H = 62_px});
+                {
+                    Hax::Gui::BeginVertical();
+                    Hax::Gui::Space(13_px);
+                    Hax::Gui::BeginHorizontal(8_px);
+                    Hax::Gui::Space(16_px);
+                    {
+                        const float available = Hax::Gui::GetContentRegionAvail().X - 16_px - 8_px * (float)(activeGroup.Count - 1);
+                        const float buttonWidth = available / (float)activeGroup.Count;
+                        for (size_t i = 0; i < activeGroup.Count; ++i)
+                        {
+                            const size_t tabIndex = activeGroup.Tabs[i];
+                            if (SubTabButton(Hax::Hash(L"SubTab") + tabIndex, G->Loc[g_Tabs[tabIndex].Loc], g_ActiveTab == tabIndex, buttonWidth))
+                                g_ActiveTab = tabIndex;
+                        }
+                    }
+                    Hax::Gui::EndHorizontal();
+                    Hax::Gui::EndVertical();
+                }
+                Hax::Gui::EndContainer();
+
+                Hax::Gui::HorizontalLine(1_px, 0x252A35FF);
+
+                Hax::Gui::BeginContainer(Hax::Hash("Main area"), {.Clip = true, .ScrollY = true});
+                {
+                    Hax::Gui::BeginHorizontal();
+                    g_Tabs[g_ActiveTab].DrawFunc();
+                    Hax::Gui::EndHorizontal();
+                }
+                Hax::Gui::EndContainer();
             }
-            Hax::Gui::EndContainer();
+            Hax::Gui::EndVertical();
         }
         EndWindow();
     }

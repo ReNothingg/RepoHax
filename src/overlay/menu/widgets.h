@@ -51,6 +51,7 @@ namespace Cheat
     bool Button(size_t id, Hax::WStringView label, Hax::WStringView desc = {}, const ButtonParams& params = {});
     void Image(Hax::Gui::TextureHandle tex, Hax::Vector2 customSize = {});
     bool TabButton(size_t id, Hax::WStringView text, Hax::char16 icon16, bool active);
+    bool SubTabButton(size_t id, Hax::WStringView text, bool active, float width);
     void BeginPanel(size_t id);
     void EndPanel();
     int SliderConvertInt(int min, int max, float m);

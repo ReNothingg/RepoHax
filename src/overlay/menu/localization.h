@@ -11,6 +11,10 @@ X(LocKey_Items, L"Items", L"Предметы") \
 X(LocKey_Level, L"Level", L"Уровень") \
 X(LocKey_Misc, L"Miscellaneous", L"Разное")\
 X(LocKey_Settings, L"Settings", L"Настройки")\
+X(LocKey_PlayerCategory, L"Player", L"Игрок") \
+X(LocKey_WorldCategory, L"World", L"Мир") \
+X(LocKey_ToolsCategory, L"Tools", L"Инструменты") \
+X(LocKey_Navigation, L"NAVIGATION", L"НАВИГАЦИЯ") \
 X(LocKey_HEALTH, L"HEALTH", L"ЗДОРОВЬЕ") \
 X(LocKey_Godmode, L"Godmode", L"Бессмертие") \
 X(LocKey_HealToMax, L"Heal to max", L"Исцелиться на максимум") \
@@ -24,7 +28,7 @@ X(LocKey_InfiniteJumps, L"Infinite jumps", L"Бесконечные прыжки
 X(LocKey_Flight, L"Noclip", L"Ноклип") \
 X(LocKey_FlightSpeed, L"Noclip speed", L"Скорость ноклипа") \
 X(LocKey_ToggleFlight, L"Toggle noclip", L"Включить / выключить ноклип") \
-X(LocKey_FlightControls, L"Fly through objects: WASD, Space / Ctrl - up / down", L"Полёт сквозь объекты: WASD, Пробел / Ctrl — вверх / вниз") \
+X(LocKey_FlightControls, L"WASD, Space / Ctrl; hold Sprint for 3x speed", L"WASD, Пробел / Ctrl; удерживайте бег для скорости x3") \
 X(LocKey_DontTumble, L"Dont tumble", L"Не падать") \
 X(LocKey_DisableTumbling, L"Disable tumbling from external sources", L"Отключает падение от внешних источников") \
 X(LocKey_GRAB, L"GRAB", L"ЗАХВАТ") \
@@ -39,6 +43,12 @@ X(LocKey_HEALTHPACKS, L"HEALTH PACKS", L"АПТЕЧКИ") \
 X(LocKey_ApplyAidKit, L"Apply an available aid kit to yourself", L"Применить на себя доступную аптечку") \
 X(LocKey_VIEW, L"VIEW", L"ОБЗОР") \
 X(LocKey_BetterVision, L"Better vision", L"Улучшенное зрение") \
+X(LocKey_NoFog, L"Disable fog", L"Отключить туман") \
+X(LocKey_NoFogDesc, L"Remove environmental distance fog", L"Убрать окружающий туман, ограничивающий видимость") \
+X(LocKey_DisableOcclusion, L"Disable occlusion culling", L"Отключить occlusion culling") \
+X(LocKey_DisableOcclusionDesc, L"Render geometry hidden by camera occlusion", L"Отображать геометрию, скрываемую камерой") \
+X(LocKey_RenderDistance, L"Render distance", L"Дальность отрисовки") \
+X(LocKey_Meters, L"%d m", L"%d м") \
 X(LocKey_ThirdPerson, L"Third person", L"Третье лицо") \
 X(LocKey_DefaultView, L"Default", L"Обычное") \
 X(LocKey_Degrees, L"%d degrees", L"%d градусов") \
@@ -87,6 +97,9 @@ X(LocKey_LaserCrosshair, L"Laser crosshair", L"Лазерный прицел") \
 X(LocKey_SPAWN, L"SPAWN", L"СПАВН") \
 X(LocKey_TRUCK, L"TRUCK", L"ФУРГОН") \
 X(LocKey_TeleportTruck, L"Teleport to truck", L"Телепортироваться в фургон") \
+X(LocKey_SAVE, L"SAVE PROTECTION", L"ЗАЩИТА СОХРАНЕНИЯ") \
+X(LocKey_PreserveSaveOnDeath, L"Keep save after death", L"Сохранять save после смерти") \
+X(LocKey_PreserveSaveOnDeathDesc, L"Prevent automatic save deletion after the whole team dies", L"Не удалять save после гибели всей команды") \
 X(LocKey_Cosmetic, L"Cosmetic", L"Косметика") \
 X(LocKey_Common, L"Common", L"Обычная") \
 X(LocKey_Uncommon, L"Uncommon", L"Необычная") \

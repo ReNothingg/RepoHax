@@ -8,21 +8,21 @@ namespace Cheat
 {
     namespace Theme
     {
-        constexpr Hax::Gui::Color WindowBg = 0x141415FF;
-        constexpr Hax::Gui::Color SidePanelBg = 0x1D1E20FF;
-        constexpr float WindowR = 10.f;
+        constexpr Hax::Gui::Color WindowBg = 0x101217FF;
+        constexpr Hax::Gui::Color SidePanelBg = 0x171A21FF;
+        constexpr float WindowR = 12.f;
         constexpr float MainFontSize = 13.f;
         constexpr float DescFontSize = 12.f;
         constexpr float TitleFontSize = 12.f;
-        constexpr Hax::Gui::LinearColor BtnBg = 0x292A2CFF;
-        constexpr Hax::Gui::Color BtnBgActive = 0x353639FF;
-        constexpr Hax::Gui::Color DescColor = 0x9299A8FF;
-        constexpr Hax::Gui::Color DisabledMaskCol = 0x18181AB0;
-        constexpr Hax::Gui::Color SeparatorCol = 0x202022FF;
-        constexpr Hax::Gui::Color MainCol = 0xC2C2C2FF;
-        constexpr Hax::Gui::Color PopupBg = 0x1D1E20FF;
-        constexpr Hax::Gui::Color FrameColor = 0x282828FF;
-        constexpr Hax::Gui::Color ActiveColor = 0x2B69FFFF;
+        constexpr Hax::Gui::LinearColor BtnBg = 0x222630FF;
+        constexpr Hax::Gui::Color BtnBgActive = 0x263C6BFF;
+        constexpr Hax::Gui::Color DescColor = 0x8D96A8FF;
+        constexpr Hax::Gui::Color DisabledMaskCol = 0x101217B8;
+        constexpr Hax::Gui::Color SeparatorCol = 0x252A35FF;
+        constexpr Hax::Gui::Color MainCol = 0xD8DCE5FF;
+        constexpr Hax::Gui::Color PopupBg = 0x191D25FF;
+        constexpr Hax::Gui::Color FrameColor = 0x222630FF;
+        constexpr Hax::Gui::Color ActiveColor = 0x4C82FFFF;
         constexpr Hax::Gui::Color HeaderColor = Hax::Gui::Color::White;
 
         #define DESC_FONT G->NunitoSans_SemiBold
@@ -33,7 +33,7 @@ namespace Cheat
         constexpr Hax::Vector2 ToggleSize = {35.f, 20.f};
         constexpr float SettingBtnSize = 16.f;
         constexpr float CheckboxSize = 16.f;
-        constexpr Hax::Vector2 WindowSize = {1200.f, 600.f};
+        constexpr Hax::Vector2 WindowSize = {1240.f, 660.f};
     }
 
     void Label(Hax::Gui::FontHandle hFont, Hax::WStringView text, float fontH, Hax::Gui::Color col)
@@ -118,7 +118,7 @@ namespace Cheat
 
     bool BeginSidePanel()
     {
-        const Hax::Vector2 size = {215_px, Hax::Gui::GetContentRegionAvail().Y};
+        const Hax::Vector2 size = {195_px, Hax::Gui::GetContentRegionAvail().Y};
 
         constexpr size_t id = Hax::Hash("SidePanel");
         Hax::Gui::BeginContainer(id, {.W = size.X, .H = size.Y});
@@ -443,6 +443,42 @@ namespace Cheat
         return Hax::Gui::IsItemClicked(id);
     }
 
+    bool SubTabButton(size_t id, Hax::WStringView text, bool active, float width)
+    {
+        const float fontSize = Hax::Gui::Scale(Theme::MainFontSize);
+        const Hax::Vector2 padding = {14_px, 8_px};
+        const Hax::Vector2 textSize = Hax::Gui::CalcTextSize(MAIN_FONT, text, fontSize);
+        const Hax::Vector2 size = {width, textSize.Y + padding.Y * 2.f};
+        const Hax::Rect bounds = Hax::Rect::FromPosSize(Hax::Gui::GetCursorPos(), size);
+
+        Hax::Gui::PlaceItem(size);
+        if (!Hax::Gui::IsItemVisible(bounds))
+            return false;
+
+        const auto interaction = Hax::Gui::Interact(id, bounds);
+        Hax::Gui::LinearAnim& state = Hax::Gui::GetState<Hax::Gui::LinearAnim>(id);
+        state.Elapse(interaction.Hovered ? Hax::Gui::GetDeltaTime() : -Hax::Gui::GetDeltaTime(), 0.12f);
+        if (interaction.Hovered)
+            Hax::Gui::SetMouseIcon(Hax::Gui::MouseIcon_Hand);
+
+        const Hax::Gui::Color bg = active
+            ? 0x263C6BFF
+            : Hax::Lerp(Hax::Gui::LinearColor(0x191D25FF), Hax::Gui::LinearColor(0x222936FF), state.Progress).ToColor();
+        Hax::Gui::DrawRect(bounds.Min, bounds.Max, {.FillColor = bg, .Rounding = 7_px});
+
+        if (active)
+        {
+            Hax::Vector2 accentMax = bounds.Max;
+            accentMax.Y = bounds.Min.Y + 2_px;
+            Hax::Gui::DrawRect(bounds.Min, accentMax, {.FillColor = Theme::ActiveColor, .Rounding = 7_px});
+        }
+
+        Hax::Gui::DrawString(MAIN_FONT, text, bounds.Min + (size - textSize) / 2.f, fontSize,
+            {.Color = active ? 0xFFFFFFFF : 0xB5BDCBFF});
+
+        return Hax::Gui::IsItemClicked(id);
+    }
+
     void BeginPanel(size_t id)
     {
         Hax::Gui::BeginContainer(id, {.FitY = true});
@@ -451,7 +487,7 @@ namespace Cheat
         {
             const Hax::Vector2 a = Hax::Gui::GetCursorPos();
             const Hax::Vector2 b = a + containerSize;
-            Hax::Gui::DrawRect(a, b, {.FillColor = 0x18181AFF, .Rounding = 5_px});
+            Hax::Gui::DrawRect(a, b, {.FillColor = 0x171A21FF, .Rounding = 8_px});
         }
         else
             Hax::Gui::PushSkipDrawing();

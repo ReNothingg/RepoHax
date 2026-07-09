@@ -116,6 +116,9 @@ namespace Cheat
 
         // Vision
         bool                                BetterVision;
+        bool                                NoFog;
+        bool                                DisableOcclusionCulling;
+        int                                 RenderDistance = 200;
         bool                                ThirdPerson;
         bool                                MaxHeadBattery;
         int                                 Fov = 60;
@@ -162,6 +165,7 @@ namespace Cheat
         // Misc
         bool                                TruckEsp;
         bool                                TeleportToTruck;
+        bool                                PreserveSaveOnDeath = true;
 
         // Events
         HANDLE                              UnityLoadedEvent;
@@ -269,6 +273,7 @@ namespace Cheat
         SafetyHookInline                    PhysGrabber_PhysGrabOverCharge_Hook;
         SafetyHookInline                    SpectateCamera_HeadEnergyLogic_Hook;
         SafetyHookInline                    EnemyRigidbody_FixedUpdate_Hook;
+        SafetyHookInline                    DataDirector_SaveDeleteCheck_Hook;
 
         SafetyHookInline                    UpdateHook;
         SafetyHookInline                    PostLateUpdateHook;

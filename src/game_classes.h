@@ -131,6 +131,7 @@ struct PlayerController : Unity::MonoBehaviour
     FIELD(CrouchSpeed, float);
     FIELD(JumpExtra, int);
     FIELD(SprintSpeedUpgrades, float);
+    FIELD(sprinting, bool);
 
     METHOD_WRAPPER(FixedUpdate);
     METHOD_WRAPPER(Update);
@@ -358,9 +359,20 @@ struct RunManager : Unity::MonoBehaviour
     FIELD(previousRunLevel, Level);
     FIELD(levelsCompleted, int);
     FIELD(levelIsShop, bool);
+    FIELD(allPlayersDead, bool);
 
     METHOD_WRAPPER(ChangeLevel);
     METHOD_WRAPPER(SetRunLevel);
+};
+
+struct DataDirector : Unity::MonoBehaviour
+{
+    using Unity::MonoBehaviour::MonoBehaviour;
+
+    META("Assembly-CSharp", "", "DataDirector");
+
+    STATIC_FIELD(instance, DataDirector);
+    METHOD_WRAPPER(SaveDeleteCheck);
 };
 
 struct GameDirector : Unity::MonoBehaviour

@@ -29,7 +29,7 @@
 - Infinite Stamina
 - Modify Walk / Crouch / Sprint Speed
 - Infinite Jumps
-- Noclip (`F7` by default): WASD to move through objects, Space / Ctrl to move up / down
+- Noclip (`F7` by default): WASD to move through objects, Space / Ctrl to move up / down; hold the configured Sprint action for 3x speed
 - No tumble (fall only by pressing hotkey)
 
 **Grabbing**
@@ -58,6 +58,8 @@
 
 **Vision**
 - Enhanced Vision
+- Disable environmental fog
+- Disable occlusion culling with configurable render distance
 - Third Person
 - Field of View (FOV)
 - Infinite Dead Head Charge

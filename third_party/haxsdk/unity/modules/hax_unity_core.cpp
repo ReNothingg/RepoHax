@@ -712,6 +712,20 @@ namespace Unity
         s_Method.Call<void>(*this, value);
     }
 
+    bool Camera::GetUseOcclusionCulling()
+    {
+        THROW_IF_NULL();
+        static auto s_Method = Camera::typeof().GetMethod("get_useOcclusionCulling", nullptr, true).Wrap();
+        return s_Method.Call<bool>(*this);
+    }
+
+    void Camera::SetUseOcclusionCulling(bool value)
+    {
+        THROW_IF_NULL();
+        static auto s_Method = Camera::typeof().GetMethod("set_useOcclusionCulling", nullptr, true).Wrap();
+        s_Method.Call<void>(*this, value);
+    }
+
     float Camera::GetNearClipPlane()
     {
         THROW_IF_NULL();
