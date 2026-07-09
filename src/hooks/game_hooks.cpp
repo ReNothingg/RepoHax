@@ -228,6 +228,13 @@ namespace Cheat
         Hax::Log(G->Logger, L"Session: %ls", G->SessionLastAction);
     }
 
+    static void SetSessionAction(Hax::WStringView text)
+    {
+        wchar_t buf[128]{};
+        swprintf_s(buf, _countof(buf), L"%.*ls", (int)text.Size(), text.Data());
+        SetSessionAction(buf);
+    }
+
     static bool IsPlayerUsable(PlayerAvatar avatar)
     {
         return avatar && !avatar.deadSet() && !avatar.isDisabled();
@@ -404,7 +411,7 @@ namespace Cheat
         G->NoTumble = false;
         G->DisableAllPlayersDeadCheck = false;
         ClearOneShotCommands();
-        SetSessionAction(L"Safety reset applied");
+        SetSessionAction(G->Loc[LocKey_ActionSafetyReset]);
     }
 
     static void UpdateSessionSafety(PlayerAvatar avatar)
@@ -462,7 +469,7 @@ namespace Cheat
                 G->TeleportAction = TeleportQuickAction::None;
 
             if (hadUnsafe)
-                SetSessionAction(L"Unsafe host-only action cancelled on client");
+                SetSessionAction(G->Loc[LocKey_ActionUnsafeCancelled]);
         }
     }
 
@@ -474,10 +481,10 @@ namespace Cheat
             if (StatsManager stats = StatsManager::instance())
             {
                 stats.SaveFileSave();
-                SetSessionAction(L"SaveFileSave() executed");
+                SetSessionAction(G->Loc[LocKey_ActionSaveDone]);
             }
             else
-                SetSessionAction(L"Save failed: StatsManager is not ready");
+                SetSessionAction(G->Loc[LocKey_ActionSaveFailedStats]);
         }
 
         if (G->ReloadCurrentLevel)
@@ -485,14 +492,14 @@ namespace Cheat
             G->ReloadCurrentLevel = false;
             RunManager manager = RunManager::instance();
             if (!G->IsInGame || !manager)
-                SetSessionAction(L"Reload skipped: not in game");
+                SetSessionAction(G->Loc[LocKey_ActionReloadNotInGame]);
             else if (G->IsClient)
-                SetSessionAction(L"Reload skipped: host only");
+                SetSessionAction(G->Loc[LocKey_ActionReloadHostOnly]);
             else
             {
                 G->FlightEnabled = false;
                 manager.RestartScene();
-                SetSessionAction(L"RestartScene() requested");
+                SetSessionAction(G->Loc[LocKey_ActionReloadRequested]);
             }
         }
 
@@ -501,13 +508,13 @@ namespace Cheat
             G->UnlockExtractionPoints = false;
             RoundDirector dir = RoundDirector::instance();
             if (!G->IsInGame || !dir)
-                SetSessionAction(L"Extraction unlock skipped: round is not ready");
+                SetSessionAction(G->Loc[LocKey_ActionExtractionNotReady]);
             else if (G->IsClient)
-                SetSessionAction(L"Extraction unlock skipped: host only");
+                SetSessionAction(G->Loc[LocKey_ActionExtractionHostOnly]);
             else
             {
                 dir.ExtractionPointsUnlock();
-                SetSessionAction(L"Extraction points unlocked");
+                SetSessionAction(G->Loc[LocKey_ActionExtractionUnlocked]);
             }
         }
     }
@@ -527,7 +534,7 @@ namespace Cheat
             if (slot >= 0 && slot < (int)_countof(G->SavedPositions))
             {
                 G->SavedPositions[slot].Active = false;
-                SetSessionActionF(L"Position slot %d cleared", slot + 1);
+                SetSessionActionF(G->Loc[LocKey_ActionPositionSlotClearedFmt].Data(), slot + 1);
             }
         }
 
@@ -541,10 +548,10 @@ namespace Cheat
                 G->SavedPositions[slot].Active = true;
                 G->SavedPositions[slot].Position = transform.GetPosition();
                 G->SavedPositions[slot].LevelsCompleted = RunManager::instance() ? RunManager::instance().levelsCompleted() : -1;
-                SetSessionActionF(L"Position saved to slot %d", slot + 1);
+                SetSessionActionF(G->Loc[LocKey_ActionPositionSlotSavedFmt].Data(), slot + 1);
             }
             else
-                SetSessionAction(L"Position save failed: player is not ready");
+                SetSessionAction(G->Loc[LocKey_ActionPositionSaveFailed]);
         }
 
         if (G->TeleportSavedPositionSlot >= 0)
@@ -552,9 +559,9 @@ namespace Cheat
             int slot = G->TeleportSavedPositionSlot;
             G->TeleportSavedPositionSlot = -1;
             if (slot >= 0 && slot < (int)_countof(G->SavedPositions) && G->SavedPositions[slot].Active && TeleportAvatar(avatar, G->SavedPositions[slot].Position))
-                SetSessionActionF(L"Teleported to saved slot %d", slot + 1);
+                SetSessionActionF(G->Loc[LocKey_ActionTeleportedSlotFmt].Data(), slot + 1);
             else
-                SetSessionAction(L"Saved slot teleport failed");
+                SetSessionAction(G->Loc[LocKey_ActionTeleportedSlotFailed]);
         }
 
         TeleportQuickAction action = G->TeleportAction;
@@ -564,7 +571,7 @@ namespace Cheat
 
         if (!IsPlayerUsable(avatar))
         {
-            SetSessionAction(L"Teleport skipped: local player is not ready");
+            SetSessionAction(G->Loc[LocKey_ActionTeleportPlayerNotReady]);
             return;
         }
 
@@ -575,48 +582,48 @@ namespace Cheat
         {
             case TeleportQuickAction::ToTruck:
                 if (GetTruckPosition(target) && TeleportAvatar(avatar, target))
-                    SetSessionAction(L"Teleported to truck");
+                    SetSessionAction(G->Loc[LocKey_ActionTeleportedTruck]);
                 else
-                    SetSessionAction(L"Truck teleport failed");
+                    SetSessionAction(G->Loc[LocKey_ActionTeleportedTruckFailed]);
                 break;
 
             case TeleportQuickAction::ToExtraction:
                 if (GetExtractionPosition(target) && TeleportAvatar(avatar, target))
-                    SetSessionAction(L"Teleported to extraction point");
+                    SetSessionAction(G->Loc[LocKey_ActionTeleportedExtraction]);
                 else
-                    SetSessionAction(L"Extraction teleport failed");
+                    SetSessionAction(G->Loc[LocKey_ActionTeleportedExtractionFailed]);
                 break;
 
             case TeleportQuickAction::ToNearestValuable:
                 if (avatarTransform && GetNearestValuablePosition(avatarTransform.GetPosition(), target) && TeleportAvatar(avatar, target))
-                    SetSessionAction(L"Teleported to nearest valuable");
+                    SetSessionAction(G->Loc[LocKey_ActionTeleportedValuable]);
                 else
-                    SetSessionAction(L"Valuable teleport failed");
+                    SetSessionAction(G->Loc[LocKey_ActionTeleportedValuableFailed]);
                 break;
 
             case TeleportQuickAction::ToSelectedPlayer:
                 if (G->SelectedTeleportPlayer && GetPlayerTransformSafe(G->SelectedTeleportPlayer) &&
                     TeleportAvatar(avatar, GetPlayerTransformSafe(G->SelectedTeleportPlayer).GetPosition() + Unity::Vector3::up() * 0.35f))
-                    SetSessionAction(L"Teleported to selected player");
+                    SetSessionAction(G->Loc[LocKey_ActionTeleportedPlayer]);
                 else
-                    SetSessionAction(L"Player teleport failed");
+                    SetSessionAction(G->Loc[LocKey_ActionTeleportedPlayerFailed]);
                 break;
 
             case TeleportQuickAction::SelectedPlayerToMe:
                 if (G->IsClient)
-                    SetSessionAction(L"Player-to-me skipped: host only");
+                    SetSessionAction(G->Loc[LocKey_ActionBringPlayerHostOnly]);
                 else if (G->SelectedTeleportPlayer && avatarTransform &&
                     TeleportAvatar(G->SelectedTeleportPlayer, avatarTransform.GetPosition() + Unity::Vector3::up() * 0.35f))
-                    SetSessionAction(L"Selected player teleported to you");
+                    SetSessionAction(G->Loc[LocKey_ActionBringPlayerDone]);
                 else
-                    SetSessionAction(L"Player-to-me failed");
+                    SetSessionAction(G->Loc[LocKey_ActionBringPlayerFailed]);
                 break;
 
             case TeleportQuickAction::PanicSafe:
                 if (GetSafePosition(target) && TeleportAvatar(avatar, target))
-                    SetSessionAction(L"Panic teleport completed");
+                    SetSessionAction(G->Loc[LocKey_ActionPanicDone]);
                 else
-                    SetSessionAction(L"Panic teleport failed");
+                    SetSessionAction(G->Loc[LocKey_ActionPanicFailed]);
                 break;
 
             case TeleportQuickAction::PlayerToCamera:
@@ -624,12 +631,12 @@ namespace Cheat
                 {
                     target = camera.GetTransform().GetPosition() + camera.GetTransform().GetForward() * 0.75f;
                     if (TeleportAvatar(avatar, target))
-                        SetSessionAction(L"Player moved to camera");
+                        SetSessionAction(G->Loc[LocKey_ActionPlayerToCameraDone]);
                     else
-                        SetSessionAction(L"Camera teleport failed");
+                        SetSessionAction(G->Loc[LocKey_ActionCameraTeleportFailed]);
                 }
                 else
-                    SetSessionAction(L"Camera teleport failed: camera is not ready");
+                    SetSessionAction(G->Loc[LocKey_ActionCameraNotReady]);
                 break;
 
             default:

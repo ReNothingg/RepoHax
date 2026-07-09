@@ -101,6 +101,89 @@ X(LocKey_TeleportTruck, L"Teleport to truck", L"Телепортироватьс
 X(LocKey_SAVE, L"SAVE PROTECTION", L"ЗАЩИТА СОХРАНЕНИЯ") \
 X(LocKey_PreserveSaveOnDeath, L"Keep save after death", L"Сохранять save после смерти") \
 X(LocKey_PreserveSaveOnDeathDesc, L"Prevent automatic save deletion after the whole team dies", L"Не удалять save после гибели всей команды") \
+X(LocKey_TeleportPosition, L"TELEPORT / POSITION", L"ТЕЛЕПОРТ / ПОЗИЦИЯ") \
+X(LocKey_TeleportPositionDesc, L"Quick movement tools and saved slots", L"Быстрые телепорты и сохранённые точки") \
+X(LocKey_TruckShort, L"Truck", L"Фургон") \
+X(LocKey_ExtractionShort, L"Extraction", L"Точка сбора") \
+X(LocKey_NearestValuable, L"Nearest valuable", L"Ближайшая ценность") \
+X(LocKey_PanicSafe, L"Panic safe", L"Безопасная точка") \
+X(LocKey_PlayerTarget, L"Player target", L"Целевой игрок") \
+X(LocKey_GoToPlayer, L"Go to player", L"К игроку") \
+X(LocKey_BringToMe, L"Bring to me", L"Ко мне") \
+X(LocKey_PlayerToCamera, L"Player to camera", L"Игрок к камере") \
+X(LocKey_SavedPositions, L"SAVED POSITIONS", L"СОХРАНЁННЫЕ ПОЗИЦИИ") \
+X(LocKey_SavedPositionsDesc, L"Runtime slots; cleared after game restart", L"Временные слоты; очищаются после перезапуска игры") \
+X(LocKey_PositionSlotFmt, L"Slot %d  [L%d]  %.1f, %.1f, %.1f", L"Слот %d  [У%d]  %.1f, %.1f, %.1f") \
+X(LocKey_PositionSlotEmptyFmt, L"Slot %d  empty", L"Слот %d  пусто") \
+X(LocKey_SaveButton, L"Save", L"Сохранить") \
+X(LocKey_GoButton, L"Go", L"Перейти") \
+X(LocKey_ClearButton, L"Clear", L"Очистить") \
+X(LocKey_SessionStatus, L"SESSION STATUS", L"СТАТУС СЕССИИ") \
+X(LocKey_InGame, L"In game", L"В игре") \
+X(LocKey_Authority, L"Authority", L"Права") \
+X(LocKey_LevelName, L"Level", L"Уровень") \
+X(LocKey_LastAction, L"Last action", L"Последнее действие") \
+X(LocKey_Yes, L"yes", L"да") \
+X(LocKey_No, L"no", L"нет") \
+X(LocKey_Client, L"client", L"клиент") \
+X(LocKey_HostSingleplayer, L"host / singleplayer", L"хост / одиночная игра") \
+X(LocKey_Idle, L"Idle", L"Ожидание") \
+X(LocKey_SafetyGuards, L"SAFETY GUARDS", L"ЗАЩИТА СЕССИИ") \
+X(LocKey_SafetyGuardsDesc, L"Guards that prevent stuck sessions and unsafe client-side calls", L"Защита от зависших состояний и опасных клиентских действий") \
+X(LocKey_SessionSafety, L"Session safety", L"Защита сессии") \
+X(LocKey_SessionSafetyDesc, L"Auto-disables movement tools when player/game is not ready", L"Автоматически отключает инструменты движения, если игрок или игра не готовы") \
+X(LocKey_CancelHostOnlyClient, L"Cancel host-only actions on client", L"Отменять host-only действия на клиенте") \
+X(LocKey_CancelHostOnlyClientDesc, L"Prevents queued host-only actions from firing without authority", L"Не даёт выполнять host-only действия без нужных прав") \
+X(LocKey_BlockAllDeadGameover, L"Block all-dead gameover", L"Блокировать gameover при смерти всех") \
+X(LocKey_BlockAllDeadGameoverDesc, L"Host/singleplayer safety switch; reset it after testing", L"Защитный переключатель для хоста/одиночной игры; сбросьте после теста") \
+X(LocKey_ResetRiskyToggles, L"Reset risky toggles", L"Сбросить рискованные функции") \
+X(LocKey_ResetRiskyTogglesDesc, L"Turns off noclip/visual overrides and clears queued commands", L"Отключает noclip/визуальные переопределения и очищает очередь команд") \
+X(LocKey_QuickSessionActions, L"QUICK SESSION ACTIONS", L"БЫСТРЫЕ ДЕЙСТВИЯ СЕССИИ") \
+X(LocKey_SaveNow, L"Save now", L"Сохранить сейчас") \
+X(LocKey_ReloadLevel, L"Reload level", L"Перезагрузить уровень") \
+X(LocKey_UnlockExtractionPoints, L"Unlock extraction points", L"Открыть точки сбора") \
+X(LocKey_WorldSessionStatus, L"WORLD / SESSION STATUS", L"СТАТУС МИРА / СЕССИИ") \
+X(LocKey_WorldSessionTools, L"WORLD / SESSION TOOLS", L"ИНСТРУМЕНТЫ МИРА / СЕССИИ") \
+X(LocKey_WorldSessionToolsDesc, L"Host-only actions are disabled for clients", L"Host-only действия отключены для клиентов") \
+X(LocKey_LevelsCompletedShort, L"Levels completed", L"Пройдено уровней") \
+X(LocKey_Modules, L"Modules", L"Модули") \
+X(LocKey_ActiveEnemies, L"Active enemies", L"Активные враги") \
+X(LocKey_ValuablesCount, L"Valuables", L"Ценности") \
+X(LocKey_ExtractionPointsCount, L"Extraction points", L"Точки сбора") \
+X(LocKey_SaveFile, L"Save file", L"Файл сохранения") \
+X(LocKey_SprintBoost, L"Sprint boost", L"Ускорение при беге") \
+X(LocKey_ActionSafetyReset, L"Safety reset applied", L"Защитный сброс применён") \
+X(LocKey_ActionUnsafeCancelled, L"Unsafe host-only action cancelled on client", L"Опасное host-only действие отменено на клиенте") \
+X(LocKey_ActionSaveDone, L"Save completed", L"Сохранение выполнено") \
+X(LocKey_ActionSaveFailedStats, L"Save failed: StatsManager is not ready", L"Сохранение не выполнено: StatsManager не готов") \
+X(LocKey_ActionReloadNotInGame, L"Reload skipped: not in game", L"Перезагрузка пропущена: вы не в игре") \
+X(LocKey_ActionReloadHostOnly, L"Reload skipped: host only", L"Перезагрузка пропущена: только хост") \
+X(LocKey_ActionReloadRequested, L"Level reload requested", L"Перезагрузка уровня запрошена") \
+X(LocKey_ActionExtractionNotReady, L"Extraction unlock skipped: round is not ready", L"Открытие точек сбора пропущено: раунд не готов") \
+X(LocKey_ActionExtractionHostOnly, L"Extraction unlock skipped: host only", L"Открытие точек сбора пропущено: только хост") \
+X(LocKey_ActionExtractionUnlocked, L"Extraction points unlocked", L"Точки сбора открыты") \
+X(LocKey_ActionPositionSlotClearedFmt, L"Position slot %d cleared", L"Слот позиции %d очищен") \
+X(LocKey_ActionPositionSlotSavedFmt, L"Position saved to slot %d", L"Позиция сохранена в слот %d") \
+X(LocKey_ActionPositionSaveFailed, L"Position save failed: player is not ready", L"Позиция не сохранена: игрок не готов") \
+X(LocKey_ActionTeleportedSlotFmt, L"Teleported to saved slot %d", L"Телепорт в сохранённый слот %d") \
+X(LocKey_ActionTeleportedSlotFailed, L"Saved slot teleport failed", L"Телепорт в сохранённый слот не выполнен") \
+X(LocKey_ActionTeleportPlayerNotReady, L"Teleport skipped: local player is not ready", L"Телепорт пропущен: локальный игрок не готов") \
+X(LocKey_ActionTeleportedTruck, L"Teleported to truck", L"Телепорт в фургон выполнен") \
+X(LocKey_ActionTeleportedTruckFailed, L"Truck teleport failed", L"Телепорт в фургон не выполнен") \
+X(LocKey_ActionTeleportedExtraction, L"Teleported to extraction point", L"Телепорт к точке сбора выполнен") \
+X(LocKey_ActionTeleportedExtractionFailed, L"Extraction teleport failed", L"Телепорт к точке сбора не выполнен") \
+X(LocKey_ActionTeleportedValuable, L"Teleported to nearest valuable", L"Телепорт к ближайшей ценности выполнен") \
+X(LocKey_ActionTeleportedValuableFailed, L"Valuable teleport failed", L"Телепорт к ценности не выполнен") \
+X(LocKey_ActionTeleportedPlayer, L"Teleported to selected player", L"Телепорт к выбранному игроку выполнен") \
+X(LocKey_ActionTeleportedPlayerFailed, L"Player teleport failed", L"Телепорт к игроку не выполнен") \
+X(LocKey_ActionBringPlayerHostOnly, L"Player-to-me skipped: host only", L"Перемещение игрока к вам пропущено: только хост") \
+X(LocKey_ActionBringPlayerDone, L"Selected player teleported to you", L"Выбранный игрок телепортирован к вам") \
+X(LocKey_ActionBringPlayerFailed, L"Player-to-me failed", L"Перемещение игрока к вам не выполнено") \
+X(LocKey_ActionPanicDone, L"Panic teleport completed", L"Аварийный телепорт выполнен") \
+X(LocKey_ActionPanicFailed, L"Panic teleport failed", L"Аварийный телепорт не выполнен") \
+X(LocKey_ActionPlayerToCameraDone, L"Player moved to camera", L"Игрок перемещён к камере") \
+X(LocKey_ActionCameraTeleportFailed, L"Camera teleport failed", L"Телепорт к камере не выполнен") \
+X(LocKey_ActionCameraNotReady, L"Camera teleport failed: camera is not ready", L"Телепорт к камере не выполнен: камера не готова") \
 X(LocKey_Cosmetic, L"Cosmetic", L"Косметика") \
 X(LocKey_Common, L"Common", L"Обычная") \
 X(LocKey_Uncommon, L"Uncommon", L"Необычная") \

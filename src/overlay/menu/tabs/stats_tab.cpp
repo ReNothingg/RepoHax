@@ -150,12 +150,12 @@ namespace Cheat
                 {
                     Hax::char16 buf[16]{};
                     swprintf_s(buf, _countof(buf), L"%dx", G->FlightSprintBoost);
-                    SliderEx(LINE_ID, L"Sprint boost", buf, &G->FlightSprintBoost, 1, 6, SliderConvertInt);
+                    SliderEx(LINE_ID, G->Loc[LocKey_SprintBoost], buf, &G->FlightSprintBoost, 1, 6, SliderConvertInt);
                 }
 
                 HotkeyEx(Hax::Hash(L"ToggleFlightHotkeyEditor"), G->VkToggleFlight, G->Loc[LocKey_Hotkey], G->Loc[LocKey_ToggleFlight]);
 
-                HotkeyEx(Hax::Hash(L"TeleportCameraHotkeyEditor"), G->VkTeleportPlayerToCamera, G->Loc[LocKey_Hotkey], L"Teleport player to camera");
+                HotkeyEx(Hax::Hash(L"TeleportCameraHotkeyEditor"), G->VkTeleportPlayerToCamera, G->Loc[LocKey_Hotkey], G->Loc[LocKey_PlayerToCamera]);
 
                 HorizontalLine(1_px);
 

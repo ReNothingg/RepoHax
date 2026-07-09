@@ -52,6 +52,12 @@ namespace Cheat
         Hax::Gui::EndHorizontal();
     }
 
+    static Hax::WStringView LastActionText()
+    {
+        Hax::WStringView action = Hax::WStringView(G->SessionLastAction);
+        return action == Hax::WStringView(L"Idle") ? G->Loc[LocKey_Idle] : action;
+    }
+
     static void DrawPlayerTeleportSelector()
     {
         GameDirector dir = GameDirector::instance();
@@ -99,7 +105,7 @@ namespace Cheat
         Hax::char16 label[96]{};
         if (data.Active)
         {
-            swprintf_s(label, _countof(label), L"Slot %d  [L%d]  %.1f, %.1f, %.1f",
+            swprintf_s(label, _countof(label), G->Loc[LocKey_PositionSlotFmt].Data(),
                 slot + 1,
                 data.LevelsCompleted,
                 data.Position.X,
@@ -107,7 +113,7 @@ namespace Cheat
                 data.Position.Z);
         }
         else
-            swprintf_s(label, _countof(label), L"Slot %d  empty", slot + 1);
+            swprintf_s(label, _countof(label), G->Loc[LocKey_PositionSlotEmptyFmt].Data(), slot + 1);
 
         Hax::Gui::BeginVertical(4_px);
         {
@@ -118,13 +124,13 @@ namespace Cheat
             const float btnW = (w - spacing * 2.f) / 3.f;
             Hax::Gui::BeginHorizontal(spacing);
             {
-                if (Button(id + 1, L"Save", {}, { .Enabled = G->IsInGame, .MinW = btnW }))
+                if (Button(id + 1, G->Loc[LocKey_SaveButton], {}, { .Enabled = G->IsInGame, .MinW = btnW }))
                     G->SavePositionSlot = slot;
 
-                if (Button(id + 2, L"Go", {}, { .Enabled = G->IsInGame && data.Active, .MinW = btnW }))
+                if (Button(id + 2, G->Loc[LocKey_GoButton], {}, { .Enabled = G->IsInGame && data.Active, .MinW = btnW }))
                     G->TeleportSavedPositionSlot = slot;
 
-                if (Button(id + 3, L"Clear", {}, { .Enabled = data.Active, .MinW = btnW }))
+                if (Button(id + 3, G->Loc[LocKey_ClearButton], {}, { .Enabled = data.Active, .MinW = btnW }))
                     G->ClearSavedPositionSlot = slot;
             }
             Hax::Gui::EndHorizontal();
@@ -148,7 +154,7 @@ namespace Cheat
         Hax::Gui::Dummy({0.f, 0.f});
         {
             BeginPanel(LINE_ID);
-            PanelHeader(L"TELEPORT / POSITION", L"Quick movement tools and saved slots");
+            PanelHeader(G->Loc[LocKey_TeleportPosition], G->Loc[LocKey_TeleportPositionDesc]);
             {
                 const float w = Hax::Gui::GetContentRegionAvail().X;
                 const float gap = 5_px;
@@ -156,20 +162,20 @@ namespace Cheat
 
                 Hax::Gui::BeginHorizontal(gap);
                 {
-                    if (Button(LINE_ID, L"Truck", {}, {.Enabled = playerReady, .MinW = halfW}))
+                    if (Button(LINE_ID, G->Loc[LocKey_TruckShort], {}, {.Enabled = playerReady, .MinW = halfW}))
                         G->TeleportAction = TeleportQuickAction::ToTruck;
 
-                    if (Button(LINE_ID, L"Extraction", {}, {.Enabled = playerReady, .MinW = halfW}))
+                    if (Button(LINE_ID, G->Loc[LocKey_ExtractionShort], {}, {.Enabled = playerReady, .MinW = halfW}))
                         G->TeleportAction = TeleportQuickAction::ToExtraction;
                 }
                 Hax::Gui::EndHorizontal();
 
                 Hax::Gui::BeginHorizontal(gap);
                 {
-                    if (Button(LINE_ID, L"Nearest valuable", {}, {.Enabled = playerReady, .MinW = halfW}))
+                    if (Button(LINE_ID, G->Loc[LocKey_NearestValuable], {}, {.Enabled = playerReady, .MinW = halfW}))
                         G->TeleportAction = TeleportQuickAction::ToNearestValuable;
 
-                    if (Button(LINE_ID, L"Panic safe", {}, {.Enabled = playerReady, .MinW = halfW}))
+                    if (Button(LINE_ID, G->Loc[LocKey_PanicSafe], {}, {.Enabled = playerReady, .MinW = halfW}))
                         G->TeleportAction = TeleportQuickAction::PanicSafe;
                 }
                 Hax::Gui::EndHorizontal();
@@ -180,29 +186,29 @@ namespace Cheat
 
                 HorizontalLine(1_px);
 
-                MainLabel(L"Player target");
+                MainLabel(G->Loc[LocKey_PlayerTarget]);
                 DrawPlayerTeleportSelector();
 
                 Hax::Gui::BeginHorizontal(gap);
                 {
                     bool targetReady = playerReady && G->SelectedTeleportPlayer && G->SelectedTeleportPlayer != avatar;
-                    if (Button(LINE_ID, L"Go to player", {}, {.Enabled = targetReady, .MinW = halfW}))
+                    if (Button(LINE_ID, G->Loc[LocKey_GoToPlayer], {}, {.Enabled = targetReady, .MinW = halfW}))
                         G->TeleportAction = TeleportQuickAction::ToSelectedPlayer;
 
-                    if (Button(LINE_ID, L"Bring to me", G->Loc[LocKey_HostOnly], {.Enabled = targetReady && !G->IsClient, .MinW = halfW}))
+                    if (Button(LINE_ID, G->Loc[LocKey_BringToMe], G->Loc[LocKey_HostOnly], {.Enabled = targetReady && !G->IsClient, .MinW = halfW}))
                         G->TeleportAction = TeleportQuickAction::SelectedPlayerToMe;
                 }
                 Hax::Gui::EndHorizontal();
 
                 HorizontalLine(1_px);
 
-                if (Button(LINE_ID, L"Player to camera", {}, {.Enabled = playerReady, .MinW = Hax::Gui::GetContentRegionAvail().X}))
+                if (Button(LINE_ID, G->Loc[LocKey_PlayerToCamera], {}, {.Enabled = playerReady, .MinW = Hax::Gui::GetContentRegionAvail().X}))
                     G->TeleportAction = TeleportQuickAction::PlayerToCamera;
             }
             EndPanel();
 
             BeginPanel(LINE_ID);
-            PanelHeader(L"SAVED POSITIONS", L"Runtime slots; cleared after game restart");
+            PanelHeader(G->Loc[LocKey_SavedPositions], G->Loc[LocKey_SavedPositionsDesc]);
             {
                 for (int i = 0; i < (int)_countof(G->SavedPositions); ++i)
                 {
@@ -225,38 +231,38 @@ namespace Cheat
         Hax::Gui::Dummy({0.f, 0.f});
         {
             BeginPanel(LINE_ID);
-            PanelHeader(L"SESSION STATUS");
+            PanelHeader(G->Loc[LocKey_SessionStatus]);
             {
-                StatusLine(L"In game", G->IsInGame ? L"yes" : L"no", G->IsInGame ? 0x7EE787FF : 0xFF8A8AFF);
-                StatusLine(L"Authority", G->IsClient ? L"client" : L"host / singleplayer", G->IsClient ? 0xFFD36EFF : 0x7EE787FF);
+                StatusLine(G->Loc[LocKey_InGame], G->IsInGame ? G->Loc[LocKey_Yes] : G->Loc[LocKey_No], G->IsInGame ? 0x7EE787FF : 0xFF8A8AFF);
+                StatusLine(G->Loc[LocKey_Authority], G->IsClient ? G->Loc[LocKey_Client] : G->Loc[LocKey_HostSingleplayer], G->IsClient ? 0xFFD36EFF : 0x7EE787FF);
 
                 RunManager manager = RunManager::instance();
                 System::String levelName = (manager && manager.levelCurrent()) ? manager.levelCurrent().NarrativeName() : null;
-                StatusLine(L"Level", levelName != null ? levelName.ToHaxView() : Hax::WStringView(L"-"));
+                StatusLine(G->Loc[LocKey_LevelName], levelName != null ? levelName.ToHaxView() : Hax::WStringView(L"-"));
 
-                StatusLine(L"Last action", Hax::WStringView(G->SessionLastAction), 0xC2C8D4FF);
+                StatusLine(G->Loc[LocKey_LastAction], LastActionText(), 0xC2C8D4FF);
             }
             EndPanel();
 
             BeginPanel(LINE_ID);
-            PanelHeader(L"SAFETY GUARDS", L"Guards that prevent stuck sessions and unsafe client-side calls");
+            PanelHeader(G->Loc[LocKey_SafetyGuards], G->Loc[LocKey_SafetyGuardsDesc]);
             {
-                ToggleEx(LINE_ID, G->SessionSafetyEnabled, L"Session safety", L"Auto-disables movement tools when player/game is not ready");
+                ToggleEx(LINE_ID, G->SessionSafetyEnabled, G->Loc[LocKey_SessionSafety], G->Loc[LocKey_SessionSafetyDesc]);
                 HorizontalLine(1_px);
-                ToggleEx(LINE_ID, G->AutoCancelClientUnsafe, L"Cancel host-only actions on client", L"Prevents queued host-only actions from firing without authority");
+                ToggleEx(LINE_ID, G->AutoCancelClientUnsafe, G->Loc[LocKey_CancelHostOnlyClient], G->Loc[LocKey_CancelHostOnlyClientDesc]);
                 HorizontalLine(1_px);
                 ToggleEx(LINE_ID, G->PreserveSaveOnDeath, G->Loc[LocKey_PreserveSaveOnDeath], G->Loc[LocKey_PreserveSaveOnDeathDesc]);
                 HorizontalLine(1_px);
-                ToggleEx(LINE_ID, G->DisableAllPlayersDeadCheck, L"Block all-dead gameover", L"Host/singleplayer safety switch; reset it after testing");
+                ToggleEx(LINE_ID, G->DisableAllPlayersDeadCheck, G->Loc[LocKey_BlockAllDeadGameover], G->Loc[LocKey_BlockAllDeadGameoverDesc]);
                 HorizontalLine(1_px);
 
-                if (Button(LINE_ID, L"Reset risky toggles", L"Turns off noclip/freecam/visual overrides and clears queued commands", {.MinW = Hax::Gui::GetContentRegionAvail().X}))
+                if (Button(LINE_ID, G->Loc[LocKey_ResetRiskyToggles], G->Loc[LocKey_ResetRiskyTogglesDesc], {.MinW = Hax::Gui::GetContentRegionAvail().X}))
                     G->ResetSessionSafety = true;
             }
             EndPanel();
 
             BeginPanel(LINE_ID);
-            PanelHeader(L"QUICK SESSION ACTIONS");
+            PanelHeader(G->Loc[LocKey_QuickSessionActions]);
             {
                 const float gap = 5_px;
                 const float w = Hax::Gui::GetContentRegionAvail().X;
@@ -264,15 +270,15 @@ namespace Cheat
 
                 Hax::Gui::BeginHorizontal(gap);
                 {
-                    if (Button(LINE_ID, L"Save now", {}, {.Enabled = G->IsInGame && StatsManager::instance(), .MinW = halfW}))
+                    if (Button(LINE_ID, G->Loc[LocKey_SaveNow], {}, {.Enabled = G->IsInGame && StatsManager::instance(), .MinW = halfW}))
                         G->SaveWorldNow = true;
 
-                    if (Button(LINE_ID, L"Reload level", G->Loc[LocKey_HostOnly], {.Enabled = G->IsInGame && !G->IsClient && RunManager::instance(), .MinW = halfW}))
+                    if (Button(LINE_ID, G->Loc[LocKey_ReloadLevel], G->Loc[LocKey_HostOnly], {.Enabled = G->IsInGame && !G->IsClient && RunManager::instance(), .MinW = halfW}))
                         G->ReloadCurrentLevel = true;
                 }
                 Hax::Gui::EndHorizontal();
 
-                if (Button(LINE_ID, L"Unlock extraction points", G->Loc[LocKey_HostOnly], {.Enabled = G->IsInGame && !G->IsClient && RoundDirector::instance(), .MinW = w}))
+                if (Button(LINE_ID, G->Loc[LocKey_UnlockExtractionPoints], G->Loc[LocKey_HostOnly], {.Enabled = G->IsInGame && !G->IsClient && RoundDirector::instance(), .MinW = w}))
                     G->UnlockExtractionPoints = true;
             }
             EndPanel();
