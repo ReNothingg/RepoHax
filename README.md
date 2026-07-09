@@ -1,8 +1,9 @@
 # RepoHax
 
-<img width="1338" height="691" alt="Screenshot 2026-04-19 021713 (1)" src="https://github.com/user-attachments/assets/aa2fec40-b32f-4616-b4df-26789feb9843" />
+<img width="1338" height="691" alt="Screenshot" src=".github\image.png" />
 
 ### About
+
 **RepoHax** is an advanced internal C++ cheat for the game **REPO**, developed with minimal reliance on third-party libraries. The project features custom graphics library and SDK for interacting with the Unity engine directly from C++ (both will be released as standalone open-source projects in the future).
 
 > [!IMPORTANT]
@@ -11,6 +12,7 @@
 ---
 
 ### Official Sources
+
 > [!CAUTION]
 > To ensure your security, only download the mod from these official sources:
 > 1. [This GitHub Repository] https://github.com/Sacracia/RepoHax
