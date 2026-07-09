@@ -439,6 +439,12 @@ namespace Unity
         return s_Type;
     }
 
+    float Time::GetDeltaTime()
+    {
+        static auto s_Method = typeof().GetMethod("get_deltaTime", nullptr, true).Wrap();
+        return s_Method.InternalCall<float>();
+    }
+
     float Time::GetTimeScale()
     {
         static auto s_Method = typeof().GetMethod("get_timeScale", nullptr, true).Wrap();

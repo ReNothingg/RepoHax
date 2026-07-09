@@ -14,6 +14,12 @@ namespace Unity
         void                            AddForce(const Vector3& force, ForceMode mode = ForceMode::Force);
         Vector3                         GetVelocity();
         void                            SetVelocity(const Vector3& value);
+        bool                            GetUseGravity();
+        void                            SetUseGravity(bool value);
+        bool                            GetDetectCollisions();
+        void                            SetDetectCollisions(bool value);
+        bool                            GetIsKinematic();
+        void                            SetIsKinematic(bool value);
     };
 
     struct RaycastHit

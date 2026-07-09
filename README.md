@@ -29,6 +29,7 @@
 - Infinite Stamina
 - Modify Walk / Crouch / Sprint Speed
 - Infinite Jumps
+- Noclip (`F7` by default): WASD to move through objects, Space / Ctrl to move up / down
 - No tumble (fall only by pressing hotkey)
 
 **Grabbing**

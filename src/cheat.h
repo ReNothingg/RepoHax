@@ -58,6 +58,9 @@ namespace Cheat
         bool                                InfStamina;
         bool                                InfJumps;
         bool                                NoTumble;
+        bool                                FlightEnabled;
+        int                                 VkToggleFlight = VK_F7;
+        int                                 FlightSpeed = 10;
         bool                                EasyGrab;
         bool                                UnlimGrabRange;
         bool                                NoOvercharge;

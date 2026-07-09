@@ -427,10 +427,125 @@ namespace Cheat
 
             G->PlayerController_FixedUpdate_Hook.unsafe_call<void, PlayerController>(__this);
         }
+
+        struct ColliderState
+        {
+            Unity::Collider Value;
+            bool WasEnabled;
+        };
+
+        static bool s_WasFlying = false;
+        static Hax::Vector<ColliderState> s_ColliderStates;
+        static Unity::Rigidbody s_FlightBody;
+        static bool s_BodyUsedGravity = true;
+        static bool s_BodyDetectedCollisions = true;
+        static bool s_BodyWasKinematic = false;
+
+        auto restorePhysics = [&]()
+        {
+            for (ColliderState& state : s_ColliderStates)
+            {
+                if (state.Value)
+                    state.Value.SetEnabled(state.WasEnabled);
+            }
+            s_ColliderStates.Clear();
+
+            if (s_FlightBody)
+            {
+                s_FlightBody.SetIsKinematic(s_BodyWasKinematic);
+                s_FlightBody.SetUseGravity(s_BodyUsedGravity);
+                s_FlightBody.SetDetectCollisions(s_BodyDetectedCollisions);
+                s_FlightBody = null;
+            }
+        };
+
+        try
+        {
+            if (!G->FlightEnabled || !G->IsInGame)
+            {
+                if (s_WasFlying)
+                {
+                    restorePhysics();
+                    if (Unity::Rigidbody body = __this.GetComponent<Unity::Rigidbody>())
+                        body.SetVelocity(Unity::Vector3::zero());
+                }
+                s_WasFlying = false;
+                return;
+            }
+
+            PlayerAvatar avatar = PlayerAvatar::instance();
+            Unity::Camera camera = SemiFunc::MainCamera();
+            Unity::Rigidbody body = __this.GetComponent<Unity::Rigidbody>();
+            if (!avatar || avatar.deadSet() || avatar.isDisabled() || !camera || !body)
+            {
+                restorePhysics();
+                G->FlightEnabled = false;
+                s_WasFlying = false;
+                return;
+            }
+
+            if (!s_FlightBody)
+            {
+                s_FlightBody = body;
+                s_BodyUsedGravity = body.GetUseGravity();
+                s_BodyDetectedCollisions = body.GetDetectCollisions();
+                s_BodyWasKinematic = body.GetIsKinematic();
+            }
+            body.SetUseGravity(false);
+            body.SetDetectCollisions(false);
+            body.SetIsKinematic(true);
+
+            auto disableColliders = [&](auto root)
+            {
+                for (Unity::Collider collider : root.template GetComponentsInChildren<Unity::Collider>(true))
+                {
+                    if (!collider)
+                        continue;
+
+                    bool alreadyTracked = false;
+                    for (const ColliderState& state : s_ColliderStates)
+                    {
+                        if (state.Value == collider)
+                        {
+                            alreadyTracked = true;
+                            break;
+                        }
+                    }
+
+                    if (alreadyTracked)
+                    {
+                        if (collider.GetEnabled())
+                            collider.SetEnabled(false);
+                    }
+                    else
+                    {
+                        bool wasEnabled = collider.GetEnabled();
+                        s_ColliderStates.PushBack({collider, wasEnabled});
+                        if (wasEnabled)
+                            collider.SetEnabled(false);
+                    }
+                }
+            };
+            disableColliders(__this);
+            disableColliders(avatar);
+
+            s_WasFlying = true;
+        }
+        catch (System::Exception& ex)
+        {
+            System::String message = ex.Message();
+            Hax::LogError(G->Logger, L"Noclip: %ls", message != null ? message.ToString().GetRawStringData() : L"Exception without message");
+            restorePhysics();
+            G->FlightEnabled = false;
+            s_WasFlying = false;
+        }
     }
 
     static void Hooked__PlayerController_Update(PlayerController __this)
     {
+        static bool s_NoclipPositionInitialized = false;
+        static Unity::Vector3 s_NoclipPosition;
+
         int& jumps = __this.JumpExtra();
         int cachedJumps = jumps;
         if (G->InfJumps)
@@ -439,10 +554,65 @@ namespace Cheat
         G->PlayerController_Update_Hook.unsafe_call<void, PlayerController>(__this);
 
         jumps = cachedJumps;
+
+        if (!G->FlightEnabled || !G->IsInGame)
+        {
+            s_NoclipPositionInitialized = false;
+            return;
+        }
+
+        try
+        {
+            PlayerAvatar avatar = PlayerAvatar::instance();
+            Unity::Camera camera = SemiFunc::MainCamera();
+            Unity::Transform playerTransform = __this.GetTransform();
+            if (!avatar || avatar.deadSet() || avatar.isDisabled() || !camera || !playerTransform)
+            {
+                G->FlightEnabled = false;
+                s_NoclipPositionInitialized = false;
+                return;
+            }
+
+            if (!s_NoclipPositionInitialized)
+            {
+                s_NoclipPosition = playerTransform.GetPosition();
+                s_NoclipPositionInitialized = true;
+            }
+
+            Unity::Vector3 direction = Unity::Vector3::zero();
+            if (!G->MenuVisible)
+            {
+                Unity::Quaternion cameraRotation = camera.GetTransform().GetRotation();
+                Unity::Vector3 forward = cameraRotation * Unity::Vector3::forward();
+                Unity::Vector3 right = cameraRotation * Unity::Vector3::right();
+
+                if (Hax::Gui::IsKeyDown('W')) direction = direction + forward;
+                if (Hax::Gui::IsKeyDown('S')) direction = direction - forward;
+                if (Hax::Gui::IsKeyDown('D')) direction = direction + right;
+                if (Hax::Gui::IsKeyDown('A')) direction = direction - right;
+                if (Hax::Gui::IsKeyDown(VK_SPACE)) direction = direction + Unity::Vector3::up();
+                if (Hax::Gui::IsKeyDown(VK_CONTROL)) direction = direction + Unity::Vector3::down();
+            }
+
+            if (direction.GetMagnitude() > 0.001f)
+                s_NoclipPosition = s_NoclipPosition + direction.GetNormalized() * (float)G->FlightSpeed * Unity::Time::GetDeltaTime();
+
+            playerTransform.SetPosition(s_NoclipPosition);
+        }
+        catch (System::Exception& ex)
+        {
+            System::String message = ex.Message();
+            Hax::LogError(G->Logger, L"Noclip position: %ls", message != null ? message.ToString().GetRawStringData() : L"Exception without message");
+            G->FlightEnabled = false;
+            s_NoclipPositionInitialized = false;
+        }
     }
 
     static void Hooked__PlayerTumble_TumbleRequest(PlayerTumble __this, bool isTumbling, bool playerInput)
     {
+        if (G->FlightEnabled && __this.playerAvatar().isLocal())
+            return;
+
         if (G->NoTumble && __this.playerAvatar().isLocal() && !playerInput)
             return;
 

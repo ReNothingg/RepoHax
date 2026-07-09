@@ -93,6 +93,18 @@ namespace Cheat
 
                 HorizontalLine(1_px);
 
+                ToggleEx(LINE_ID, G->FlightEnabled, G->Loc[LocKey_Flight], G->Loc[LocKey_FlightControls], {.Disabled = !G->IsInGame});
+
+                {
+                    Hax::char16 buf[16]{};
+                    swprintf_s(buf, _countof(buf), L"%d", G->FlightSpeed);
+                    SliderEx(LINE_ID, G->Loc[LocKey_FlightSpeed], buf, &G->FlightSpeed, 1, 30, SliderConvertInt);
+                }
+
+                HotkeyEx(Hax::Hash(L"ToggleFlightHotkeyEditor"), G->VkToggleFlight, G->Loc[LocKey_Hotkey], G->Loc[LocKey_ToggleFlight]);
+
+                HorizontalLine(1_px);
+
                 ToggleEx(LINE_ID, G->NoTumble, G->Loc[LocKey_DontTumble], G->Loc[LocKey_DisableTumbling]);
             }
             EndPanel();

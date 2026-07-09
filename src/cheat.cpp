@@ -71,6 +71,8 @@ namespace Cheat
         Hax::IniAddEntry(ini, "Stats",      "CrouchingSpeed",      &G->Accel.Crouching,     Hax::IniFileWrite_Int,  IniFileRead_IntClamped<1, 1, 5>);
         Hax::IniAddEntry(ini, "Stats",      "InfiniteJumps",       &G->InfJumps,            Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Stats",      "NoTumble",            &G->NoTumble,            Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Stats",      "VkToggleFlight",      &G->VkToggleFlight,      Hax::IniFileWrite_Int,  IniFileRead_IntClamped<VK_F7, 0, 255>);
+        Hax::IniAddEntry(ini, "Stats",      "FlightSpeed",         &G->FlightSpeed,         Hax::IniFileWrite_Int,  IniFileRead_IntClamped<10, 1, 30>);
         Hax::IniAddEntry(ini, "Stats",      "EasyGrab",            &G->EasyGrab,            Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Stats",      "UnlimitedGrabRange",  &G->UnlimGrabRange,      Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Stats",      "NoOverCharge",        &G->NoOvercharge,        Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);

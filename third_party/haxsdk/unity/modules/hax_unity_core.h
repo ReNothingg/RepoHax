@@ -367,6 +367,7 @@ namespace Unity
 
         static System::Type             typeof();
 
+        static float                    GetDeltaTime();
         static float                    GetTimeScale();
         static void                     SetTimeScale(float scale);
     };

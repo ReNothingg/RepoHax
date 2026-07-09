@@ -21,6 +21,10 @@ X(LocKey_WalkingSpeed, L"Walking speed", L"Скорость ходьбы") \
 X(LocKey_RunningSpeed, L"Running speed", L"Скорость бега") \
 X(LocKey_CrouchingSpeed, L"Crouching speed", L"Скорость ползания") \
 X(LocKey_InfiniteJumps, L"Infinite jumps", L"Бесконечные прыжки") \
+X(LocKey_Flight, L"Noclip", L"Ноклип") \
+X(LocKey_FlightSpeed, L"Noclip speed", L"Скорость ноклипа") \
+X(LocKey_ToggleFlight, L"Toggle noclip", L"Включить / выключить ноклип") \
+X(LocKey_FlightControls, L"Fly through objects: WASD, Space / Ctrl - up / down", L"Полёт сквозь объекты: WASD, Пробел / Ctrl — вверх / вниз") \
 X(LocKey_DontTumble, L"Dont tumble", L"Не падать") \
 X(LocKey_DisableTumbling, L"Disable tumbling from external sources", L"Отключает падение от внешних источников") \
 X(LocKey_GRAB, L"GRAB", L"ЗАХВАТ") \

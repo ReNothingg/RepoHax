@@ -35,6 +35,48 @@ namespace Unity
             s_Method.Call<void>(*this, value);
     }
 
+    bool Rigidbody::GetUseGravity()
+    {
+        THROW_IF_NULL();
+        static auto s_Method = typeof().GetMethod("get_useGravity", nullptr, true).Wrap();
+        return s_Method.Call<bool>(*this);
+    }
+
+    void Rigidbody::SetUseGravity(bool value)
+    {
+        THROW_IF_NULL();
+        static auto s_Method = typeof().GetMethod("set_useGravity", nullptr, true).Wrap();
+        s_Method.Call<void>(*this, value);
+    }
+
+    bool Rigidbody::GetDetectCollisions()
+    {
+        THROW_IF_NULL();
+        static auto s_Method = typeof().GetMethod("get_detectCollisions", nullptr, true).Wrap();
+        return s_Method.Call<bool>(*this);
+    }
+
+    void Rigidbody::SetDetectCollisions(bool value)
+    {
+        THROW_IF_NULL();
+        static auto s_Method = typeof().GetMethod("set_detectCollisions", nullptr, true).Wrap();
+        s_Method.Call<void>(*this, value);
+    }
+
+    bool Rigidbody::GetIsKinematic()
+    {
+        THROW_IF_NULL();
+        static auto s_Method = typeof().GetMethod("get_isKinematic", nullptr, true).Wrap();
+        return s_Method.Call<bool>(*this);
+    }
+
+    void Rigidbody::SetIsKinematic(bool value)
+    {
+        THROW_IF_NULL();
+        static auto s_Method = typeof().GetMethod("set_isKinematic", nullptr, true).Wrap();
+        s_Method.Call<void>(*this, value);
+    }
+
     System::Type RaycastHit::typeof()
     {
         static System::Type s_Type = System::Type::GetType("UnityEngine.PhysicsModule", "UnityEngine", "RaycastHit", true);
