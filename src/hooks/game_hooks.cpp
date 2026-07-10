@@ -58,7 +58,9 @@ namespace Cheat
     static void ApplyPlayerUpgradeChange(PlayerAvatar avatar);
     static void UpdateSessionSafety(PlayerAvatar avatar);
     static void ProcessWorldSessionCommands(PlayerAvatar avatar);
+    static void ProcessCurrencyCommands();
     static void ProcessTeleportCommands(PlayerAvatar avatar);
+    static void UpdateEyeLasers();
     static void DrawPlayerChams(PlayerAvatar player, Unity::CommandBuffer cb, Unity::Material aliveMat, Unity::Material deadMat);
 
     void HookMonoRuntimeInvoke()
@@ -400,11 +402,14 @@ namespace Cheat
         G->SavePositionSlot = -1;
         G->TeleportSavedPositionSlot = -1;
         G->ClearSavedPositionSlot = -1;
+        G->CurrencyDeltaPending = 0;
+        G->CurrencySetZero = false;
     }
 
     static void ResetSessionState()
     {
         G->FlightEnabled = false;
+        G->EyeLasersEnabled = false;
         G->ThirdPerson = false;
         G->DisableOcclusionCulling = false;
         G->NoFog = false;
@@ -428,6 +433,7 @@ namespace Cheat
         if (!G->IsInGame)
         {
             G->FlightEnabled = false;
+            G->EyeLasersEnabled = false;
             G->TeleportAction = TeleportQuickAction::None;
             G->TeleportToTruck = false;
             return;
@@ -436,6 +442,7 @@ namespace Cheat
         if (!IsPlayerUsable(avatar))
         {
             G->FlightEnabled = false;
+            G->EyeLasersEnabled = false;
         }
 
         if (RunManager manager = RunManager::instance())
@@ -517,6 +524,51 @@ namespace Cheat
                 SetSessionAction(G->Loc[LocKey_ActionExtractionUnlocked]);
             }
         }
+    }
+
+    static void ProcessCurrencyCommands()
+    {
+        if (!G->IsInGame)
+        {
+            G->CurrentRunCurrency = 0;
+            G->CurrencyDeltaPending = 0;
+            G->CurrencySetZero = false;
+            return;
+        }
+
+        StatsManager stats = StatsManager::instance();
+        if (stats)
+            G->CurrentRunCurrency = SemiFunc::StatGetRunCurrency();
+
+        if (G->CurrencyDeltaPending == 0 && !G->CurrencySetZero)
+            return;
+
+        const int delta = G->CurrencyDeltaPending;
+        const bool setZero = G->CurrencySetZero;
+        G->CurrencyDeltaPending = 0;
+        G->CurrencySetZero = false;
+
+        if (G->IsClient)
+        {
+            SetSessionAction(G->Loc[LocKey_ActionCurrencyHostOnly]);
+            return;
+        }
+
+        if (!stats)
+        {
+            SetSessionAction(G->Loc[LocKey_ActionCurrencyNotReady]);
+            return;
+        }
+
+        long long target = setZero ? 0LL : (long long)G->CurrentRunCurrency + (long long)delta;
+        if (target < 0)
+            target = 0;
+        if (target > INT_MAX)
+            target = INT_MAX;
+
+        G->CurrentRunCurrency = SemiFunc::StatSetRunCurrency((int)target);
+        stats.SaveFileSave();
+        SetSessionActionF(G->Loc[LocKey_ActionCurrencyChangedFmt].Data(), G->CurrentRunCurrency);
     }
 
     static void ProcessTeleportCommands(PlayerAvatar avatar)
@@ -659,6 +711,7 @@ namespace Cheat
 
             UpdateSessionSafety(avatar);
             ProcessWorldSessionCommands(avatar);
+            ProcessCurrencyCommands();
             ProcessTeleportCommands(avatar);
 
             if (G->IsInGame)
@@ -1287,6 +1340,203 @@ namespace Cheat
         return G->IsInGame && MenuManager::instance() && !MenuManager::instance().currentMenuPage();
     }
 
+    static bool IsTransformBelow(Unity::Transform child, Unity::Transform root)
+    {
+        for (int depth = 0; child && depth < 24; ++depth)
+        {
+            if (child == root)
+                return true;
+            child = child.GetParent();
+        }
+        return false;
+    }
+
+    static bool IsTriggerCollider(Unity::Collider collider)
+    {
+        if (!collider)
+            return false;
+
+        static auto s_GetIsTrigger = Unity::Collider::typeof().GetMethod("get_isTrigger", nullptr, true).Wrap();
+        return s_GetIsTrigger.Call<bool>(collider);
+    }
+
+    struct EyeLaserPrefabState
+    {
+        SemiLaser Template = null;
+        SemiLaser Left = null;
+        SemiLaser Right = null;
+        bool SearchFailureLogged;
+    };
+
+    static EyeLaserPrefabState s_EyeLaserPrefab;
+
+    static SemiLaser FindEyeLaserTemplate()
+    {
+        for (const auto& entry : G->ItemsPool)
+        {
+            Item item = entry.value;
+            if (!item || item.prefab() == null)
+                continue;
+
+            Unity::GameObject prefab = item.prefab().Prefab();
+            if (!prefab)
+                continue;
+
+            ItemGunLaser gunLaser = prefab.GetComponent<ItemGunLaser>();
+            if (!gunLaser)
+                gunLaser = prefab.GetTransform().GetComponentInChildren<ItemGunLaser>();
+
+            if (gunLaser && gunLaser.semiLaser())
+            {
+                Hax::Log(G->Logger, L"Eye lasers: using game prefab from %ls", item.itemName().GetRawStringData());
+                return gunLaser.semiLaser();
+            }
+        }
+
+        return null;
+    }
+
+    static SemiLaser CreateEyeLaserFromPrefab(SemiLaser source, const Unity::Vector3& position)
+    {
+        if (!source)
+            return null;
+
+        Unity::Object cloned = Unity::Object::Instantiate((Unity::Object)source.GetGameObject());
+        Unity::GameObject instance = std::bit_cast<Unity::GameObject>(cloned);
+        if (!instance)
+            return null;
+
+        instance.SetActive(true);
+        instance.GetTransform().SetPosition(position);
+
+        SemiLaser laser = instance.GetComponent<SemiLaser>();
+        if (laser)
+        {
+            laser.hurtColliderBeamThickness() = 0.32f;
+            laser.beamThickness() = 1.2f;
+            laser.beamHitSize() = 1.35f;
+            laser.wobbleAmount() = 1.15f;
+        }
+        return laser;
+    }
+
+    static void ConfigureEyeLaserDamage(SemiLaser laser, PlayerAvatar avatar)
+    {
+        if (!laser)
+            return;
+
+        HurtCollider hurt = laser.hurtCollider();
+        if (!hurt)
+            hurt = laser.GetComponentInChildren<HurtCollider>();
+        if (!hurt)
+            return;
+
+        hurt.playerLogic() = false;
+        hurt.physLogic() = true;
+        hurt.physDestroy() = G->EyeLaserDestroyObjects;
+        hurt.physHingeDestroy() = G->EyeLaserDestroyObjects;
+        hurt.physReleaseGrab() = true;
+        hurt.physImpact() = 3; // HurtCollider.BreakImpact.Heavy
+        hurt.physDamageCooldown() = 0.05f;
+        hurt.enemyLogic() = true;
+        hurt.enemyKill() = G->EyeLaserInstantKill;
+        hurt.enemyDamage() = G->EyeLaserDamage;
+        hurt.enemyDamageCooldown() = 0.05f;
+        hurt.enemyHitTriggers() = true;
+        hurt.playerCausingHurtOverride() = avatar;
+    }
+
+    static void UpdateEyeLasers()
+    {
+        try
+        {
+            if (!s_EyeLaserPrefab.Template && !G->ItemsPool.Empty())
+                s_EyeLaserPrefab.Template = FindEyeLaserTemplate();
+
+            if (!s_EyeLaserPrefab.Template)
+            {
+                if (!G->ItemsPool.Empty() && !s_EyeLaserPrefab.SearchFailureLogged)
+                {
+                    Hax::LogError(G->Logger, L"Eye lasers: ItemGunLaser prefab was not found");
+                    s_EyeLaserPrefab.SearchFailureLogged = true;
+                }
+                return;
+            }
+
+            if (!G->EyeLasersEnabled || !G->IsInGame || G->MenuVisible)
+                return;
+
+            PlayerAvatar avatar = PlayerAvatar::instance();
+            Unity::Camera camera = SemiFunc::MainCamera();
+            if (!IsPlayerUsable(avatar) || !camera)
+                return;
+
+            Unity::Transform cameraTransform = camera.GetTransform();
+            Unity::Quaternion rotation = cameraTransform.GetRotation();
+            Unity::Vector3 forward = (rotation * Unity::Vector3::forward()).GetNormalized();
+            Unity::Vector3 right = (rotation * Unity::Vector3::right()).GetNormalized();
+            Unity::Vector3 up = (rotation * Unity::Vector3::up()).GetNormalized();
+
+            Unity::Transform eyeAnchor = avatar.spectatePoint();
+            Unity::Vector3 rayOrigin = eyeAnchor ? eyeAnchor.GetPosition() : cameraTransform.GetPosition();
+            Unity::Vector3 eyeCenter = rayOrigin + forward * 0.16f - up * 0.025f;
+            Unity::Vector3 leftEye = eyeCenter - right * 0.055f;
+            Unity::Vector3 rightEye = eyeCenter + right * 0.055f;
+
+            if (!s_EyeLaserPrefab.Left)
+                s_EyeLaserPrefab.Left = CreateEyeLaserFromPrefab(s_EyeLaserPrefab.Template, leftEye);
+            if (!s_EyeLaserPrefab.Right)
+                s_EyeLaserPrefab.Right = CreateEyeLaserFromPrefab(s_EyeLaserPrefab.Template, rightEye);
+            if (!s_EyeLaserPrefab.Left || !s_EyeLaserPrefab.Right)
+                return;
+
+            Unity::Vector3 endPoint = rayOrigin + forward * (float)G->EyeLaserRange;
+            bool hitSomething = false;
+            float closestDistance = (float)G->EyeLaserRange;
+            const int layerMask = SemiFunc::LayerMaskGetVisionObstruct();
+            System::Array<Unity::RaycastHit> hits = Unity::Physics::SphereCastAll(rayOrigin, 0.025f, forward, (float)G->EyeLaserRange, layerMask);
+            if (hits != null)
+            {
+                Unity::Transform avatarRoot = avatar.GetTransform();
+                Unity::Transform playerRoot = avatar.playerTransform();
+                Unity::Transform controllerRoot = PlayerController::instance() ? PlayerController::instance().GetTransform() : null;
+
+                for (Unity::RaycastHit& hit : hits)
+                {
+                    if (hit.m_Distance < 0.05f || hit.m_Distance >= closestDistance)
+                        continue;
+
+                    Unity::Transform hitTransform = hit.GetTransform();
+                    if (!hitTransform || IsTransformBelow(hitTransform, avatarRoot) ||
+                        (playerRoot && IsTransformBelow(hitTransform, playerRoot)) ||
+                        (controllerRoot && IsTransformBelow(hitTransform, controllerRoot)))
+                    {
+                        continue;
+                    }
+
+                    Unity::Collider collider = hitTransform.GetComponent<Unity::Collider>();
+                    if (collider && IsTriggerCollider(collider))
+                        continue;
+
+                    closestDistance = hit.m_Distance;
+                    endPoint = hit.m_Point;
+                    hitSomething = true;
+                }
+            }
+
+            ConfigureEyeLaserDamage(s_EyeLaserPrefab.Left, avatar);
+            ConfigureEyeLaserDamage(s_EyeLaserPrefab.Right, avatar);
+            s_EyeLaserPrefab.Left.LaserActive(leftEye, endPoint, hitSomething);
+            s_EyeLaserPrefab.Right.LaserActive(rightEye, endPoint, hitSomething);
+        }
+        catch (System::Exception& ex)
+        {
+            System::String message = ex.Message();
+            Hax::LogError(G->Logger, L"Eye laser prefab: %ls", message != null ? message.ToString().GetRawStringData() : L"Exception without message");
+            G->EyeLasersEnabled = false;
+        }
+    }
+
     static float prevPlane;
     static float prevFov;
     static bool prevOcclusionCulling;
@@ -1442,6 +1692,7 @@ namespace Cheat
         }
 
         G->PostLateUpdateHook.unsafe_call<void>();
+        UpdateEyeLasers();
 
         static bool s_FogOverridden = false;
         static bool s_PreviousFog = true;

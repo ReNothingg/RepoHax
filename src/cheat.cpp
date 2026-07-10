@@ -75,6 +75,12 @@ namespace Cheat
         Hax::IniAddEntry(ini, "Stats",      "FlightSpeed",         &G->FlightSpeed,         Hax::IniFileWrite_Int,  IniFileRead_IntClamped<10, 1, 30>);
         Hax::IniAddEntry(ini, "Stats",      "FlightSprintBoost",    &G->FlightSprintBoost,   Hax::IniFileWrite_Int,  IniFileRead_IntClamped<3, 1, 6>);
         Hax::IniAddEntry(ini, "Stats",      "VkTeleportPlayerToCamera", &G->VkTeleportPlayerToCamera, Hax::IniFileWrite_Int, IniFileRead_IntClamped<VK_F9, 0, 255>);
+        Hax::IniAddEntry(ini, "Stats",      "EyeLasersEnabled",    &G->EyeLasersEnabled,    Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Stats",      "VkToggleEyeLasers",   &G->VkToggleEyeLasers,   Hax::IniFileWrite_Int,  IniFileRead_IntClamped<VK_F8, 0, 255>);
+        Hax::IniAddEntry(ini, "Stats",      "EyeLaserRange",       &G->EyeLaserRange,       Hax::IniFileWrite_Int,  IniFileRead_IntClamped<80, 10, 200>);
+        Hax::IniAddEntry(ini, "Stats",      "EyeLaserDamage",      &G->EyeLaserDamage,      Hax::IniFileWrite_Int,  IniFileRead_IntClamped<250, 10, 2000>);
+        Hax::IniAddEntry(ini, "Stats",      "EyeLaserInstantKill", &G->EyeLaserInstantKill, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Stats",      "EyeLaserDestroyObjects", &G->EyeLaserDestroyObjects, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Stats",      "EasyGrab",            &G->EasyGrab,            Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Stats",      "UnlimitedGrabRange",  &G->UnlimGrabRange,      Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Stats",      "NoOverCharge",        &G->NoOvercharge,        Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
@@ -120,6 +126,7 @@ namespace Cheat
         Hax::IniAddEntry(ini, "Misc",       "SessionSafetyEnabled", &G->SessionSafetyEnabled, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Misc",       "AutoCancelClientUnsafe", &G->AutoCancelClientUnsafe, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Misc",       "DisableAllPlayersDeadCheck", &G->DisableAllPlayersDeadCheck, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Misc",       "CurrencyChangeAmount", &G->CurrencyChangeAmount, Hax::IniFileWrite_Int, IniFileRead_IntClamped<1000, 1, 100000>);
 
         Hax::IniLoad(G->Config);
         G->Loc = g_LocDict[G->Language];

@@ -28,6 +28,17 @@ namespace Cheat
             G->FlightEnabled = !G->FlightEnabled;
         }
 
+        constexpr size_t toggleEyeLasersHotkeyId = Hax::Hash(L"ToggleEyeLasersHotkeyAction");
+        if (!G->IsInGame)
+        {
+            G->EyeLasersEnabled = false;
+        }
+        else if (G->VkToggleEyeLasers != 0 &&
+                 IsKeyJustDown(toggleEyeLasersHotkeyId, (Hax::uint8)G->VkToggleEyeLasers))
+        {
+            G->EyeLasersEnabled = !G->EyeLasersEnabled;
+        }
+
         constexpr size_t teleportPlayerToCameraHotkeyId = Hax::Hash(L"TeleportPlayerToCameraHotkeyAction");
         if (G->VkTeleportPlayerToCamera != 0 &&
             G->IsInGame &&

@@ -245,6 +245,44 @@ namespace Cheat
             EndPanel();
 
             BeginPanel(LINE_ID);
+            PanelHeader(G->Loc[LocKey_BALANCE], G->Loc[LocKey_BalanceDesc]);
+            {
+                Hax::char16 current[32]{};
+                Hax::char16 amount[32]{};
+                Hax::char16 subtractLabel[48]{};
+                Hax::char16 addLabel[48]{};
+                swprintf_s(current, _countof(current), L"$%dK", G->CurrentRunCurrency);
+                swprintf_s(amount, _countof(amount), L"$%dK", G->CurrencyChangeAmount);
+                swprintf_s(subtractLabel, _countof(subtractLabel), L"- $%dK", G->CurrencyChangeAmount);
+                swprintf_s(addLabel, _countof(addLabel), L"+ $%dK", G->CurrencyChangeAmount);
+
+                StatusLine(G->Loc[LocKey_CurrentBalance], G->IsInGame ? Hax::WStringView(current) : Hax::WStringView(L"-"), G->IsInGame ? 0x7EE787FF : 0x8D96A8FF);
+
+                HorizontalLine(1_px);
+
+                SliderEx(LINE_ID, G->Loc[LocKey_CurrencyChangeAmount], amount, &G->CurrencyChangeAmount, 1, 100000, SliderConvertInt);
+
+                const float gap = 5_px;
+                const float w = Hax::Gui::GetContentRegionAvail().X;
+                const float halfW = (w - gap) / 2.f;
+                const bool canChange = G->IsInGame && !G->IsClient && StatsManager::instance();
+
+                Hax::Gui::BeginHorizontal(gap);
+                {
+                    if (Button(LINE_ID, subtractLabel, G->Loc[LocKey_SubtractMoney], {.Enabled = canChange, .MinW = halfW}))
+                        G->CurrencyDeltaPending = -G->CurrencyChangeAmount;
+
+                    if (Button(LINE_ID, addLabel, G->Loc[LocKey_AddMoney], {.Enabled = canChange, .MinW = halfW}))
+                        G->CurrencyDeltaPending = G->CurrencyChangeAmount;
+                }
+                Hax::Gui::EndHorizontal();
+
+                if (Button(LINE_ID, G->Loc[LocKey_SetBalanceZero], G->Loc[LocKey_HostOnly], {.Enabled = canChange, .MinW = w}))
+                    G->CurrencySetZero = true;
+            }
+            EndPanel();
+
+            BeginPanel(LINE_ID);
             PanelHeader(G->Loc[LocKey_SafetyGuards], G->Loc[LocKey_SafetyGuardsDesc]);
             {
                 ToggleEx(LINE_ID, G->SessionSafetyEnabled, G->Loc[LocKey_SessionSafety], G->Loc[LocKey_SessionSafetyDesc]);

@@ -31,6 +31,14 @@ X(LocKey_ToggleFlight, L"Toggle noclip", L"Включить / выключить
 X(LocKey_FlightControls, L"WASD, Space / Ctrl; hold Sprint for 3x speed", L"WASD, Пробел / Ctrl; удерживайте бег для скорости x3") \
 X(LocKey_DontTumble, L"Dont tumble", L"Не падать") \
 X(LocKey_DisableTumbling, L"Disable tumbling from external sources", L"Отключает падение от внешних источников") \
+X(LocKey_EYELASERS, L"EYE LASERS", L"ЛАЗЕРЫ ИЗ ГЛАЗ") \
+X(LocKey_EyeLasers, L"Deadly eye lasers", L"Смертельные лазеры") \
+X(LocKey_EyeLasersDesc, L"Uses the original laser-weapon effects and damage system; damage is host-only", L"Использует оригинальные эффекты и систему урона лазерного оружия; урон доступен только хосту") \
+X(LocKey_EyeLaserRange, L"Laser range", L"Дальность лазеров") \
+X(LocKey_EyeLaserDamage, L"Damage without instant kill", L"Урон без мгновенного убийства") \
+X(LocKey_EyeLaserInstantKill, L"Instantly kill enemies", L"Мгновенно убивать врагов") \
+X(LocKey_EyeLaserDestroyObjects, L"Destroy objects", L"Разрушать предметы") \
+X(LocKey_ToggleEyeLasers, L"Toggle eye lasers", L"Включить / выключить лазеры") \
 X(LocKey_GRAB, L"GRAB", L"ЗАХВАТ") \
 X(LocKey_HighStrength, L"High strength", L"Большая сила") \
 X(LocKey_AvailableIfHost, L"Available if you are host", L"Доступно если вы хост") \
@@ -139,6 +147,16 @@ X(LocKey_BlockAllDeadGameoverDesc, L"Host/singleplayer safety switch; reset it a
 X(LocKey_ResetRiskyToggles, L"Reset risky toggles", L"Сбросить рискованные функции") \
 X(LocKey_ResetRiskyTogglesDesc, L"Turns off noclip/visual overrides and clears queued commands", L"Отключает noclip/визуальные переопределения и очищает очередь команд") \
 X(LocKey_QuickSessionActions, L"QUICK SESSION ACTIONS", L"БЫСТРЫЕ ДЕЙСТВИЯ СЕССИИ") \
+X(LocKey_BALANCE, L"RUN BALANCE", L"БАЛАНС ЗАБЕГА") \
+X(LocKey_BalanceDesc, L"Host changes are synchronized and saved immediately", L"Изменения хоста синхронизируются и сразу сохраняются") \
+X(LocKey_CurrentBalance, L"Current balance", L"Текущий баланс") \
+X(LocKey_CurrencyChangeAmount, L"Change amount", L"Сумма изменения") \
+X(LocKey_SubtractMoney, L"Subtract", L"Убавить") \
+X(LocKey_AddMoney, L"Add", L"Добавить") \
+X(LocKey_SetBalanceZero, L"Set balance to zero", L"Обнулить баланс") \
+X(LocKey_ActionCurrencyChangedFmt, L"Balance changed: $%dK", L"Баланс изменён: $%dK") \
+X(LocKey_ActionCurrencyHostOnly, L"Balance change skipped: host only", L"Изменение баланса пропущено: только хост") \
+X(LocKey_ActionCurrencyNotReady, L"Balance change failed: run stats are not ready", L"Баланс не изменён: статистика забега не готова") \
 X(LocKey_SaveNow, L"Save now", L"Сохранить сейчас") \
 X(LocKey_ReloadLevel, L"Reload level", L"Перезагрузить уровень") \
 X(LocKey_UnlockExtractionPoints, L"Unlock extraction points", L"Открыть точки сбора") \

@@ -263,6 +263,11 @@ struct SemiFunc
         return s_StatSetRunCurrency.Call<int, int>(value);
     }
 
+    static inline int StatGetRunCurrency()
+    {
+        return s_StatGetRunCurrency.Call<int>();
+    }
+
     static inline int PhotonViewIDPlayerAvatarLocal()
     {
         return s_PhotonViewIDPlayerAvatarLocal.Call<int>();
@@ -286,6 +291,7 @@ private:
     METHOD_WRAPPER(IsMasterClient);
     METHOD_WRAPPER(PlayerGetSteamID);
     METHOD_WRAPPER(StatSetRunCurrency);
+    METHOD_WRAPPER(StatGetRunCurrency);
     METHOD_WRAPPER(PhotonViewIDPlayerAvatarLocal);
     METHOD_WRAPPER(LayerMaskGetVisionObstruct);
     METHOD_WRAPPER(PlayerGetName);
@@ -656,6 +662,59 @@ struct PhysGrabObjectImpactDetector : Unity::MonoBehaviour
     METHOD_WRAPPER(DestroyObject);
 private:
     METHOD_WRAPPER(HealLogic);
+};
+
+struct HurtCollider : Unity::MonoBehaviour
+{
+    using Unity::MonoBehaviour::MonoBehaviour;
+
+    META("Assembly-CSharp", "", "HurtCollider");
+
+    FIELD(playerLogic, bool);
+    FIELD(physLogic, bool);
+    FIELD(physDestroy, bool);
+    FIELD(physHingeDestroy, bool);
+    FIELD(physReleaseGrab, bool);
+    FIELD(physImpact, int);
+    FIELD(physDamageCooldown, float);
+    FIELD(enemyLogic, bool);
+    FIELD(enemyKill, bool);
+    FIELD(enemyDamage, int);
+    FIELD(enemyDamageCooldown, float);
+    FIELD(enemyHitTriggers, bool);
+    FIELD(playerCausingHurtOverride, PlayerAvatar);
+};
+
+struct SemiLaser : Unity::MonoBehaviour
+{
+    using Unity::MonoBehaviour::MonoBehaviour;
+
+    META("Assembly-CSharp", "", "SemiLaser");
+
+    void LaserActive(const Unity::Vector3& startPosition, const Unity::Vector3& endPosition, bool isHitting)
+    {
+        THROW_IF_NULL();
+        s_LaserActive.Call<void>(*this, System::Box(startPosition), System::Box(endPosition), isHitting);
+    }
+
+    FIELD(hurtColliderBeamThickness, float);
+    FIELD(beamThickness, float);
+    FIELD(beamHitSize, float);
+    FIELD(wobbleAmount, float);
+    FIELD(hurtCollider, HurtCollider);
+
+private:
+    METHOD_WRAPPER(LaserActive);
+};
+
+struct ItemGunLaser : Unity::MonoBehaviour
+{
+    using Unity::MonoBehaviour::MonoBehaviour;
+
+    META("Assembly-CSharp", "", "ItemGunLaser");
+
+    FIELD(semiLaser, SemiLaser);
+    FIELD(muzzleTransform, Unity::Transform);
 };
 
 struct ItemBattery : Unity::MonoBehaviour

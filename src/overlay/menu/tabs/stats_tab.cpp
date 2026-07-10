@@ -162,6 +162,37 @@ namespace Cheat
                 ToggleEx(LINE_ID, G->NoTumble, G->Loc[LocKey_DontTumble], G->Loc[LocKey_DisableTumbling]);
             }
             EndPanel();
+
+            BeginPanel(LINE_ID);
+            PanelHeader(G->Loc[LocKey_EYELASERS]);
+            {
+                ToggleEx(LINE_ID, G->EyeLasersEnabled, G->Loc[LocKey_EyeLasers], G->Loc[LocKey_EyeLasersDesc], {.Disabled = !G->IsInGame || !avatar});
+
+                HorizontalLine(1_px);
+
+                {
+                    Hax::char16 buf[16]{};
+                    swprintf_s(buf, _countof(buf), G->Loc[LocKey_Meters].Data(), G->EyeLaserRange);
+                    SliderEx(LINE_ID, G->Loc[LocKey_EyeLaserRange], buf, &G->EyeLaserRange, 10, 200, SliderConvertInt);
+                }
+
+                {
+                    Hax::char16 buf[16]{};
+                    swprintf_s(buf, _countof(buf), L"%d", G->EyeLaserDamage);
+                    SliderEx(LINE_ID, G->Loc[LocKey_EyeLaserDamage], buf, &G->EyeLaserDamage, 10, 2000, SliderConvertInt);
+                }
+
+                HorizontalLine(1_px);
+
+                ToggleEx(LINE_ID, G->EyeLaserInstantKill, G->Loc[LocKey_EyeLaserInstantKill]);
+
+                HorizontalLine(1_px);
+
+                ToggleEx(LINE_ID, G->EyeLaserDestroyObjects, G->Loc[LocKey_EyeLaserDestroyObjects], G->Loc[LocKey_AvailableIfHost], {.Disabled = G->IsClient});
+
+                HotkeyEx(Hax::Hash(L"ToggleEyeLasersHotkeyEditor"), G->VkToggleEyeLasers, G->Loc[LocKey_Hotkey], G->Loc[LocKey_ToggleEyeLasers]);
+            }
+            EndPanel();
         }
         Hax::Gui::Dummy({0.f, 0.f});
         Hax::Gui::EndVertical();

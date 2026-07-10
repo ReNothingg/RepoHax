@@ -87,6 +87,12 @@ namespace Cheat
         int                                 FlightSpeed = 10;
         int                                 FlightSprintBoost = 3;
         int                                 VkTeleportPlayerToCamera = VK_F9;
+        bool                                EyeLasersEnabled;
+        int                                 VkToggleEyeLasers = VK_F8;
+        int                                 EyeLaserRange = 80;
+        int                                 EyeLaserDamage = 250;
+        bool                                EyeLaserInstantKill = true;
+        bool                                EyeLaserDestroyObjects = true;
         bool                                EasyGrab;
         bool                                UnlimGrabRange;
         bool                                NoOvercharge;
@@ -202,6 +208,10 @@ namespace Cheat
         bool                                SaveWorldNow;
         bool                                ReloadCurrentLevel;
         bool                                UnlockExtractionPoints;
+        int                                 CurrentRunCurrency;
+        int                                 CurrencyChangeAmount = 1000;
+        int                                 CurrencyDeltaPending;
+        bool                                CurrencySetZero;
         TeleportQuickAction                 TeleportAction = TeleportQuickAction::None;
         PlayerAvatar                        SelectedTeleportPlayer = null;
         int                                 SavePositionSlot = -1;
