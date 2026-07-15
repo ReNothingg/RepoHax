@@ -17,7 +17,7 @@ namespace Cheat
 
         // Column 1
         Hax::Gui::Space(spacing);
-        Hax::Gui::BeginContainer(0, {.W = columnSize.X, .H = columnSize.Y});
+        Hax::Gui::BeginContainer(Hax::Hash("ValuablesColumnLeft"), {.W = columnSize.X, .FitY = true});
         Hax::Gui::BeginVertical(spacing);
         Hax::Gui::Dummy({0.f, 0.f});
         {
@@ -74,7 +74,7 @@ namespace Cheat
 
         // Column 2
         Hax::Gui::Space(spacing);
-        Hax::Gui::BeginContainer(0, {.W = columnSize.X, .H = columnSize.Y});
+        Hax::Gui::BeginContainer(Hax::Hash("ValuablesColumnRight"), {.W = columnSize.X, .FitY = true});
         Hax::Gui::BeginVertical(spacing);
         Hax::Gui::Dummy({0.f, 0.f});
         {

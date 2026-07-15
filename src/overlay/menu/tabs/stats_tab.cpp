@@ -9,19 +9,6 @@
 
 namespace Cheat
 {
-    static Hax::Gui::ScrollStyle ColumnScrollStyle()
-    {
-        return
-        {
-            .TrackWidth = 6_px,
-            .ThumbPadding = 0.f,
-            .TrackCol = 0x00000000,
-            .ThumbCol = 0x4F5B70FF,
-            .ThumbHovCol = 0x6C7A94FF,
-            .ThumbActiveCol = 0x7F8FADFF
-        };
-    }
-
     static bool IsPlayerAlive()
     {
         PlayerAvatar avatar = PlayerAvatar::instance();
@@ -84,7 +71,7 @@ namespace Cheat
 
         // Column 1
         Hax::Gui::Space(spacing);
-        Hax::Gui::BeginContainer(Hax::Hash("StatsColumnLeft"), {.W = columnSize.X, .H = columnSize.Y, .Clip = true, .ScrollY = true, .ScrollVisible = true, .Style = ColumnScrollStyle()});
+        Hax::Gui::BeginContainer(Hax::Hash("StatsColumnLeft"), {.W = columnSize.X, .FitY = true});
         Hax::Gui::BeginVertical(spacing);
         Hax::Gui::Dummy({0.f, 0.f});
         {
@@ -200,7 +187,7 @@ namespace Cheat
 
         // Column 2
         Hax::Gui::Space(spacing);
-        Hax::Gui::BeginContainer(Hax::Hash("StatsColumnRight"), {.W = columnSize.X, .H = columnSize.Y, .Clip = true, .ScrollY = true, .ScrollVisible = true, .Style = ColumnScrollStyle()});
+        Hax::Gui::BeginContainer(Hax::Hash("StatsColumnRight"), {.W = columnSize.X, .FitY = true});
         Hax::Gui::BeginVertical(spacing);
         Hax::Gui::Dummy({0.f, 0.f});
         {

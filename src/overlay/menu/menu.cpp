@@ -50,6 +50,19 @@ namespace Cheat
     static size_t g_ActiveGroup = 0;
     static size_t g_ActiveTab = 0;
 
+    static Hax::Gui::ScrollStyle PageScrollStyle()
+    {
+        return
+        {
+            .TrackWidth = 8_px,
+            .ThumbPadding = 1_px,
+            .TrackCol = 0x151820FF,
+            .ThumbCol = 0x66738AFF,
+            .ThumbHovCol = 0x8492ACFF,
+            .ThumbActiveCol = 0xA1AEC4FF
+        };
+    }
+
     void ToggleMenuVisibility()
     {
         ::PostMessageW(G->GameWndHandle, WM_USER, 0, 0);
@@ -194,7 +207,9 @@ namespace Cheat
 
                 Hax::Gui::HorizontalLine(1_px, 0x252A35FF);
 
-                Hax::Gui::BeginContainer(Hax::Hash("Main area"), {.Clip = true, .ScrollY = true});
+                // The whole active page owns scrolling. Tab columns use auto-height so both
+                // sides move together and only one scrollbar is shown.
+                Hax::Gui::BeginContainer(Hax::Hash("Main area"), {.Clip = true, .ScrollY = true, .Style = PageScrollStyle()});
                 {
                     Hax::Gui::BeginHorizontal();
                     g_Tabs[g_ActiveTab].DrawFunc();

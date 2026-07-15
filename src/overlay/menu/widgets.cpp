@@ -90,18 +90,28 @@ namespace Cheat
     void BeginWindow()
     {
         constexpr size_t WINDOW_ID = Hax::Hash("MainWindow");
-        const Hax::Vector2 windowSize = Hax::Gui::Scale(Theme::WindowSize);
+        const Hax::Vector2 viewportSize = Hax::Gui::GetViewportSize();
+        const float viewportMargin = Hax::Gui::Scale(12.f);
+        Hax::Vector2 windowSize = Hax::Gui::Scale(Theme::WindowSize);
+        windowSize.X = Hax::Min(windowSize.X, Hax::Max(1.f, viewportSize.X - viewportMargin * 2.f));
+        windowSize.Y = Hax::Min(windowSize.Y, Hax::Max(1.f, viewportSize.Y - viewportMargin * 2.f));
 
         const Hax::Vector2 viewportCenter = Hax::Gui::GetViewportCenter();
         Hax::Vector2& posOffset = Hax::Gui::GetState<Hax::Vector2>(WINDOW_ID);
 
-        Hax::Rect windowBounds;
-        windowBounds.Min = viewportCenter - windowSize / 2.f + posOffset;
-        windowBounds.Max = windowBounds.Min + windowSize;
+        const Hax::Vector2 centeredPos = viewportCenter - windowSize / 2.f;
+        Hax::Rect dragBounds = Hax::Rect::FromPosSize(centeredPos + posOffset, windowSize);
 
-        Hax::Gui::Interact(WINDOW_ID, windowBounds);
+        Hax::Gui::Interact(WINDOW_ID, dragBounds);
         if (Hax::Gui::IsItemActive(WINDOW_ID))
             posOffset += Hax::Gui::GetMouseDeltaPos();
+
+        Hax::Vector2 windowPos = centeredPos + posOffset;
+        windowPos.X = Hax::Clamp(windowPos.X, viewportMargin, viewportSize.X - windowSize.X - viewportMargin);
+        windowPos.Y = Hax::Clamp(windowPos.Y, viewportMargin, viewportSize.Y - windowSize.Y - viewportMargin);
+        posOffset = windowPos - centeredPos;
+
+        const Hax::Rect windowBounds = Hax::Rect::FromPosSize(windowPos, windowSize);
 
         Hax::Gui::SetCursorPos(windowBounds.Min);
         Hax::Gui::BeginContainer(WINDOW_ID, {.W = windowSize.X, .H = windowSize.Y, .Clip = true});

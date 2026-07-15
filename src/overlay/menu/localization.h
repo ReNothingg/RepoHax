@@ -33,7 +33,7 @@ X(LocKey_DontTumble, L"Dont tumble", L"Не падать") \
 X(LocKey_DisableTumbling, L"Disable tumbling from external sources", L"Отключает падение от внешних источников") \
 X(LocKey_EYELASERS, L"EYE LASERS", L"ЛАЗЕРЫ ИЗ ГЛАЗ") \
 X(LocKey_EyeLasers, L"Deadly eye lasers", L"Смертельные лазеры") \
-X(LocKey_EyeLasersDesc, L"Uses the original laser-weapon effects and damage system; damage is host-only", L"Использует оригинальные эффекты и систему урона лазерного оружия; урон доступен только хосту") \
+X(LocKey_EyeLasersDesc, L"Eye lasers; damage is host-only", L"Лазеры из глаз; урон только у хоста") \
 X(LocKey_EyeLaserRange, L"Laser range", L"Дальность лазеров") \
 X(LocKey_EyeLaserDamage, L"Damage without instant kill", L"Урон без мгновенного убийства") \
 X(LocKey_EyeLaserInstantKill, L"Instantly kill enemies", L"Мгновенно убивать врагов") \

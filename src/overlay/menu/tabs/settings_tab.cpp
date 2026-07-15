@@ -17,7 +17,7 @@ namespace Cheat
 
         // Column 1
         Hax::Gui::Space(spacing);
-        Hax::Gui::BeginContainer(0, {.W = columnSize.X, .H = columnSize.Y});
+        Hax::Gui::BeginContainer(Hax::Hash("SettingsColumnLeft"), {.W = columnSize.X, .FitY = true});
         Hax::Gui::BeginVertical(spacing);
         Hax::Gui::Dummy({0.f, 0.f});
         {
