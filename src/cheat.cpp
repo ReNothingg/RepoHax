@@ -114,6 +114,11 @@ namespace Cheat
         Hax::IniAddEntry(ini, "Items",      "ObjectRemoverEnabled", &G->ObjectRemoverEnabled, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Items",      "VkDeleteObject",      &G->VkDeleteObject,      Hax::IniFileWrite_Int,  IniFileRead_IntClamped<VK_F10, 0, 255>);
         Hax::IniAddEntry(ini, "Items",      "ObjectRemoverRange",  &G->ObjectRemoverRange,  Hax::IniFileWrite_Int,  IniFileRead_IntClamped<25, 3, 100>);
+        Hax::IniAddEntry(ini, "GodTools",   "VkLockTarget",       &G->VkLockGodTarget,      Hax::IniFileWrite_Int,  IniFileRead_IntClamped<VK_F11, 0, 255>);
+        Hax::IniAddEntry(ini, "GodTools",   "HoldDistance",       &G->GodHoldDistance,      Hax::IniFileWrite_Int,  IniFileRead_IntClamped<5, 1, 25>);
+        Hax::IniAddEntry(ini, "GodTools",   "ThrowForce",         &G->GodThrowForce,        Hax::IniFileWrite_Int,  IniFileRead_IntClamped<35, 5, 150>);
+        Hax::IniAddEntry(ini, "GodTools",   "TimeScale",          &G->WorldTimeScalePercent,Hax::IniFileWrite_Int,  IniFileRead_IntClamped<100, 0, 300>);
+        Hax::IniAddEntry(ini, "GodTools",   "GravityY",           &G->WorldGravityY,        Hax::IniFileWrite_Int,  IniFileRead_IntClamped<-10, -30, 30>);
 
         Hax::IniAddEntry(ini, "Valuables",  "ValuablesEsp",        &G->ValuablesEsp,        Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Valuables",  "ValuablesEspRange",   &G->ValuablesEspRange,   Hax::IniFileWrite_Int,  IniFileRead_IntClamped<50, 5, 500>);

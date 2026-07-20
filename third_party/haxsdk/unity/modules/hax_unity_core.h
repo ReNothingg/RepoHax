@@ -130,10 +130,12 @@ namespace Unity
         static System::Type             typeof();
 
         Vector3                         operator*(const Vector3& point) const;
+        Quaternion                      operator*(const Quaternion& rhs) const;
 
         static Quaternion               identity() { return Quaternion(0.f, 0.f, 0.f, 1.f); }
 
         static Quaternion               Euler(float x, float y, float z);
+        static Quaternion               AngleAxis(float degrees, const Vector3& axis);
 
         float                           X;
         float                           Y;

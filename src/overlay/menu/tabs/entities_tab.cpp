@@ -4,6 +4,7 @@
 
 #include "../localization.h"
 #include "../widgets.h"
+#include "tabs.h"
 
 #define LINE_ID (HAX_LINE * 123)
 
@@ -121,6 +122,8 @@ namespace Cheat
                 ToggleEx(LINE_ID, G->EnemiesEsp, G->Loc[LocKey_DisplayThroughWalls]);
             }
             EndPanel();
+
+            DrawEnemyDirectorPanel();
         }
         Hax::Gui::Dummy({ 0.f, 0.f });
         Hax::Gui::EndVertical();
@@ -247,6 +250,8 @@ namespace Cheat
                     G->PlayerToHeal = s_SelectedPlayer;
             }
             EndPanel();
+
+            DrawTeamControlPanel();
         }
         Hax::Gui::Dummy({ 0.f, 0.f });
         Hax::Gui::EndVertical();

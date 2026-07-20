@@ -4,16 +4,107 @@
 
 #define LOC_LIST(X) \
 X(LocKey_Stats, L"Stats", L"Статы") \
-X(LocKey_Entities, L"Entities", L"Существа") \
+X(LocKey_Entities, L"Entities & team", L"Существа и команда") \
 X(LocKey_Vision, L"Vision", L"Зрение") \
-X(LocKey_Valuables, L"Valuables", L"Ценности") \
-X(LocKey_Items, L"Items", L"Предметы") \
-X(LocKey_Level, L"Level", L"Уровень") \
-X(LocKey_Misc, L"Miscellaneous", L"Разное")\
+X(LocKey_Valuables, L"Economy", L"Экономика") \
+X(LocKey_Items, L"Items & spawn", L"Предметы и спавн") \
+X(LocKey_Level, L"Session & level", L"Сессия и уровень") \
+X(LocKey_Misc, L"Teleport", L"Телепорт")\
 X(LocKey_Settings, L"Settings", L"Настройки")\
+X(LocKey_ControlCenter, L"CONTROL CENTER", L"ЦЕНТР УПРАВЛЕНИЯ") \
 X(LocKey_PlayerCategory, L"Player", L"Игрок") \
 X(LocKey_WorldCategory, L"World", L"Мир") \
+X(LocKey_SessionCategory, L"Session", L"Сессия") \
 X(LocKey_ToolsCategory, L"Tools", L"Инструменты") \
+X(LocKey_EconomyCategory, L"Economy", L"Экономика") \
+X(LocKey_GodCategory, L"GOD MODE", L"РЕЖИМ БОГА") \
+X(LocKey_GodTools, L"Object editor", L"Редактор объектов") \
+X(LocKey_StatsPageDesc, L"Health, movement, abilities and upgrades", L"Здоровье, передвижение, способности и улучшения") \
+X(LocKey_EntitiesPageDesc, L"Enemies, players, friends and team-wide actions", L"Враги, игроки, друзья и массовые действия команды") \
+X(LocKey_VisionPageDesc, L"ESP, visibility, lighting and camera helpers", L"ESP, видимость, освещение и инструменты камеры") \
+X(LocKey_EconomyPageDesc, L"Quota, balance, valuables, extraction and loot", L"Квота, баланс, ценности, эвакуация и добыча") \
+X(LocKey_ItemsPageDesc, L"Weapons, item spawning and raycast deletion", L"Оружие, создание предметов и удаление по прицелу") \
+X(LocKey_LevelPageDesc, L"Session safety, progression, maps and world state", L"Безопасность сессии, прогресс, карты и состояние мира") \
+X(LocKey_CosmeticPageDesc, L"Local appearance and cosmetic spawning", L"Локальный внешний вид и создание косметики") \
+X(LocKey_TeleportPageDesc, L"Quick destinations, players and saved positions", L"Быстрые точки, игроки и сохранённые позиции") \
+X(LocKey_SettingsPageDesc, L"Interface, language and hotkeys", L"Интерфейс, язык и горячие клавиши") \
+X(LocKey_EditorPageDesc, L"Select, move, rotate, scale and manipulate scene objects", L"Выбор, перемещение, вращение и изменение объектов сцены") \
+X(LocKey_QUOTA, L"QUOTA", L"КВОТА") \
+X(LocKey_CurrentQuota, L"Current quota", L"Текущая квота") \
+X(LocKey_QuotaTarget, L"New quota", L"Новая квота") \
+X(LocKey_ApplyQuota, L"Apply quota", L"Применить квоту") \
+X(LocKey_QuotaDesc, L"Updates every extraction point; host only", L"Обновляет все точки эвакуации; только хост") \
+X(LocKey_ActionQuotaChangedFmt, L"Quota changed: $%dK", L"Квота изменена: $%dK") \
+X(LocKey_ActionQuotaHostOnly, L"Quota change skipped: host only", L"Изменение квоты пропущено: только хост") \
+X(LocKey_ActionQuotaNotReady, L"Quota change failed: extraction is not ready", L"Квота не изменена: эвакуация не готова") \
+X(LocKey_TARGET_INSPECTOR, L"TARGET INSPECTOR", L"ИНСПЕКТОР ЦЕЛИ") \
+X(LocKey_TargetingEnabled, L"Aim targeting", L"Наведение на объекты") \
+X(LocKey_AimedObject, L"Aimed object", L"Объект под прицелом") \
+X(LocKey_LockedObject, L"Locked object", L"Зафиксированный объект") \
+X(LocKey_ObjectAuthority, L"Object authority", L"Тип объекта") \
+X(LocKey_ObjectPosition, L"Position", L"Позиция") \
+X(LocKey_ObjectLayer, L"Layer", L"Слой") \
+X(LocKey_NetworkObject, L"Photon / synchronized", L"Photon / синхронизируемый") \
+X(LocKey_LocalObject, L"Scene / local", L"Объект сцены / локальный") \
+X(LocKey_LockTarget, L"Lock aimed target", L"Зафиксировать цель") \
+X(LocKey_ClearTarget, L"Clear target", L"Очистить цель") \
+X(LocKey_TRANSFORM_GIZMO, L"TRANSFORM GIZMO", L"ГИЗМО ТРАНСФОРМАЦИИ") \
+X(LocKey_GizmoVisible, L"Show 3D gizmo", L"Показывать 3D-гизмо") \
+X(LocKey_GizmoEditMode, L"Scene edit mode", L"Режим редактирования сцены") \
+X(LocKey_GizmoEditModeDesc, L"Close the menu to drag axes; Esc returns to the menu", L"Закройте меню и тяните оси; Esc возвращает в меню") \
+X(LocKey_GizmoMove, L"Move (W)", L"Перемещение (W)") \
+X(LocKey_GizmoRotate, L"Rotate (E)", L"Вращение (E)") \
+X(LocKey_GizmoScale, L"Scale (R)", L"Масштаб (R)") \
+X(LocKey_GizmoWorld, L"World", L"Мировые оси") \
+X(LocKey_GizmoLocal, L"Local", L"Локальные оси") \
+X(LocKey_GizmoControls, L"X red · Y green · Z blue · drag with LMB", L"X красная · Y зелёная · Z синяя · тяните ЛКМ") \
+X(LocKey_TELEKINESIS, L"TELEKINESIS / BUILDER", L"ТЕЛЕКИНЕЗ / РЕДАКТОР") \
+X(LocKey_HoldRelease, L"Hold / release", L"Удерживать / отпустить") \
+X(LocKey_HoldDistance, L"Hold distance", L"Дистанция удержания") \
+X(LocKey_ThrowForce, L"Throw force", L"Сила броска") \
+X(LocKey_PullObject, L"Pull", L"Притянуть") \
+X(LocKey_PushObject, L"Throw", L"Бросить") \
+X(LocKey_FreezeObject, L"Freeze / unfreeze", L"Заморозить / разморозить") \
+X(LocKey_DuplicateObject, L"Duplicate locally", L"Дублировать локально") \
+X(LocKey_ObjectScale, L"Uniform scale", L"Масштаб") \
+X(LocKey_ScaleX, L"Scale X", L"Масштаб X") \
+X(LocKey_ScaleY, L"Scale Y", L"Масштаб Y") \
+X(LocKey_ScaleZ, L"Scale Z", L"Масштаб Z") \
+X(LocKey_RotationX, L"Rotation X", L"Поворот X") \
+X(LocKey_RotationY, L"Rotation Y", L"Поворот Y") \
+X(LocKey_RotationZ, L"Rotation Z", L"Поворот Z") \
+X(LocKey_ApplyTransform, L"Apply transform", L"Применить трансформацию") \
+X(LocKey_UndoActionFmt, L"Undo last action (%d)", L"Отменить действие (%d)") \
+X(LocKey_WORLD_CONTROL, L"WORLD CONTROL", L"УПРАВЛЕНИЕ МИРОМ") \
+X(LocKey_TimeScale, L"Time scale", L"Скорость времени") \
+X(LocKey_GravityOverride, L"Override gravity", L"Изменить гравитацию") \
+X(LocKey_GravityY, L"Vertical gravity", L"Вертикальная гравитация") \
+X(LocKey_FreezePhysics, L"Freeze world physics", L"Заморозить физику мира") \
+X(LocKey_Blackout, L"Blackout", L"Выключить свет") \
+X(LocKey_FullBrightWorld, L"Full bright", L"Максимальный свет") \
+X(LocKey_RestoreLighting, L"Restore lighting", L"Восстановить освещение") \
+X(LocKey_ENEMY_DIRECTOR, L"ENEMY DIRECTOR", L"УПРАВЛЕНИЕ ВРАГАМИ") \
+X(LocKey_PacifyEnemies, L"Pacify all enemies", L"Сделать всех врагов пассивными") \
+X(LocKey_FreezeEnemies, L"Freeze all enemies", L"Заморозить всех врагов") \
+X(LocKey_GatherEnemies, L"Gather in front of me", L"Собрать перед собой") \
+X(LocKey_KillAllEnemies, L"Kill all", L"Убить всех") \
+X(LocKey_DeleteAllEnemies, L"Delete all", L"Удалить всех") \
+X(LocKey_LOOT_CONTROL, L"LOOT CONTROL", L"УПРАВЛЕНИЕ ДОБЫЧЕЙ") \
+X(LocKey_FreezeLoot, L"Freeze all valuables", L"Заморозить все ценности") \
+X(LocKey_LootToPlayer, L"Bring to me", L"Притянуть ко мне") \
+X(LocKey_LootToTruck, L"Send to truck", L"Отправить в фургон") \
+X(LocKey_LootToExtraction, L"Send to extraction", L"Отправить на точку сбора") \
+X(LocKey_DiscoverLoot, L"Discover all", L"Обнаружить всё") \
+X(LocKey_ValueMultiplier, L"Value multiplier", L"Множитель стоимости") \
+X(LocKey_ApplyValueMultiplier, L"Apply to all valuables", L"Применить ко всем ценностям") \
+X(LocKey_TEAM_CONTROL, L"TEAM CONTROL", L"УПРАВЛЕНИЕ КОМАНДОЙ") \
+X(LocKey_GodmodeAll, L"Godmode for everyone", L"Бессмертие для всех") \
+X(LocKey_AntiTumbleAll, L"Anti-tumble for everyone", L"Защита от падения для всех") \
+X(LocKey_HealAllPlayers, L"Heal everyone", L"Вылечить всех") \
+X(LocKey_ReviveAllPlayers, L"Revive everyone", L"Воскресить всех") \
+X(LocKey_GatherAllPlayers, L"Gather team", L"Собрать команду") \
+X(LocKey_PlayerScaleAll, L"Team scale", L"Размер команды") \
+X(LocKey_ApplyPlayerScaleAll, L"Apply scale to everyone", L"Изменить размер всех") \
 X(LocKey_Navigation, L"NAVIGATION", L"НАВИГАЦИЯ") \
 X(LocKey_HEALTH, L"HEALTH", L"ЗДОРОВЬЕ") \
 X(LocKey_Godmode, L"Godmode", L"Бессмертие") \
@@ -146,6 +237,7 @@ X(LocKey_GoButton, L"Go", L"Перейти") \
 X(LocKey_ClearButton, L"Clear", L"Очистить") \
 X(LocKey_SessionStatus, L"SESSION STATUS", L"СТАТУС СЕССИИ") \
 X(LocKey_InGame, L"In game", L"В игре") \
+X(LocKey_MainMenuStatus, L"Main menu", L"Главное меню") \
 X(LocKey_Authority, L"Authority", L"Права") \
 X(LocKey_LevelName, L"Level", L"Уровень") \
 X(LocKey_LastAction, L"Last action", L"Последнее действие") \

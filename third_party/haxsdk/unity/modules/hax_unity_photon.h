@@ -28,6 +28,7 @@ namespace Unity::Photon
 
         bool&                           IsMine();
         Player                          GetOwner();
+        void                            RequestOwnership();
 
         void                            RPC(System::String methodName, RpcTarget target, System::Array<System::Object> parameters);
     };

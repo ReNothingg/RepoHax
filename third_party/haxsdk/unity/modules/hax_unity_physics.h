@@ -40,6 +40,8 @@ namespace Unity
     {
     public:
         static System::Type              typeof();
+        static Vector3                   GetGravity();
+        static void                      SetGravity(const Vector3& value);
         static System::Array<RaycastHit> SphereCastAll(const Vector3& origin, float radius, const Vector3& direction, float maxDistance, int layerMask);
     };
 

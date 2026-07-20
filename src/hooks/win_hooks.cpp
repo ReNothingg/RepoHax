@@ -143,6 +143,11 @@ namespace Cheat
         if (msg->message == WM_USER)
             G->MenuVisible ? CloseMenu() : OpenMenu();
 
+        // Scene gizmo editing deliberately keeps the cursor detached from the game while
+        // the menu is hidden. Restore the normal game input state as soon as editing ends.
+        if (!G->MenuVisible && G->GameInputPrevented && !G->GodGizmoEditMode)
+            CloseMenu();
+
         if (Hax::Gui::HandleWndMsg(msg->hwnd, msg->message, msg->wParam, msg->lParam))
             msg->message = WM_NULL;
 
@@ -262,6 +267,12 @@ namespace Cheat
 
     static void CloseMenu()
     {
+        if (G->GodGizmoEditMode && G->GodTargetObjectValid && G->IsInGame)
+        {
+            G->MenuVisible = false;
+            return;
+        }
+
         if (G->ForceCursorVisible)
         {
             G->ForceCursorVisible = false;

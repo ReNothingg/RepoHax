@@ -8,21 +8,21 @@ namespace Cheat
 {
     namespace Theme
     {
-        constexpr Hax::Gui::Color WindowBg = 0x101217FF;
-        constexpr Hax::Gui::Color SidePanelBg = 0x171A21FF;
+        constexpr Hax::Gui::Color WindowBg = 0x0B0F16FF;
+        constexpr Hax::Gui::Color SidePanelBg = 0x111722FF;
         constexpr float WindowR = 12.f;
         constexpr float MainFontSize = 13.f;
         constexpr float DescFontSize = 12.f;
         constexpr float TitleFontSize = 12.f;
-        constexpr Hax::Gui::LinearColor BtnBg = 0x222630FF;
-        constexpr Hax::Gui::Color BtnBgActive = 0x263C6BFF;
+        constexpr Hax::Gui::LinearColor BtnBg = 0x1B2330FF;
+        constexpr Hax::Gui::Color BtnBgActive = 0x294A91FF;
         constexpr Hax::Gui::Color DescColor = 0x8D96A8FF;
         constexpr Hax::Gui::Color DisabledMaskCol = 0x101217B8;
-        constexpr Hax::Gui::Color SeparatorCol = 0x252A35FF;
+        constexpr Hax::Gui::Color SeparatorCol = 0x273142FF;
         constexpr Hax::Gui::Color MainCol = 0xD8DCE5FF;
         constexpr Hax::Gui::Color PopupBg = 0x191D25FF;
         constexpr Hax::Gui::Color FrameColor = 0x222630FF;
-        constexpr Hax::Gui::Color ActiveColor = 0x4C82FFFF;
+        constexpr Hax::Gui::Color ActiveColor = 0x5A8DFFFF;
         constexpr Hax::Gui::Color HeaderColor = Hax::Gui::Color::White;
 
         #define DESC_FONT G->NunitoSans_SemiBold
@@ -33,7 +33,7 @@ namespace Cheat
         constexpr Hax::Vector2 ToggleSize = {35.f, 20.f};
         constexpr float SettingBtnSize = 16.f;
         constexpr float CheckboxSize = 16.f;
-        constexpr Hax::Vector2 WindowSize = {1240.f, 660.f};
+        constexpr Hax::Vector2 WindowSize = {1320.f, 740.f};
     }
 
     void Label(Hax::Gui::FontHandle hFont, Hax::WStringView text, float fontH, Hax::Gui::Color col)
@@ -128,7 +128,7 @@ namespace Cheat
 
     bool BeginSidePanel()
     {
-        const Hax::Vector2 size = {195_px, Hax::Gui::GetContentRegionAvail().Y};
+        const Hax::Vector2 size = {236_px, Hax::Gui::GetContentRegionAvail().Y};
 
         constexpr size_t id = Hax::Hash("SidePanel");
         Hax::Gui::BeginContainer(id, {.W = size.X, .H = size.Y});
@@ -347,15 +347,15 @@ namespace Cheat
 
         Hax::Gui::LinearAnim& state = Hax::Gui::GetState<Hax::Gui::LinearAnim>(id);
 
-        Hax::Gui::Color bg = 0x2B2B2BFF;
-        Hax::Gui::Color fg = 0xC8C8C8FF;
+        Hax::Gui::Color bg = 0x24334BFF;
+        Hax::Gui::Color fg = 0xE3E8F1FF;
         if (!Hax::Gui::IsItemActive(id))
         {
-            constexpr Hax::Gui::LinearColor fromBg = 0x282828FF;
-            constexpr Hax::Gui::LinearColor toBg = 0x343434FF;
+            constexpr Hax::Gui::LinearColor fromBg = 0x1C2430FF;
+            constexpr Hax::Gui::LinearColor toBg = 0x26344AFF;
             bg = Hax::Lerp(fromBg, toBg, state.Progress).ToColor();
 
-            constexpr Hax::Gui::LinearColor fromFg = 0xC8C8C8FF;
+            constexpr Hax::Gui::LinearColor fromFg = 0xC7CFDBFF;
             constexpr Hax::Gui::LinearColor toFg = 0xFFFFFFFF;
             fg = Hax::Lerp(fromFg, toFg, state.Progress).ToColor();
         }
@@ -497,7 +497,7 @@ namespace Cheat
         {
             const Hax::Vector2 a = Hax::Gui::GetCursorPos();
             const Hax::Vector2 b = a + containerSize;
-            Hax::Gui::DrawRect(a, b, {.FillColor = 0x171A21FF, .Rounding = 8_px});
+            Hax::Gui::DrawRect(a, b, {.BorderColor = 0x263142FF, .FillColor = 0x151B26FF, .Rounding = 9_px});
         }
         else
             Hax::Gui::PushSkipDrawing();

@@ -4,6 +4,7 @@
 
 #include "../localization.h"
 #include "../widgets.h"
+#include "tabs.h"
 
 #define LINE_ID (HAX_LINE * 345)
 
@@ -106,6 +107,13 @@ namespace Cheat
                 ToggleEx(LINE_ID, G->PreserveSaveOnDeath, G->Loc[LocKey_PreserveSaveOnDeath], G->Loc[LocKey_PreserveSaveOnDeathDesc]);
                 HorizontalLine(1_px);
                 ToggleEx(LINE_ID, G->SessionSafetyEnabled, G->Loc[LocKey_SessionSafety], G->Loc[LocKey_SessionSafetyDesc]);
+                HorizontalLine(1_px);
+                ToggleEx(LINE_ID, G->AutoCancelClientUnsafe, G->Loc[LocKey_CancelHostOnlyClient], G->Loc[LocKey_CancelHostOnlyClientDesc]);
+                HorizontalLine(1_px);
+                ToggleEx(LINE_ID, G->DisableAllPlayersDeadCheck, G->Loc[LocKey_BlockAllDeadGameover], G->Loc[LocKey_BlockAllDeadGameoverDesc]);
+                HorizontalLine(1_px);
+                if (Button(LINE_ID, G->Loc[LocKey_ResetRiskyToggles], G->Loc[LocKey_ResetRiskyTogglesDesc], {.MinW = w}))
+                    G->ResetSessionSafety = true;
             }
             EndPanel();
 
@@ -160,6 +168,8 @@ namespace Cheat
         Hax::Gui::BeginVertical(spacing);
         Hax::Gui::Dummy({0.f, 0.f});
         {
+            DrawWorldControlPanel();
+
             BeginPanel(LINE_ID);
             PanelHeader(G->Loc[LocKey_MAPFILTER], G->Loc[LocKey_AvailableIfHost]);
             {

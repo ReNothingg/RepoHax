@@ -4,11 +4,22 @@
 
 #include "../localization.h"
 #include "../widgets.h"
+#include "tabs.h"
 
 #define LINE_ID (HAX_LINE * 789)
 
 namespace Cheat
 {
+    static void StatusLine(Hax::WStringView name, Hax::WStringView value, Hax::Gui::Color valueColor = 0xD8DCE5FF)
+    {
+        Hax::Gui::BeginHorizontal();
+        MainLabel(name, 0x8D96A8FF);
+        const Hax::Vector2 valueSize = CalcMainLabelSize(value);
+        Hax::Gui::Space(Hax::Max(0.f, Hax::Gui::GetContentRegionAvail().X - valueSize.X));
+        MainLabel(value, valueColor);
+        Hax::Gui::EndHorizontal();
+    }
+
     void DrawValuablesTab()
     {
         const Hax::Vector2 mainAreaSize = Hax::Gui::GetContentRegionAvail();
@@ -21,6 +32,26 @@ namespace Cheat
         Hax::Gui::BeginVertical(spacing);
         Hax::Gui::Dummy({0.f, 0.f});
         {
+            BeginPanel(LINE_ID);
+            PanelHeader(G->Loc[LocKey_QUOTA], G->Loc[LocKey_QuotaDesc]);
+            {
+                Hax::char16 current[32]{};
+                Hax::char16 target[32]{};
+                swprintf_s(current, _countof(current), L"$%dK", G->CurrentQuota);
+                swprintf_s(target, _countof(target), L"$%dK", G->QuotaTarget);
+                StatusLine(G->Loc[LocKey_CurrentQuota], G->IsInGame ? Hax::WStringView(current) : Hax::WStringView(L"-"),
+                    G->IsInGame ? 0x65B8FFFF : 0x8D96A8FF);
+                HorizontalLine(1_px);
+                SliderEx(LINE_ID, G->Loc[LocKey_QuotaTarget], target, &G->QuotaTarget, 0, 1000000, SliderConvertInt);
+                const bool canApply = G->IsInGame && !G->IsClient && RoundDirector::instance();
+                if (Button(LINE_ID, G->Loc[LocKey_ApplyQuota], G->Loc[LocKey_HostOnly],
+                    {.Enabled = canApply, .MinW = Hax::Gui::GetContentRegionAvail().X}))
+                    G->QuotaApplyRequested = true;
+            }
+            EndPanel();
+
+            DrawBalancePanel();
+
             BeginPanel(LINE_ID);
             PanelHeader(G->Loc[LocKey_VISUALS]);
             {
@@ -67,6 +98,7 @@ namespace Cheat
                 }
             }
             EndPanel();
+
         }
         Hax::Gui::Dummy({0.f, 0.f});
         Hax::Gui::EndVertical();
@@ -93,6 +125,8 @@ namespace Cheat
                     G->ActivateNextPoint = true;
             }
             EndPanel();
+
+            DrawLootControlPanel();
         }
         Hax::Gui::Dummy({0.f, 0.f});
         Hax::Gui::EndVertical();

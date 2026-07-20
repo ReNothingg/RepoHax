@@ -34,6 +34,20 @@ namespace Cheat
         PlayerToCamera
     };
 
+    enum class GodObjectCommand
+    {
+        None, LockAimed, ClearTarget, ToggleTelekinesis, Pull, Push, FreezeToggle,
+        Duplicate, ApplyTransform, DeleteTarget, Undo
+    };
+
+    enum class EnemyGodCommand { None, Gather, KillAll, DeleteAll };
+    enum class LootGodCommand { None, BringToPlayer, BringToTruck, BringToExtraction, DiscoverAll, ApplyValueMultiplier };
+    enum class WorldLightCommand { None, Blackout, FullBright, Restore };
+    enum class PlayerGodCommand { None, HealAll, ReviveAll, GatherAll, ApplyScaleAll };
+    enum class GodGizmoMode { Move, Rotate, Scale };
+    enum class GodGizmoSpace { World, Local };
+    inline constexpr int GodGizmoRingSegments = 32;
+
     struct SavedPositionSlot
     {
         bool                                Active;
@@ -197,6 +211,80 @@ namespace Cheat
         bool                                ObjectRemoverTargetValid;
         float                               ObjectRemoverTargetDistance;
 
+        // God tools / runtime object editor
+        bool                                GodTargetingEnabled;
+        int                                 VkLockGodTarget = VK_F11;
+        Unity::GameObject                   GodAimedObject = null;
+        bool                                GodAimedObjectValid;
+        bool                                GodAimedObjectNetworked;
+        float                               GodAimedObjectDistance;
+        Hax::char16                         GodAimedObjectName[96] = L"-";
+        Unity::GameObject                   GodTargetObject = null;
+        bool                                GodTargetObjectValid;
+        bool                                GodTargetNetworked;
+        Hax::char16                         GodTargetName[96] = L"-";
+        Unity::Vector3                      GodTargetPosition;
+        int                                 GodTargetLayer;
+        GodObjectCommand                    GodObjectAction = GodObjectCommand::None;
+        bool                                GodTelekinesisActive;
+        int                                 GodHoldDistance = 5;
+        int                                 GodThrowForce = 35;
+        int                                 GodScalePercent = 100;
+        int                                 GodScaleXPercent = 100;
+        int                                 GodScaleYPercent = 100;
+        int                                 GodScaleZPercent = 100;
+        int                                 GodRotationX;
+        int                                 GodRotationY;
+        int                                 GodRotationZ;
+        int                                 GodUndoCount;
+
+        // Unity-style transform gizmo. Unity calls stay on the game thread; the overlay
+        // consumes only these projected POD snapshots and submits drag deltas back.
+        bool                                GodGizmoVisible = true;
+        bool                                GodGizmoEditMode;
+        GodGizmoMode                        GodGizmoModeCurrent = GodGizmoMode::Move;
+        GodGizmoSpace                       GodGizmoSpaceCurrent = GodGizmoSpace::Local;
+        bool                                GodGizmoProjectionValid;
+        Hax::Vector2                        GodGizmoScreenOrigin{};
+        Hax::Vector2                        GodGizmoScreenAxes[3]{};
+        bool                                GodGizmoScreenAxisValid[3]{};
+        Hax::Vector2                        GodGizmoRingPoints[3][GodGizmoRingSegments + 1]{};
+        bool                                GodGizmoRingPointValid[3][GodGizmoRingSegments + 1]{};
+        float                               GodGizmoWorldSize;
+        int                                 GodGizmoHoveredAxis = -1;
+        int                                 GodGizmoActiveAxis = -1;
+        Hax::Vector2                        GodGizmoDragScreenDirection{};
+        float                               GodGizmoDragPixelsPending;
+        bool                                GodGizmoDragBeginRequested;
+        bool                                GodGizmoDragEndRequested;
+
+        // World control
+        int                                 WorldTimeScalePercent = 100;
+        bool                                WorldGravityOverride;
+        int                                 WorldGravityY = -10;
+        bool                                WorldFreezePhysics;
+        bool                                WorldFreezePhysicsChanged;
+        WorldLightCommand                   WorldLightAction = WorldLightCommand::None;
+
+        // Enemy director
+        bool                                GodEnemiesPacified;
+        bool                                GodEnemiesPacifiedChanged;
+        bool                                GodEnemiesFrozen;
+        bool                                GodEnemiesFreezeChanged;
+        EnemyGodCommand                     EnemyGodAction = EnemyGodCommand::None;
+
+        // Loot control
+        bool                                GodLootFrozen;
+        bool                                GodLootFreezeChanged;
+        int                                 GodLootValuePercent = 100;
+        LootGodCommand                      LootGodAction = LootGodCommand::None;
+
+        // Team-wide player control
+        bool                                GodAllPlayers;
+        bool                                GodAllPlayersNoTumble;
+        int                                 GodAllPlayerScalePercent = 100;
+        PlayerGodCommand                    PlayerGodAction = PlayerGodCommand::None;
+
         // Levels
         Hax::Vector<LevelBan>               LevelBans;
         size_t                              TotalBans;
@@ -224,6 +312,9 @@ namespace Cheat
         int                                 CurrencyDeltaPending;
         bool                                CurrencySetZero;
         bool                                CurrencyRepairOverflow;
+        int                                 CurrentQuota;
+        int                                 QuotaTarget = 10000;
+        bool                                QuotaApplyRequested;
         TeleportQuickAction                 TeleportAction = TeleportQuickAction::None;
         PlayerAvatar                        SelectedTeleportPlayer = null;
         int                                 SavePositionSlot = -1;

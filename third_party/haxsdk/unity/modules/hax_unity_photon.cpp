@@ -15,6 +15,13 @@ namespace Unity::Photon
         return s_Method.Call<Player>(*this);
     }
 
+    void PhotonView::RequestOwnership()
+    {
+        THROW_IF_NULL();
+        static auto s_Method = PhotonView::typeof().GetMethod("RequestOwnership", "System.Void()", true).Wrap();
+        s_Method.Call<void>(*this);
+    }
+
     void PhotonView::RPC(System::String methodName, RpcTarget target, System::Array<System::Object> parameters)
     {
         THROW_IF_NULL();

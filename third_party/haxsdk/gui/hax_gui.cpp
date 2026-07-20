@@ -1446,6 +1446,16 @@ namespace Hax::Gui
 
         ContainerState& state = GetState<ContainerState>(id);
 
+        // A zero target is the conventional "scroll to top" request. Handle it
+        // explicitly because the absolute-coordinate branch below intentionally
+        // excludes the container's upper edge.
+        if (posY <= 0.f)
+        {
+            state.Scroll.Offset.Y = 0.f;
+            state.Scroll.TargetOffsetY = 0.f;
+            return;
+        }
+
         float minY = state.Bounds.Min.Y;
         float maxY = state.Bounds.Max.Y;
 

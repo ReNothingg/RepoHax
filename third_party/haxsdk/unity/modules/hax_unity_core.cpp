@@ -69,6 +69,9 @@ namespace Unity
 
     Quaternion Quaternion::Euler(float x, float y, float z)
     {
+        x = Hax::DegToRad(x);
+        y = Hax::DegToRad(y);
+        z = Hax::DegToRad(z);
         x *= 0.5f;
         y *= 0.5f;
         z *= 0.5f;
@@ -81,6 +84,23 @@ namespace Unity
                           cx * sy * cz - sx * cy * sz,
                           cx * cy * sz - sx * sy * cz,
                           cx * cy * cz + sx * sy * sz);
+    }
+
+    Quaternion Quaternion::AngleAxis(float degrees, const Vector3& axis)
+    {
+        Vector3 n = axis.GetNormalized();
+        const float half = Hax::DegToRad(degrees) * 0.5f;
+        const float s = sinf(half);
+        return Quaternion(n.X * s, n.Y * s, n.Z * s, cosf(half));
+    }
+
+    Quaternion Quaternion::operator*(const Quaternion& rhs) const
+    {
+        return Quaternion(
+            W * rhs.X + X * rhs.W + Y * rhs.Z - Z * rhs.Y,
+            W * rhs.Y - X * rhs.Z + Y * rhs.W + Z * rhs.X,
+            W * rhs.Z + X * rhs.Y - Y * rhs.X + Z * rhs.W,
+            W * rhs.W - X * rhs.X - Y * rhs.Y - Z * rhs.Z);
     }
 
     Vector3 Quaternion::operator*(const Vector3& point) const

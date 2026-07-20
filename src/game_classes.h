@@ -304,13 +304,21 @@ struct PhysGrabObject : Unity::Behaviour
 
     META("Assembly-CSharp", "", "PhysGrabObject");
 
+    void Teleport(const Unity::Vector3& position, const Unity::Quaternion& rotation)
+    {
+        THROW_IF_NULL();
+        s_Teleport.Call<void>(*this, System::Box(position), System::Box(rotation));
+    }
+
     FIELD(grabbedLocal, bool);
     FIELD(centerPoint, Unity::Vector3);
     FIELD(boundingBox, Unity::Vector3);
     FIELD(midPoint, Unity::Vector3);
     FIELD(impactDetector, PhysGrabObjectImpactDetector);
+    FIELD(photonView, Unity::Photon::PhotonView);
 
     METHOD_WRAPPER(PhysicsGrabbingManipulation);
+    METHOD_WRAPPER(Teleport);
 };
 
 struct PhysGrabber : Unity::MonoBehaviour
@@ -892,6 +900,7 @@ struct ExtractionPoint : Unity::MonoBehaviour
 
     FIELD(isLocked, bool);
     FIELD(currentState, int);
+    FIELD(extractionArea, Unity::GameObject);
 
     void HaulGoalSet(int value)
     {
@@ -935,6 +944,7 @@ struct RoundDirector : Unity::MonoBehaviour
     FIELD(extractionPointActive, bool);
     FIELD(extractionPointCurrent, ExtractionPoint);
     FIELD(extractionPointList, System::List<Unity::GameObject>);
+    FIELD(extractionHaulGoal, int);
     FIELD(cosmeticWorldObjects, System::List<CosmeticWorldObject>);
 
 private:

@@ -125,6 +125,46 @@ namespace Cheat
         Hax::Gui::EndVertical();
     }
 
+    void DrawBalancePanel()
+    {
+        BeginPanel(LINE_ID);
+        PanelHeader(G->Loc[LocKey_BALANCE], G->Loc[LocKey_BalanceDesc]);
+        {
+            Hax::char16 current[32]{};
+            Hax::char16 amount[32]{};
+            Hax::char16 subtractLabel[48]{};
+            Hax::char16 addLabel[48]{};
+            swprintf_s(current, _countof(current), L"$%dK", G->CurrentRunCurrency);
+            swprintf_s(amount, _countof(amount), L"$%dK", G->CurrencyChangeAmount);
+            swprintf_s(subtractLabel, _countof(subtractLabel), L"- $%dK", G->CurrencyChangeAmount);
+            swprintf_s(addLabel, _countof(addLabel), L"+ $%dK", G->CurrencyChangeAmount);
+
+            StatusLine(G->Loc[LocKey_CurrentBalance], G->IsInGame ? Hax::WStringView(current) : Hax::WStringView(L"-"), G->IsInGame ? 0x7EE787FF : 0x8D96A8FF);
+            HorizontalLine(1_px);
+            SliderEx(LINE_ID, G->Loc[LocKey_CurrencyChangeAmount], amount, &G->CurrencyChangeAmount, 1, 100000, SliderConvertInt);
+
+            const float gap = 5_px;
+            const float w = Hax::Gui::GetContentRegionAvail().X;
+            const float halfW = (w - gap) / 2.f;
+            const bool canChange = G->IsInGame && !G->IsClient && StatsManager::instance();
+            Hax::Gui::BeginHorizontal(gap);
+            {
+                if (Button(LINE_ID, subtractLabel, G->Loc[LocKey_SubtractMoney], {.Enabled = canChange, .MinW = halfW}))
+                    G->CurrencyDeltaPending = -G->CurrencyChangeAmount;
+                if (Button(LINE_ID, addLabel, G->Loc[LocKey_AddMoney], {.Enabled = canChange, .MinW = halfW}))
+                    G->CurrencyDeltaPending = G->CurrencyChangeAmount;
+            }
+            Hax::Gui::EndHorizontal();
+
+            if (Button(LINE_ID, G->Loc[LocKey_SetBalanceZero], G->Loc[LocKey_HostOnly], {.Enabled = canChange, .MinW = w}))
+                G->CurrencySetZero = true;
+            if (G->CurrentRunCurrency > MaxSafeRunCurrency &&
+                Button(LINE_ID, G->Loc[LocKey_RepairBalance], G->Loc[LocKey_RepairBalanceDesc], {.Enabled = canChange, .MinW = w}))
+                G->CurrencyRepairOverflow = true;
+        }
+        EndPanel();
+    }
+
     void DrawMiscTab()
     {
         const Hax::Vector2 mainAreaSize = Hax::Gui::GetContentRegionAvail();
@@ -194,18 +234,6 @@ namespace Cheat
             }
             EndPanel();
 
-            BeginPanel(LINE_ID);
-            PanelHeader(G->Loc[LocKey_SavedPositions], G->Loc[LocKey_SavedPositionsDesc]);
-            {
-                for (int i = 0; i < (int)_countof(G->SavedPositions); ++i)
-                {
-                    if (i > 0)
-                        HorizontalLine(1_px);
-
-                    DrawSavedPositionRow(LINE_ID + i * 100, i);
-                }
-            }
-            EndPanel();
         }
         Hax::Gui::Dummy({0.f, 0.f});
         Hax::Gui::EndVertical();
@@ -218,99 +246,14 @@ namespace Cheat
         Hax::Gui::Dummy({0.f, 0.f});
         {
             BeginPanel(LINE_ID);
-            PanelHeader(G->Loc[LocKey_SessionStatus]);
+            PanelHeader(G->Loc[LocKey_SavedPositions], G->Loc[LocKey_SavedPositionsDesc]);
             {
-                StatusLine(G->Loc[LocKey_InGame], G->IsInGame ? G->Loc[LocKey_Yes] : G->Loc[LocKey_No], G->IsInGame ? 0x7EE787FF : 0xFF8A8AFF);
-                StatusLine(G->Loc[LocKey_Authority], G->IsClient ? G->Loc[LocKey_Client] : G->Loc[LocKey_HostSingleplayer], G->IsClient ? 0xFFD36EFF : 0x7EE787FF);
-
-                RunManager manager = RunManager::instance();
-                System::String levelName = (manager && manager.levelCurrent()) ? manager.levelCurrent().NarrativeName() : null;
-                StatusLine(G->Loc[LocKey_LevelName], levelName != null ? levelName.ToHaxView() : Hax::WStringView(L"-"));
-
-                StatusLine(G->Loc[LocKey_LastAction], LastActionText(), 0xC2C8D4FF);
-            }
-            EndPanel();
-
-            BeginPanel(LINE_ID);
-            PanelHeader(G->Loc[LocKey_BALANCE], G->Loc[LocKey_BalanceDesc]);
-            {
-                Hax::char16 current[32]{};
-                Hax::char16 amount[32]{};
-                Hax::char16 subtractLabel[48]{};
-                Hax::char16 addLabel[48]{};
-                swprintf_s(current, _countof(current), L"$%dK", G->CurrentRunCurrency);
-                swprintf_s(amount, _countof(amount), L"$%dK", G->CurrencyChangeAmount);
-                swprintf_s(subtractLabel, _countof(subtractLabel), L"- $%dK", G->CurrencyChangeAmount);
-                swprintf_s(addLabel, _countof(addLabel), L"+ $%dK", G->CurrencyChangeAmount);
-
-                StatusLine(G->Loc[LocKey_CurrentBalance], G->IsInGame ? Hax::WStringView(current) : Hax::WStringView(L"-"), G->IsInGame ? 0x7EE787FF : 0x8D96A8FF);
-
-                HorizontalLine(1_px);
-
-                SliderEx(LINE_ID, G->Loc[LocKey_CurrencyChangeAmount], amount, &G->CurrencyChangeAmount, 1, 100000, SliderConvertInt);
-
-                const float gap = 5_px;
-                const float w = Hax::Gui::GetContentRegionAvail().X;
-                const float halfW = (w - gap) / 2.f;
-                const bool canChange = G->IsInGame && !G->IsClient && StatsManager::instance();
-
-                Hax::Gui::BeginHorizontal(gap);
+                for (int i = 0; i < (int)_countof(G->SavedPositions); ++i)
                 {
-                    if (Button(LINE_ID, subtractLabel, G->Loc[LocKey_SubtractMoney], {.Enabled = canChange, .MinW = halfW}))
-                        G->CurrencyDeltaPending = -G->CurrencyChangeAmount;
-
-                    if (Button(LINE_ID, addLabel, G->Loc[LocKey_AddMoney], {.Enabled = canChange, .MinW = halfW}))
-                        G->CurrencyDeltaPending = G->CurrencyChangeAmount;
+                    if (i > 0)
+                        HorizontalLine(1_px);
+                    DrawSavedPositionRow(LINE_ID + i * 100, i);
                 }
-                Hax::Gui::EndHorizontal();
-
-                if (Button(LINE_ID, G->Loc[LocKey_SetBalanceZero], G->Loc[LocKey_HostOnly], {.Enabled = canChange, .MinW = w}))
-                    G->CurrencySetZero = true;
-
-                if (G->CurrentRunCurrency > MaxSafeRunCurrency &&
-                    Button(LINE_ID, G->Loc[LocKey_RepairBalance], G->Loc[LocKey_RepairBalanceDesc], {.Enabled = canChange, .MinW = w}))
-                {
-                    G->CurrencyRepairOverflow = true;
-                }
-            }
-            EndPanel();
-
-            BeginPanel(LINE_ID);
-            PanelHeader(G->Loc[LocKey_SafetyGuards], G->Loc[LocKey_SafetyGuardsDesc]);
-            {
-                ToggleEx(LINE_ID, G->SessionSafetyEnabled, G->Loc[LocKey_SessionSafety], G->Loc[LocKey_SessionSafetyDesc]);
-                HorizontalLine(1_px);
-                ToggleEx(LINE_ID, G->AutoCancelClientUnsafe, G->Loc[LocKey_CancelHostOnlyClient], G->Loc[LocKey_CancelHostOnlyClientDesc]);
-                HorizontalLine(1_px);
-                ToggleEx(LINE_ID, G->PreserveSaveOnDeath, G->Loc[LocKey_PreserveSaveOnDeath], G->Loc[LocKey_PreserveSaveOnDeathDesc]);
-                HorizontalLine(1_px);
-                ToggleEx(LINE_ID, G->DisableAllPlayersDeadCheck, G->Loc[LocKey_BlockAllDeadGameover], G->Loc[LocKey_BlockAllDeadGameoverDesc]);
-                HorizontalLine(1_px);
-
-                if (Button(LINE_ID, G->Loc[LocKey_ResetRiskyToggles], G->Loc[LocKey_ResetRiskyTogglesDesc], {.MinW = Hax::Gui::GetContentRegionAvail().X}))
-                    G->ResetSessionSafety = true;
-            }
-            EndPanel();
-
-            BeginPanel(LINE_ID);
-            PanelHeader(G->Loc[LocKey_QuickSessionActions]);
-            {
-                const float gap = 5_px;
-                const float w = Hax::Gui::GetContentRegionAvail().X;
-                const float halfW = (w - gap) / 2.f;
-
-                Hax::Gui::BeginHorizontal(gap);
-                {
-                    if (Button(LINE_ID, G->Loc[LocKey_SaveNow], {}, {.Enabled = G->IsInGame && StatsManager::instance(), .MinW = halfW}))
-                        G->SaveWorldNow = true;
-
-                    if (Button(LINE_ID, G->Loc[LocKey_ReloadLevel], G->Loc[LocKey_HostOnly], {.Enabled = G->IsInGame && !G->IsClient && RunManager::instance(), .MinW = halfW}))
-                        G->ReloadCurrentLevel = true;
-                }
-                Hax::Gui::EndHorizontal();
-
-                if (Button(LINE_ID, G->Loc[LocKey_UnlockExtractionPoints], G->Loc[LocKey_HostOnly], {.Enabled = G->IsInGame && !G->IsClient && RoundDirector::instance(), .MinW = w}))
-                    G->UnlockExtractionPoints = true;
             }
             EndPanel();
         }

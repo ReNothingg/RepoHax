@@ -98,6 +98,20 @@ namespace Unity
         return s_Type;
     }
 
+    Vector3 Physics::GetGravity()
+    {
+        static auto s_Method = typeof().GetMethod("get_gravity_Injected", nullptr, true).Wrap();
+        Vector3 value{};
+        s_Method.InternalCall<void>(&value);
+        return value;
+    }
+
+    void Physics::SetGravity(const Vector3& value)
+    {
+        static auto s_Method = typeof().GetMethod("set_gravity_Injected", nullptr, true).Wrap();
+        s_Method.InternalCall<void>(&value);
+    }
+
     System::Array<RaycastHit> Physics::SphereCastAll(const Vector3& origin, float radius, const Vector3& direction, float maxDistance, int layerMask)
     {
         static auto s_Method = typeof().GetMethod("SphereCastAll", "UnityEngine.RaycastHit[](UnityEngine.Vector3,System.Single,UnityEngine.Vector3,System.Single,System.Int32)", true).Wrap();

@@ -15,20 +15,22 @@ namespace Cheat
     {
         void(*DrawFunc)(void);
         LocKey Loc;
+        LocKey Desc;
         Hax::char16 Icon;
     };
 
     static const Tab g_Tabs[] = 
     {
-        {DrawStatsTab, LocKey_Stats, L'\ue473'},
-        {DrawEntitiesTab, LocKey_Entities, L'\uf8f5'},
-        {DrawVisionTab, LocKey_Vision, L'\uf06e'},
-        {DrawValuablesTab, LocKey_Valuables, L'\uf81d'},
-        {DrawItemsTab, LocKey_Items, L'\uf1e2'},
-        {DrawLevelTab, LocKey_Level, L'\uf5fd'},
-        {DrawCosmeticTab, LocKey_Cosmetic, L'\ue136'},
-        {DrawMiscTab, LocKey_Misc, L'\uf86d'},
-        {DrawSettingsTab, LocKey_Settings, L'\uf013'}
+        {DrawStatsTab, LocKey_Stats, LocKey_StatsPageDesc, L'\ue473'},
+        {DrawEntitiesTab, LocKey_Entities, LocKey_EntitiesPageDesc, L'\uf8f5'},
+        {DrawVisionTab, LocKey_Vision, LocKey_VisionPageDesc, L'\uf06e'},
+        {DrawValuablesTab, LocKey_Valuables, LocKey_EconomyPageDesc, L'\uf81d'},
+        {DrawItemsTab, LocKey_Items, LocKey_ItemsPageDesc, L'\uf1e2'},
+        {DrawLevelTab, LocKey_Level, LocKey_LevelPageDesc, L'\uf5fd'},
+        {DrawCosmeticTab, LocKey_Cosmetic, LocKey_CosmeticPageDesc, L'\ue136'},
+        {DrawMiscTab, LocKey_Misc, LocKey_TeleportPageDesc, L'\uf86d'},
+        {DrawSettingsTab, LocKey_Settings, LocKey_SettingsPageDesc, L'\uf013'},
+        {DrawGodToolsTab, LocKey_GodTools, LocKey_EditorPageDesc, L'\uf521'}
     };
 
     struct TabGroup
@@ -42,8 +44,9 @@ namespace Cheat
     static const TabGroup g_TabGroups[] =
     {
         {LocKey_PlayerCategory, L'\ue473', {0, 2, 6}, 3},
-        {LocKey_WorldCategory,  L'\uf5fd', {1, 3, 5}, 3},
-        {LocKey_ToolsCategory,  L'\uf468', {4, 7, 0}, 2},
+        {LocKey_SessionCategory,L'\uf5fd', {5, 1, 0}, 2},
+        {LocKey_EconomyCategory,L'\uf81d', {3, 0, 0}, 1},
+        {LocKey_ToolsCategory,  L'\uf468', {4, 7, 9}, 3},
         {LocKey_Settings,       L'\uf013', {8, 0, 0}, 1}
     };
 
@@ -132,20 +135,22 @@ namespace Cheat
             {
                 const float sidePanelWidth = Hax::Gui::GetContentRegionAvail().X;
 
-                Hax::Gui::Space(24_px);
+                Hax::Gui::Space(27_px);
 
-                // Logo
+                // Compact product identity leaves more room for navigation.
                 {
                     Hax::Gui::BeginHorizontal();
                     {
-                        Hax::Vector2 customSize = Hax::Gui::GetImageSize(G->Logo) * (0.38f * Hax::Gui::G.ScaleFactor);
-                        Hax::Gui::Space((sidePanelWidth - customSize.X) / 2.f);
-                        Image(G->Logo, customSize);
+                        Hax::Gui::Space(20_px);
+                        Hax::Gui::BeginVertical(2_px);
+                        Label(G->NunitoSans_ExtraBold, L"REPOHAX", 22_px, 0xF5F7FBFF);
+                        Label(G->NunitoSans_SemiBold, G->Loc[LocKey_ControlCenter], 10_px, 0x5A8DFFFF);
+                        Hax::Gui::EndVertical();
                     }
                     Hax::Gui::EndHorizontal();
                 }
 
-                Hax::Gui::Space(24_px);
+                Hax::Gui::Space(28_px);
 
                 const float padding = 12_px;
                 Hax::Gui::BeginHorizontal();
@@ -170,6 +175,16 @@ namespace Cheat
                                     }
                                 }
                             }
+
+                            Hax::Gui::Space(18_px);
+                            HorizontalLine(1_px);
+                            Hax::Gui::Space(10_px);
+                            DescLabel(G->Loc[LocKey_SessionStatus]);
+                            Hax::Gui::Space(4_px);
+                            MainLabel(G->IsInGame ? G->Loc[LocKey_InGame] : G->Loc[LocKey_MainMenuStatus],
+                                G->IsInGame ? 0x7EE787FF : 0x8D96A8FF);
+                            MainLabel(G->IsClient ? G->Loc[LocKey_Client] : G->Loc[LocKey_HostSingleplayer],
+                                G->IsClient ? 0xFFD36EFF : 0x65B8FFFF);
                         }
                         Hax::Gui::EndVertical();
                     }
@@ -184,33 +199,58 @@ namespace Cheat
             Hax::Gui::BeginVertical();
             {
                 const TabGroup& activeGroup = g_TabGroups[g_ActiveGroup];
-                Hax::Gui::BeginContainer(Hax::Hash("Sub navigation"), {.H = 62_px});
+
+                // Every page has a stable title and purpose. The content beneath it
+                // owns the only vertical scrollbar in the main area.
+                Hax::Gui::BeginContainer(Hax::Hash("Page header"), {.H = 78_px});
                 {
-                    Hax::Gui::BeginVertical();
-                    Hax::Gui::Space(13_px);
-                    Hax::Gui::BeginHorizontal(8_px);
-                    Hax::Gui::Space(16_px);
-                    {
-                        const float available = Hax::Gui::GetContentRegionAvail().X - 16_px - 8_px * (float)(activeGroup.Count - 1);
-                        const float buttonWidth = available / (float)activeGroup.Count;
-                        for (size_t i = 0; i < activeGroup.Count; ++i)
-                        {
-                            const size_t tabIndex = activeGroup.Tabs[i];
-                            if (SubTabButton(Hax::Hash(L"SubTab") + tabIndex, G->Loc[g_Tabs[tabIndex].Loc], g_ActiveTab == tabIndex, buttonWidth))
-                                g_ActiveTab = tabIndex;
-                        }
-                    }
+                    Hax::Gui::BeginVertical(5_px);
+                    Hax::Gui::Space(17_px);
+                    Hax::Gui::BeginHorizontal();
+                    Hax::Gui::Space(20_px);
+                    Hax::Gui::BeginVertical(3_px);
+                    Label(G->NunitoSans_ExtraBold, G->Loc[g_Tabs[g_ActiveTab].Loc], 20_px, 0xF5F7FBFF);
+                    DescLabel(G->Loc[g_Tabs[g_ActiveTab].Desc]);
+                    Hax::Gui::EndVertical();
                     Hax::Gui::EndHorizontal();
                     Hax::Gui::EndVertical();
                 }
                 Hax::Gui::EndContainer();
 
-                Hax::Gui::HorizontalLine(1_px, 0x252A35FF);
+                if (activeGroup.Count > 1)
+                {
+                    Hax::Gui::BeginContainer(Hax::Hash("Sub navigation"), {.H = 54_px});
+                    {
+                        Hax::Gui::BeginVertical();
+                        Hax::Gui::Space(7_px);
+                        Hax::Gui::BeginHorizontal(8_px);
+                        Hax::Gui::Space(16_px);
+                        {
+                            const float available = Hax::Gui::GetContentRegionAvail().X - 16_px - 8_px * (float)(activeGroup.Count - 1);
+                            const float buttonWidth = available / (float)activeGroup.Count;
+                            for (size_t i = 0; i < activeGroup.Count; ++i)
+                            {
+                                const size_t tabIndex = activeGroup.Tabs[i];
+                                if (SubTabButton(Hax::Hash(L"SubTab") + tabIndex, G->Loc[g_Tabs[tabIndex].Loc], g_ActiveTab == tabIndex, buttonWidth))
+                                    g_ActiveTab = tabIndex;
+                            }
+                        }
+                        Hax::Gui::EndHorizontal();
+                        Hax::Gui::EndVertical();
+                    }
+                    Hax::Gui::EndContainer();
+                    Hax::Gui::HorizontalLine(1_px, 0x252A35FF);
+                }
 
                 // The whole active page owns scrolling. Tab columns use auto-height so both
                 // sides move together and only one scrollbar is shown.
+                static size_t s_LastRenderedTab = (size_t)-1;
+                const bool resetScroll = s_LastRenderedTab != g_ActiveTab;
+                s_LastRenderedTab = g_ActiveTab;
                 Hax::Gui::BeginContainer(Hax::Hash("Main area"), {.Clip = true, .ScrollY = true, .Style = PageScrollStyle()});
                 {
+                    if (resetScroll)
+                        Hax::Gui::ScrollYTo(0.f);
                     Hax::Gui::BeginHorizontal();
                     g_Tabs[g_ActiveTab].DrawFunc();
                     Hax::Gui::EndHorizontal();

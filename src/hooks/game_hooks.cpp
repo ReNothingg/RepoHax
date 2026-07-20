@@ -59,9 +59,12 @@ namespace Cheat
     static void UpdateSessionSafety(PlayerAvatar avatar);
     static void ProcessWorldSessionCommands(PlayerAvatar avatar);
     static void ProcessCurrencyCommands();
+    static void ProcessQuotaCommands();
     static void ProcessTeleportCommands(PlayerAvatar avatar);
     static void ProcessObjectRemover(PlayerAvatar avatar);
     static void MaintainFriendEffects();
+    static void ProcessGodTools(PlayerAvatar avatar);
+    static void DeleteGodObject(Unity::GameObject object, bool networked);
     static void UpdateEyeLasers();
     static void DrawPlayerChams(PlayerAvatar player, Unity::CommandBuffer cb, Unity::Material aliveMat, Unity::Material deadMat);
 
@@ -294,17 +297,14 @@ namespace Cheat
         return false;
     }
 
-    static bool GetExtractionPosition(Unity::Vector3& out)
+    static ExtractionPoint GetPreferredExtractionPoint()
     {
         RoundDirector dir = RoundDirector::instance();
         if (!dir)
-            return false;
+            return null;
 
         if (ExtractionPoint current = dir.extractionPointCurrent())
-        {
-            out = current.GetTransform().GetPosition() + Unity::Vector3::up() * 0.35f;
-            return true;
-        }
+            return current;
 
         System::List<Unity::GameObject> points = dir.extractionPointList();
         if (points != null)
@@ -313,23 +313,54 @@ namespace Cheat
             {
                 ExtractionPoint point = go ? go.GetComponent<ExtractionPoint>() : null;
                 if (point && !point.isLocked())
-                {
-                    out = point.GetTransform().GetPosition() + Unity::Vector3::up() * 0.35f;
-                    return true;
-                }
+                    return point;
             }
 
             for (Unity::GameObject go : points)
             {
                 if (go)
-                {
-                    out = go.GetTransform().GetPosition() + Unity::Vector3::up() * 0.35f;
-                    return true;
-                }
+                    if (ExtractionPoint point = go.GetComponent<ExtractionPoint>())
+                        return point;
             }
         }
 
+        return null;
+    }
+
+    static bool GetExtractionPosition(Unity::Vector3& out)
+    {
+        if (ExtractionPoint point = GetPreferredExtractionPoint())
+        {
+            out = point.GetTransform().GetPosition() + Unity::Vector3::up() * 0.35f;
+            return true;
+        }
         return false;
+    }
+
+    static bool GetExtractionPackingBounds(Unity::Bounds& out)
+    {
+        ExtractionPoint point = GetPreferredExtractionPoint();
+        if (!point)
+            return false;
+
+        Unity::GameObject area = point.extractionArea();
+        Unity::Collider collider = area ? area.GetComponent<Unity::Collider>() : null;
+        if (!collider && area)
+            collider = area.GetTransform().GetComponentInChildren<Unity::Collider>();
+
+        if (collider && collider.GetEnabled())
+        {
+            out = collider.GetBounds();
+            const Unity::Vector3 size = out.GetSize();
+            if (size.X >= 0.75f && size.Z >= 0.75f)
+                return true;
+        }
+
+        // Old maps or unusual prefabs may not expose the area collider. Keep the
+        // fallback centered instead of extending every row in one direction.
+        out = Unity::Bounds(point.GetTransform().GetPosition() + Unity::Vector3::up() * 1.25f,
+            Unity::Vector3(3.6f, 2.5f, 3.6f));
+        return true;
     }
 
     static bool GetNearestValuablePosition(const Unity::Vector3& origin, Unity::Vector3& out)
@@ -411,7 +442,12 @@ namespace Cheat
         G->CurrencyDeltaPending = 0;
         G->CurrencySetZero = false;
         G->CurrencyRepairOverflow = false;
+        G->QuotaApplyRequested = false;
         G->DeleteObjectRequested = false;
+        G->GodObjectAction = GodObjectCommand::None;
+        G->EnemyGodAction = EnemyGodCommand::None;
+        G->LootGodAction = LootGodCommand::None;
+        G->PlayerGodAction = PlayerGodCommand::None;
     }
 
     static void ResetSessionState()
@@ -424,6 +460,20 @@ namespace Cheat
         G->NoTumble = false;
         G->ObjectRemoverEnabled = false;
         G->ObjectRemoverTargetValid = false;
+        G->GodTargetingEnabled = false;
+        G->WorldTimeScalePercent = 100;
+        G->WorldGravityOverride = false;
+        G->WorldFreezePhysics = false;
+        G->WorldFreezePhysicsChanged = true;
+        G->WorldLightAction = WorldLightCommand::Restore;
+        G->GodEnemiesPacified = false;
+        G->GodEnemiesPacifiedChanged = true;
+        G->GodEnemiesFrozen = false;
+        G->GodEnemiesFreezeChanged = true;
+        G->GodLootFrozen = false;
+        G->GodLootFreezeChanged = true;
+        G->GodAllPlayers = false;
+        G->GodAllPlayersNoTumble = false;
         G->DisableAllPlayersDeadCheck = false;
         for (PlayerAvatar& player : G->ProtectedPlayers)
             player = null;
@@ -450,6 +500,13 @@ namespace Cheat
             G->EyeLasersEnabled = false;
             G->ObjectRemoverTargetValid = false;
             G->DeleteObjectRequested = false;
+            // Transitional startup/menu scenes can briefly satisfy IsInGame(). Keep the
+            // expensive object scan opt-in and never carry it across a scene boundary.
+            G->GodTargetingEnabled = false;
+            G->GodObjectAction = GodObjectCommand::None;
+            G->EnemyGodAction = EnemyGodCommand::None;
+            G->LootGodAction = LootGodCommand::None;
+            G->PlayerGodAction = PlayerGodCommand::None;
             for (PlayerAvatar& player : G->ProtectedPlayers)
                 player = null;
             for (PlayerAvatar& player : G->NoTumblePlayers)
@@ -479,6 +536,9 @@ namespace Cheat
                 G->ReloadCurrentLevel || G->UnlockExtractionPoints || G->PlayerToKill ||
                 G->PlayerToRevive || G->PlayerToTumble ||
                 G->PlayerToHeal || G->DeleteObjectRequested ||
+                G->EnemyGodAction != EnemyGodCommand::None ||
+                G->LootGodAction != LootGodCommand::None ||
+                G->PlayerGodAction != PlayerGodCommand::None ||
                 G->TeleportAction == TeleportQuickAction::SelectedPlayerToMe)
             {
                 hadUnsafe = true;
@@ -495,6 +555,9 @@ namespace Cheat
             G->PlayerToTumble = null;
             G->PlayerToHeal = null;
             G->DeleteObjectRequested = false;
+            G->EnemyGodAction = EnemyGodCommand::None;
+            G->LootGodAction = LootGodCommand::None;
+            G->PlayerGodAction = PlayerGodCommand::None;
             if (G->TeleportAction == TeleportQuickAction::SelectedPlayerToMe)
                 G->TeleportAction = TeleportQuickAction::None;
 
@@ -597,6 +660,59 @@ namespace Cheat
         G->CurrentRunCurrency = SemiFunc::StatSetRunCurrency((int)target);
         stats.SaveFileSave();
         SetSessionActionF(G->Loc[LocKey_ActionCurrencyChangedFmt].Data(), G->CurrentRunCurrency);
+    }
+
+    static void ProcessQuotaCommands()
+    {
+        if (!G->IsInGame)
+        {
+            G->CurrentQuota = 0;
+            G->QuotaApplyRequested = false;
+            return;
+        }
+
+        RoundDirector director = RoundDirector::instance();
+        if (director)
+            G->CurrentQuota = director.extractionHaulGoal();
+
+        if (!G->QuotaApplyRequested)
+            return;
+        G->QuotaApplyRequested = false;
+
+        if (G->IsClient)
+        {
+            SetSessionAction(G->Loc[LocKey_ActionQuotaHostOnly]);
+            return;
+        }
+
+        if (!director || director.extractionPointList() == null)
+        {
+            SetSessionAction(G->Loc[LocKey_ActionQuotaNotReady]);
+            return;
+        }
+
+        const int target = Hax::Clamp(G->QuotaTarget, 0, 10000000);
+        bool applied = false;
+        for (Unity::GameObject pointObject : director.extractionPointList())
+        {
+            if (pointObject)
+            {
+                if (ExtractionPoint point = pointObject.GetComponent<ExtractionPoint>())
+                {
+                    point.HaulGoalSet(target);
+                    applied = true;
+                }
+            }
+        }
+
+        if (!applied)
+        {
+            SetSessionAction(G->Loc[LocKey_ActionQuotaNotReady]);
+            return;
+        }
+
+        G->CurrentQuota = target;
+        SetSessionActionF(G->Loc[LocKey_ActionQuotaChangedFmt].Data(), target);
     }
 
     static void ProcessTeleportCommands(PlayerAvatar avatar)
@@ -740,8 +856,10 @@ namespace Cheat
             UpdateSessionSafety(avatar);
             ProcessWorldSessionCommands(avatar);
             ProcessCurrencyCommands();
+            ProcessQuotaCommands();
             ProcessTeleportCommands(avatar);
             ProcessObjectRemover(avatar);
+            ProcessGodTools(avatar);
             MaintainFriendEffects();
 
             if (G->IsInGame)
@@ -1081,12 +1199,24 @@ namespace Cheat
         for (PlayerAvatar& player : G->NoTumblePlayers)
             if (!IsPlayerPresent(player, players))
                 player = null;
+
+        if (G->GodAllPlayers)
+        {
+            for (PlayerAvatar player : players)
+            {
+                if (!player || player.deadSet())
+                    continue;
+                PlayerHealth health = player.playerHealth();
+                if (health && health.health() < health.maxHealth())
+                    health.HealOther(health.maxHealth() - health.health(), false);
+            }
+        }
     }
 
     static void Hooked__PlayerHealth_Hurt(PlayerHealth __this, int damage, bool savingGrace, int enemyIndex)
     {
         PlayerAvatar localPlayer = PlayerAvatar::instance();
-        if ((G->Godmode && localPlayer && localPlayer.playerHealth() == __this) || IsProtectedHealth(__this))
+        if (G->GodAllPlayers || (G->Godmode && localPlayer && localPlayer.playerHealth() == __this) || IsProtectedHealth(__this))
             return;
 
         G->PlayerHealth_Hurt_Hook.unsafe_call<void, PlayerHealth, int, bool, int>(__this, damage, savingGrace, enemyIndex);
@@ -1095,7 +1225,7 @@ namespace Cheat
     static void Hooked__PlayerAvatar_PlayerDeath(PlayerAvatar __this, int enemyIndex)
     {
         if (!s_ForcedPlayerDeath &&
-            ((G->Godmode && __this.isLocal()) || IsPlayerInRuntimeSlots(__this, G->ProtectedPlayers)))
+            (G->GodAllPlayers || (G->Godmode && __this.isLocal()) || IsPlayerInRuntimeSlots(__this, G->ProtectedPlayers)))
             return;
 
         G->PlayerAvatar_PlayerDeath_Hook.unsafe_call<void, PlayerAvatar, int>(__this, enemyIndex);
@@ -1338,7 +1468,7 @@ namespace Cheat
             return;
 
         if (!s_ForcedPlayerTumble && !playerInput &&
-            ((G->NoTumble && player.isLocal()) || IsPlayerInRuntimeSlots(player, G->NoTumblePlayers)))
+            (G->GodAllPlayersNoTumble || (G->NoTumble && player.isLocal()) || IsPlayerInRuntimeSlots(player, G->NoTumblePlayers)))
             return;
 
         G->PlayerTumble_TumbleRequest_Hook.unsafe_call<void, PlayerTumble, bool, bool>(__this, isTumbling, playerInput);
@@ -1541,17 +1671,14 @@ namespace Cheat
     {
         G->ObjectRemoverTargetValid = false;
         G->ObjectRemoverTargetDistance = 0.f;
+        G->GodAimedObject = null;
+        G->GodAimedObjectValid = false;
+        G->GodAimedObjectNetworked = false;
+        G->GodAimedObjectDistance = 0.f;
+        wcscpy_s(G->GodAimedObjectName, L"-");
 
-        if (!G->ObjectRemoverEnabled || !G->IsInGame)
+        if ((!G->ObjectRemoverEnabled && !G->GodTargetingEnabled) || !G->IsInGame)
         {
-            G->DeleteObjectRequested = false;
-            return;
-        }
-
-        if (G->IsClient)
-        {
-            if (G->DeleteObjectRequested)
-                SetSessionAction(G->Loc[LocKey_ActionObjectHostOnly]);
             G->DeleteObjectRequested = false;
             return;
         }
@@ -1603,10 +1730,26 @@ namespace Cheat
 
         G->ObjectRemoverTargetValid = target.Object != null;
         G->ObjectRemoverTargetDistance = target.Object ? closestDistance : 0.f;
+        G->GodAimedObject = target.Object;
+        G->GodAimedObjectValid = target.Object != null;
+        G->GodAimedObjectNetworked = target.Networked;
+        G->GodAimedObjectDistance = target.Object ? closestDistance : 0.f;
+        if (target.Object)
+        {
+            System::String name = target.Object.GetName();
+            if (name != null && name.GetRawStringData())
+                wcsncpy_s(G->GodAimedObjectName, name.GetRawStringData(), _TRUNCATE);
+        }
 
         if (!G->DeleteObjectRequested)
             return;
         G->DeleteObjectRequested = false;
+
+        if (G->IsClient)
+        {
+            SetSessionAction(G->Loc[LocKey_ActionObjectHostOnly]);
+            return;
+        }
 
         if (!target.Object)
         {
@@ -1614,12 +1757,1017 @@ namespace Cheat
             return;
         }
 
-        if (target.Networked && SemiFunc::IsMultiplayer())
-            Unity::Photon::PhotonNetwork::Destroy(target.Object);
-        else
-            Unity::Object::Destroy(target.Object);
+        DeleteGodObject(target.Object, target.Networked);
         G->ObjectRemoverTargetValid = false;
         SetSessionAction(G->Loc[LocKey_ActionObjectDeleted]);
+    }
+
+    enum class GodUndoType { Transform, Reactivate, DestroyClone };
+
+    struct GodUndoEntry
+    {
+        GodUndoType Type;
+        Unity::GameObject Object;
+        System::GCHandle Handle{nullptr};
+        Unity::Vector3 Position;
+        Unity::Quaternion Rotation;
+        Unity::Vector3 Scale;
+    };
+
+    struct BodyState
+    {
+        Unity::Rigidbody Body;
+        bool Kinematic;
+        bool UseGravity;
+    };
+
+    struct LightState
+    {
+        Unity::Light Light;
+        bool Enabled;
+        float Intensity;
+    };
+
+    static Hax::Vector<GodUndoEntry> s_GodUndo;
+    static Hax::Vector<BodyState> s_WorldFrozenBodies;
+    static Hax::Vector<BodyState> s_EnemyFrozenBodies;
+    static Hax::Vector<BodyState> s_LootFrozenBodies;
+    static Hax::Vector<LightState> s_WorldLights;
+    static Unity::GameObject s_HeldObject;
+    static Unity::Rigidbody s_HeldBody;
+    static System::GCHandle s_GodTargetHandle{nullptr};
+    static bool s_HeldBodyKinematic;
+    static bool s_HeldBodyGravity;
+    static bool s_TimeScaleWasOverridden;
+    static bool s_GravityWasOverridden;
+    static Unity::Vector3 s_OriginalGravity = Unity::Vector3(0.f, -9.81f, 0.f);
+    static bool s_GizmoDragActive;
+    static GodGizmoMode s_GizmoDragMode;
+    static GodGizmoSpace s_GizmoDragSpace;
+    static int s_GizmoDragAxis = -1;
+    static float s_GizmoDragAmount;
+    static Unity::Vector3 s_GizmoStartPosition;
+    static Unity::Quaternion s_GizmoStartRotation;
+    static Unity::Vector3 s_GizmoStartScale;
+    static Unity::Vector3 s_GizmoDragWorldAxis;
+    static Unity::Rigidbody s_GizmoDragBody;
+    static bool s_GizmoDragBodyKinematic;
+    static bool s_GizmoDragBodyGravity;
+
+    static void RefreshGodUndoCount()
+    {
+        G->GodUndoCount = (int)s_GodUndo.Size();
+    }
+
+    static void PushGodUndo(GodUndoType type, Unity::GameObject object)
+    {
+        if (!object)
+            return;
+
+        if (s_GodUndo.Size() >= 24)
+        {
+            s_GodUndo[0].Handle.Free();
+            s_GodUndo.Erase((size_t)0);
+        }
+
+        Unity::Transform transform = object.GetTransform();
+        GodUndoEntry entry{};
+        entry.Type = type;
+        entry.Object = object;
+        entry.Handle = System::GCHandle::Alloc(object, false);
+        if (transform)
+        {
+            entry.Position = transform.GetPosition();
+            entry.Rotation = transform.GetRotation();
+            entry.Scale = transform.GetLocalScale();
+        }
+        s_GodUndo.PushBack(entry);
+        RefreshGodUndoCount();
+    }
+
+    static void UndoLastGodAction()
+    {
+        while (!s_GodUndo.Empty())
+        {
+            GodUndoEntry entry = s_GodUndo.Last();
+            s_GodUndo.PopBack();
+            RefreshGodUndoCount();
+            if (!entry.Object)
+            {
+                entry.Handle.Free();
+                continue;
+            }
+
+            if (entry.Type == GodUndoType::DestroyClone)
+            {
+                Unity::Object::Destroy(entry.Object);
+                entry.Handle.Free();
+                return;
+            }
+
+            if (entry.Type == GodUndoType::Reactivate)
+                entry.Object.SetActive(true);
+
+            Unity::Transform transform = entry.Object.GetTransform();
+            if (transform)
+            {
+                transform.SetPosition(entry.Position);
+                transform.SetRotation(entry.Rotation);
+                transform.SetLocalScale(entry.Scale);
+            }
+            entry.Handle.Free();
+            return;
+        }
+    }
+
+    static void DeleteGodObject(Unity::GameObject object, bool networked)
+    {
+        if (!object)
+            return;
+
+        if (networked && SemiFunc::IsMultiplayer())
+        {
+            Unity::Photon::PhotonNetwork::Destroy(object);
+            return;
+        }
+
+        // Scene objects are soft-deleted so the operation can be undone safely.
+        PushGodUndo(GodUndoType::Reactivate, object);
+        object.SetActive(false);
+    }
+
+    static void SetGodTarget(Unity::GameObject object, bool networked)
+    {
+        s_GodTargetHandle.Free();
+        G->GodTargetObject = object;
+        G->GodTargetObjectValid = object != null;
+        G->GodTargetNetworked = object && networked;
+        wcscpy_s(G->GodTargetName, L"-");
+        G->GodTargetPosition = Unity::Vector3::zero();
+        G->GodTargetLayer = 0;
+        if (!object)
+        {
+            G->GodGizmoEditMode = false;
+            G->GodGizmoProjectionValid = false;
+            return;
+        }
+
+        s_GodTargetHandle = System::GCHandle::Alloc(object, false);
+        if (networked && !G->IsClient)
+        {
+            // REPO serializes network-object position/rotation from the owning PhotonView.
+            // Ask for ownership before editing so another client cannot immediately
+            // overwrite the host's gizmo movement.
+            if (Unity::Photon::PhotonView view = object.GetComponent<Unity::Photon::PhotonView>();
+                view && !view.IsMine())
+            {
+                view.RequestOwnership();
+            }
+        }
+        System::String name = object.GetName();
+        if (name != null && name.GetRawStringData())
+            wcsncpy_s(G->GodTargetName, name.GetRawStringData(), _TRUNCATE);
+
+        Unity::Transform transform = object.GetTransform();
+        if (transform)
+        {
+            G->GodTargetPosition = transform.GetPosition();
+            Unity::Vector3 scale = transform.GetLocalScale();
+            G->GodScaleXPercent = (int)Hax::Round(scale.X * 100.f);
+            G->GodScaleYPercent = (int)Hax::Round(scale.Y * 100.f);
+            G->GodScaleZPercent = (int)Hax::Round(scale.Z * 100.f);
+            G->GodScalePercent = (G->GodScaleXPercent + G->GodScaleYPercent + G->GodScaleZPercent) / 3;
+        }
+        G->GodTargetLayer = object.GetLayer();
+    }
+
+    static void RefreshGodTargetSnapshot(Unity::GameObject object)
+    {
+        if (!object)
+        {
+            SetGodTarget(null, false);
+            return;
+        }
+
+        Unity::Transform transform = object.GetTransform();
+        G->GodTargetObjectValid = transform != null;
+        if (transform)
+            G->GodTargetPosition = transform.GetPosition();
+        G->GodTargetLayer = object.GetLayer();
+    }
+
+    static void DiscardGodSceneReferences()
+    {
+        for (GodUndoEntry& entry : s_GodUndo)
+            entry.Handle.Free();
+        s_GodUndo.Clear();
+        RefreshGodUndoCount();
+
+        s_WorldFrozenBodies.Clear();
+        s_EnemyFrozenBodies.Clear();
+        s_LootFrozenBodies.Clear();
+        s_WorldLights.Clear();
+        s_HeldBody = null;
+        s_HeldObject = null;
+        G->GodTelekinesisActive = false;
+
+        s_GodTargetHandle.Free();
+        G->GodTargetObject = null;
+        G->GodTargetObjectValid = false;
+        G->GodTargetNetworked = false;
+        G->GodTargetPosition = Unity::Vector3::zero();
+        G->GodTargetLayer = 0;
+        wcscpy_s(G->GodTargetName, L"-");
+
+        G->GodAimedObject = null;
+        G->GodAimedObjectValid = false;
+        G->GodAimedObjectNetworked = false;
+        G->GodAimedObjectDistance = 0.f;
+        wcscpy_s(G->GodAimedObjectName, L"-");
+
+        s_GizmoDragActive = false;
+        s_GizmoDragAxis = -1;
+        s_GizmoDragBody = null;
+        G->GodGizmoEditMode = false;
+        G->GodGizmoProjectionValid = false;
+        G->GodGizmoHoveredAxis = -1;
+        G->GodGizmoActiveAxis = -1;
+        G->GodGizmoDragPixelsPending = 0.f;
+        G->GodGizmoDragBeginRequested = false;
+        G->GodGizmoDragEndRequested = false;
+    }
+
+    static bool ProjectGizmoPoint(Unity::Camera camera, const Unity::Vector3& world, Hax::Vector2& out)
+    {
+        if (!camera || G->PixelWidth <= 0.f || G->PixelHeight <= 0.f ||
+            G->ScreenWidth <= 0.f || G->ScreenHeight <= 0.f)
+        {
+            return false;
+        }
+
+        Unity::Vector3 screen = camera.WorldToScreenPoint(world);
+        if (screen.Z <= 0.f)
+            return false;
+
+        out.X = screen.X * (G->ScreenWidth / G->PixelWidth);
+        out.Y = G->ScreenHeight - screen.Y * (G->ScreenHeight / G->PixelHeight);
+        return out.X >= -64.f && out.Y >= -64.f &&
+            out.X <= G->ScreenWidth + 64.f && out.Y <= G->ScreenHeight + 64.f;
+    }
+
+    static Unity::Vector3 GetGizmoAxis(int axis, const Unity::Quaternion& rotation, GodGizmoSpace space)
+    {
+        Unity::Vector3 direction = axis == 0 ? Unity::Vector3::right() :
+            (axis == 1 ? Unity::Vector3::up() : Unity::Vector3::forward());
+        return space == GodGizmoSpace::Local ? rotation * direction : direction;
+    }
+
+    static void EndGodGizmoDrag()
+    {
+        if (s_GizmoDragBody)
+        {
+            s_GizmoDragBody.SetIsKinematic(s_GizmoDragBodyKinematic);
+            s_GizmoDragBody.SetUseGravity(s_GizmoDragBodyGravity);
+        }
+        s_GizmoDragBody = null;
+        s_GizmoDragActive = false;
+        s_GizmoDragAxis = -1;
+        G->GodGizmoActiveAxis = -1;
+    }
+
+    static void SyncGodTargetPose(Unity::GameObject target, Unity::Transform transform)
+    {
+        if (!target || !transform || G->IsClient || !G->GodTargetNetworked)
+            return;
+
+        // Use REPO's own RPC/PhotonTransformView path for the final pose. Directly
+        // assigning Transform only changes the current machine for non-owned objects.
+        if (PhysGrabObject physGrab = target.GetComponent<PhysGrabObject>())
+            physGrab.Teleport(transform.GetPosition(), transform.GetRotation());
+    }
+
+    static void ProcessGodGizmoDrag(Unity::GameObject target, Unity::Transform transform)
+    {
+        if (!target || !transform || !G->GodGizmoVisible)
+        {
+            if (s_GizmoDragActive)
+                EndGodGizmoDrag();
+            G->GodGizmoDragPixelsPending = 0.f;
+            G->GodGizmoDragBeginRequested = false;
+            G->GodGizmoDragEndRequested = false;
+            return;
+        }
+
+        if (G->GodGizmoDragBeginRequested)
+        {
+            G->GodGizmoDragBeginRequested = false;
+            const int axis = G->GodGizmoActiveAxis;
+            if (axis >= 0 && axis < 3)
+            {
+                PushGodUndo(GodUndoType::Transform, target);
+                s_GizmoDragActive = true;
+                s_GizmoDragAxis = axis;
+                s_GizmoDragMode = G->GodGizmoModeCurrent;
+                s_GizmoDragSpace = G->GodGizmoSpaceCurrent;
+                s_GizmoDragAmount = 0.f;
+                s_GizmoStartPosition = transform.GetPosition();
+                s_GizmoStartRotation = transform.GetRotation();
+                s_GizmoStartScale = transform.GetLocalScale();
+                s_GizmoDragWorldAxis = GetGizmoAxis(axis, s_GizmoStartRotation, s_GizmoDragSpace);
+                s_GizmoDragBody = target.GetComponent<Unity::Rigidbody>();
+                if (s_GizmoDragBody)
+                {
+                    s_GizmoDragBodyKinematic = s_GizmoDragBody.GetIsKinematic();
+                    s_GizmoDragBodyGravity = s_GizmoDragBody.GetUseGravity();
+                    s_GizmoDragBody.SetVelocity(Unity::Vector3::zero());
+                    s_GizmoDragBody.SetUseGravity(false);
+                    s_GizmoDragBody.SetIsKinematic(true);
+                }
+            }
+        }
+
+        const float pixels = G->GodGizmoDragPixelsPending;
+        G->GodGizmoDragPixelsPending = 0.f;
+        if (s_GizmoDragActive && pixels != 0.f)
+        {
+            Hax::Vector2 screenAxis = G->GodGizmoScreenAxes[s_GizmoDragAxis] - G->GodGizmoScreenOrigin;
+            const float screenLength = Hax::Max(screenAxis.Length(), 40.f);
+
+            if (s_GizmoDragMode == GodGizmoMode::Move)
+            {
+                s_GizmoDragAmount += pixels * G->GodGizmoWorldSize / screenLength;
+                transform.SetPosition(s_GizmoStartPosition + s_GizmoDragWorldAxis * s_GizmoDragAmount);
+            }
+            else if (s_GizmoDragMode == GodGizmoMode::Scale)
+            {
+                const float startAxis = s_GizmoDragAxis == 0 ? s_GizmoStartScale.X :
+                    (s_GizmoDragAxis == 1 ? s_GizmoStartScale.Y : s_GizmoStartScale.Z);
+                s_GizmoDragAmount += pixels * Hax::Max(Hax::Abs(startAxis), 0.25f) / screenLength;
+                Unity::Vector3 scale = s_GizmoStartScale;
+                float value = Hax::Clamp(startAxis + s_GizmoDragAmount, 0.01f, 50.f);
+                if (s_GizmoDragAxis == 0) scale.X = value;
+                else if (s_GizmoDragAxis == 1) scale.Y = value;
+                else scale.Z = value;
+                transform.SetLocalScale(scale);
+                G->GodScaleXPercent = (int)Hax::Round(scale.X * 100.f);
+                G->GodScaleYPercent = (int)Hax::Round(scale.Y * 100.f);
+                G->GodScaleZPercent = (int)Hax::Round(scale.Z * 100.f);
+            }
+            else
+            {
+                s_GizmoDragAmount += pixels * 0.8f;
+                Unity::Quaternion delta = Unity::Quaternion::AngleAxis(s_GizmoDragAmount,
+                    s_GizmoDragSpace == GodGizmoSpace::Local
+                        ? (s_GizmoDragAxis == 0 ? Unity::Vector3::right() :
+                            (s_GizmoDragAxis == 1 ? Unity::Vector3::up() : Unity::Vector3::forward()))
+                        : s_GizmoDragWorldAxis);
+                transform.SetRotation(s_GizmoDragSpace == GodGizmoSpace::Local
+                    ? s_GizmoStartRotation * delta
+                    : delta * s_GizmoStartRotation);
+            }
+        }
+
+        if (G->GodGizmoDragEndRequested)
+        {
+            G->GodGizmoDragEndRequested = false;
+            SyncGodTargetPose(target, transform);
+            EndGodGizmoDrag();
+        }
+    }
+
+    static void UpdateGodGizmoProjection(Unity::GameObject target, Unity::Transform transform)
+    {
+        G->GodGizmoProjectionValid = false;
+        if (!G->GodGizmoVisible || !target || !transform)
+            return;
+
+        Unity::Camera camera = SemiFunc::MainCamera();
+        if (!camera)
+            return;
+
+        const Unity::Vector3 origin = transform.GetPosition();
+        const Unity::Quaternion rotation = transform.GetRotation();
+        const float distance = camera.GetTransform().GetPosition().Distance(origin);
+        const float worldSize = Hax::Clamp(distance * 0.12f, 0.6f, 7.f);
+        G->GodGizmoWorldSize = worldSize;
+
+        if (!ProjectGizmoPoint(camera, origin, G->GodGizmoScreenOrigin))
+            return;
+
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            const Unity::Vector3 direction = GetGizmoAxis(axis, rotation,
+                G->GodGizmoModeCurrent == GodGizmoMode::Scale ? GodGizmoSpace::Local : G->GodGizmoSpaceCurrent);
+            G->GodGizmoScreenAxisValid[axis] = ProjectGizmoPoint(camera,
+                origin + direction * worldSize, G->GodGizmoScreenAxes[axis]);
+
+            Unity::Vector3 basisA = axis == 0 ? Unity::Vector3::up() : Unity::Vector3::right();
+            Unity::Vector3 basisB = axis == 2 ? Unity::Vector3::up() : Unity::Vector3::forward();
+            if (axis == 1)
+                basisB = Unity::Vector3::forward();
+            const GodGizmoSpace ringSpace = G->GodGizmoSpaceCurrent;
+            if (ringSpace == GodGizmoSpace::Local)
+            {
+                basisA = rotation * basisA;
+                basisB = rotation * basisB;
+            }
+
+            for (int point = 0; point <= GodGizmoRingSegments; ++point)
+            {
+                const float angle = (float)point / (float)GodGizmoRingSegments * Hax::kPi * 2.f;
+                const Unity::Vector3 ringWorld = origin +
+                    (basisA * Hax::Cos(angle) + basisB * Hax::Sin(angle)) * (worldSize * 0.82f);
+                G->GodGizmoRingPointValid[axis][point] = ProjectGizmoPoint(camera,
+                    ringWorld, G->GodGizmoRingPoints[axis][point]);
+            }
+        }
+        G->GodGizmoProjectionValid = true;
+    }
+
+    static void ReleaseGodTelekinesis()
+    {
+        if (s_HeldBody)
+        {
+            s_HeldBody.SetIsKinematic(s_HeldBodyKinematic);
+            s_HeldBody.SetUseGravity(s_HeldBodyGravity);
+        }
+        s_HeldBody = null;
+        s_HeldObject = null;
+        G->GodTelekinesisActive = false;
+    }
+
+    static bool IsPlayerHierarchy(Unity::Transform transform)
+    {
+        GameDirector director = GameDirector::instance();
+        System::List<PlayerAvatar> players{};
+        if (director)
+            players = director.PlayerList();
+        if (players == null)
+            return false;
+
+        for (PlayerAvatar player : players)
+            if (player && IsTransformBelow(transform, player.GetTransform()))
+                return true;
+        return false;
+    }
+
+    static void FreezeBodies(Hax::Vector<BodyState>& states, System::Array<Unity::Rigidbody> bodies, bool skipPlayers)
+    {
+        states.Clear();
+        if (bodies == null)
+            return;
+
+        for (Unity::Rigidbody body : bodies)
+        {
+            if (!body || (skipPlayers && IsPlayerHierarchy(body.GetTransform())))
+                continue;
+
+            states.PushBack({body, body.GetIsKinematic(), body.GetUseGravity()});
+            body.SetVelocity(Unity::Vector3::zero());
+            body.SetUseGravity(false);
+            body.SetIsKinematic(true);
+        }
+    }
+
+    static void RestoreBodies(Hax::Vector<BodyState>& states)
+    {
+        for (BodyState& state : states)
+        {
+            if (!state.Body)
+                continue;
+            state.Body.SetIsKinematic(state.Kinematic);
+            state.Body.SetUseGravity(state.UseGravity);
+        }
+        states.Clear();
+    }
+
+    static void ProcessWorldGodTools()
+    {
+        if (G->IsInGame && G->WorldTimeScalePercent != 100)
+        {
+            Unity::Time::SetTimeScale(G->WorldTimeScalePercent / 100.f);
+            s_TimeScaleWasOverridden = true;
+        }
+        else if (s_TimeScaleWasOverridden)
+        {
+            Unity::Time::SetTimeScale(1.f);
+            s_TimeScaleWasOverridden = false;
+        }
+
+        if (G->WorldGravityOverride)
+        {
+            if (!s_GravityWasOverridden)
+            {
+                s_OriginalGravity = Unity::Physics::GetGravity();
+                s_GravityWasOverridden = true;
+            }
+            Unity::Physics::SetGravity(Unity::Vector3(0.f, (float)G->WorldGravityY, 0.f));
+        }
+        else if (s_GravityWasOverridden)
+        {
+            Unity::Physics::SetGravity(s_OriginalGravity);
+            s_GravityWasOverridden = false;
+        }
+
+        // Scene objects are already being destroyed once IsInGame turns false.
+        // Never inspect or restore cached Components during that unload window.
+        if (!G->IsInGame)
+        {
+            G->WorldFreezePhysicsChanged = false;
+            G->WorldLightAction = WorldLightCommand::None;
+            return;
+        }
+
+        if (G->WorldFreezePhysicsChanged)
+        {
+            G->WorldFreezePhysicsChanged = false;
+            if (G->WorldFreezePhysics)
+                FreezeBodies(s_WorldFrozenBodies, Unity::Object::FindObjectsOfType<Unity::Rigidbody>(), true);
+            else
+                RestoreBodies(s_WorldFrozenBodies);
+        }
+
+        WorldLightCommand lightAction = G->WorldLightAction;
+        G->WorldLightAction = WorldLightCommand::None;
+        if (lightAction != WorldLightCommand::None)
+        {
+            if (lightAction == WorldLightCommand::Restore)
+            {
+                for (LightState& state : s_WorldLights)
+                {
+                    if (state.Light)
+                    {
+                        state.Light.SetEnabled(state.Enabled);
+                        state.Light.SetIntensity(state.Intensity);
+                    }
+                }
+                s_WorldLights.Clear();
+            }
+            else
+            {
+                System::Array<Unity::Light> lights = Unity::Object::FindObjectsOfType<Unity::Light>();
+                if (s_WorldLights.Empty() && lights != null)
+                    for (Unity::Light light : lights)
+                        if (light)
+                            s_WorldLights.PushBack({light, light.GetEnabled(), light.GetIntensity()});
+
+                if (lights != null)
+                {
+                    for (Unity::Light light : lights)
+                    {
+                        if (!light)
+                            continue;
+                        if (lightAction == WorldLightCommand::Blackout)
+                            light.SetEnabled(false);
+                        else
+                        {
+                            light.SetEnabled(true);
+                            light.SetIntensity(Hax::Max(light.GetIntensity(), 8.f));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    static void ProcessEnemyGodTools()
+    {
+        EnemyDirector director = EnemyDirector::instance();
+        if (!director)
+            return;
+
+        if (G->GodEnemiesPacifiedChanged)
+        {
+            G->GodEnemiesPacifiedChanged = false;
+            director.debugNoVision() = G->GodEnemiesPacified;
+        }
+        System::List<EnemyParent> enemies = director.enemiesSpawned();
+        if (enemies == null)
+            return;
+
+        if (G->GodEnemiesFreezeChanged)
+        {
+            G->GodEnemiesFreezeChanged = false;
+            if (!G->GodEnemiesFrozen)
+                RestoreBodies(s_EnemyFrozenBodies);
+            else
+            {
+                s_EnemyFrozenBodies.Clear();
+                for (EnemyParent parent : enemies)
+                {
+                    Enemy enemy{};
+                    if (parent)
+                        enemy = parent.enemy();
+                    EnemyRigidbody enemyBody = enemy ? enemy.Rigidbody() : null;
+                    Unity::Rigidbody body = enemyBody ? enemyBody.GetComponent<Unity::Rigidbody>() : null;
+                    if (body)
+                    {
+                        s_EnemyFrozenBodies.PushBack({body, body.GetIsKinematic(), body.GetUseGravity()});
+                        body.SetVelocity(Unity::Vector3::zero());
+                        body.SetUseGravity(false);
+                        body.SetIsKinematic(true);
+                    }
+                }
+            }
+        }
+
+        EnemyGodCommand action = G->EnemyGodAction;
+        G->EnemyGodAction = EnemyGodCommand::None;
+        if (action == EnemyGodCommand::None)
+            return;
+
+        Unity::Camera camera = SemiFunc::MainCamera();
+        Unity::Vector3 gatherBase{};
+        Unity::Vector3 right = Unity::Vector3::right();
+        if (camera)
+        {
+            Unity::Transform ct = camera.GetTransform();
+            gatherBase = ct.GetPosition() + ct.GetForward() * 6.f;
+            right = ct.GetRotation() * Unity::Vector3::right();
+        }
+
+        int index = 0;
+        for (EnemyParent parent : enemies)
+        {
+            Enemy enemy{};
+            if (parent)
+                enemy = parent.enemy();
+            if (!enemy)
+                continue;
+
+            if (action == EnemyGodCommand::KillAll)
+            {
+                if (EnemyHealth health = enemy.Health(); health && !health.dead())
+                    health.Hurt(999999, Unity::Vector3::zero());
+            }
+            else if (action == EnemyGodCommand::Gather && camera)
+            {
+                enemy.GetTransform().SetPosition(gatherBase + right * ((float)(index++ % 7) - 3.f) * 1.2f);
+            }
+            else if (action == EnemyGodCommand::DeleteAll && !G->IsClient)
+            {
+                Unity::GameObject object = parent.GetGameObject();
+                Unity::Photon::PhotonView view = object ? object.GetComponent<Unity::Photon::PhotonView>() : null;
+                if (view && SemiFunc::IsMultiplayer())
+                    Unity::Photon::PhotonNetwork::Destroy(object);
+                else if (object)
+                    Unity::Object::Destroy(object);
+            }
+        }
+    }
+
+    static void ProcessLootGodTools(PlayerAvatar avatar)
+    {
+        ValuableDirector director = ValuableDirector::instance();
+        if (!director || director.valuableList() == null)
+            return;
+
+        System::List<ValuableObject> valuables = director.valuableList();
+        if (G->GodLootFreezeChanged)
+        {
+            G->GodLootFreezeChanged = false;
+            if (!G->GodLootFrozen)
+                RestoreBodies(s_LootFrozenBodies);
+            else
+            {
+                s_LootFrozenBodies.Clear();
+                for (ValuableObject valuable : valuables)
+                {
+                    PhysGrabObject phys = valuable ? valuable.physGrabObject() : null;
+                    Unity::Rigidbody body = phys ? phys.GetComponent<Unity::Rigidbody>() : null;
+                    if (body)
+                    {
+                        s_LootFrozenBodies.PushBack({body, body.GetIsKinematic(), body.GetUseGravity()});
+                        body.SetVelocity(Unity::Vector3::zero());
+                        body.SetUseGravity(false);
+                        body.SetIsKinematic(true);
+                    }
+                }
+            }
+        }
+
+        LootGodCommand action = G->LootGodAction;
+        G->LootGodAction = LootGodCommand::None;
+        if (action == LootGodCommand::None)
+            return;
+
+        if (action == LootGodCommand::BringToExtraction)
+        {
+            Unity::Bounds area{};
+            if (!GetExtractionPackingBounds(area))
+                return;
+
+            int valuableCount = 0;
+            float horizontalSpacing = 0.78f;
+            float verticalSpacing = 0.62f;
+            for (ValuableObject valuable : valuables)
+            {
+                if (valuable && valuable.GetEnabled())
+                {
+                    ++valuableCount;
+                    PhysGrabObject phys = valuable.physGrabObject();
+                    Unity::Collider collider = phys ? phys.GetComponentInChildren<Unity::Collider>() : null;
+                    if (collider && collider.GetEnabled())
+                    {
+                        const Unity::Vector3 extents = collider.GetBounds().Extents;
+                        horizontalSpacing = Hax::Max(horizontalSpacing,
+                            Hax::Min(1.25f, Hax::Max(extents.X, extents.Z) * 2.f + 0.14f));
+                        verticalSpacing = Hax::Max(verticalSpacing,
+                            Hax::Min(1.2f, extents.Y * 2.f + 0.12f));
+                    }
+                }
+            }
+            if (valuableCount == 0)
+                return;
+
+            // Build a centered three-dimensional grid from the extraction trigger's
+            // real world bounds. The old code grew rows only along +Z, so every row
+            // after the first few was guaranteed to leave the quota zone.
+            const float edgePadding = 0.32f;
+            const float usableWidth = Hax::Max(0.4f, area.GetSize().X - edgePadding * 2.f);
+            const float usableDepth = Hax::Max(0.4f, area.GetSize().Z - edgePadding * 2.f);
+            const int columns = Hax::Clamp((int)(usableWidth / horizontalSpacing) + 1, 1, 7);
+            const int rows = Hax::Clamp((int)(usableDepth / horizontalSpacing) + 1, 1, 7);
+            const int perLayer = Hax::Max(1, columns * rows);
+            const int layers = Hax::Max(1, (valuableCount + perLayer - 1) / perLayer);
+            const float stepX = columns > 1 ? Hax::Min(horizontalSpacing, usableWidth / (float)(columns - 1)) : 0.f;
+            const float stepZ = rows > 1 ? Hax::Min(horizontalSpacing, usableDepth / (float)(rows - 1)) : 0.f;
+            const float usableHeight = Hax::Max(0.65f, area.GetSize().Y - 0.3f);
+            const float stepY = Hax::Min(verticalSpacing, Hax::Max(0.58f, usableHeight / (float)layers));
+            const Unity::Vector3 areaMin = area.GetMin();
+            const Unity::Vector3 areaMax = area.GetMax();
+
+            int index = 0;
+            for (ValuableObject valuable : valuables)
+            {
+                if (!valuable || !valuable.GetEnabled())
+                    continue;
+
+                Unity::Transform transform = valuable.GetTransform();
+                PhysGrabObject phys = valuable.physGrabObject();
+                Unity::Rigidbody body = phys ? phys.GetComponent<Unity::Rigidbody>() : null;
+
+                const int layer = index / perLayer;
+                const int slot = index % perLayer;
+                const int row = slot / columns;
+                const int column = slot % columns;
+
+                Unity::Vector3 colliderOffset{};
+                Unity::Vector3 objectExtents(0.22f, 0.22f, 0.22f);
+                Unity::Collider objectCollider = phys ? phys.GetComponentInChildren<Unity::Collider>() : null;
+                if (objectCollider && objectCollider.GetEnabled())
+                {
+                    const Unity::Bounds objectBounds = objectCollider.GetBounds();
+                    objectExtents = objectBounds.Extents;
+                    colliderOffset = objectBounds.Center - transform.GetPosition();
+                }
+
+                float centerX = area.Center.X + ((float)column - (float)(columns - 1) * 0.5f) * stepX;
+                float centerZ = area.Center.Z + ((float)row - (float)(rows - 1) * 0.5f) * stepZ;
+
+                // Keep the measured collider inside the trigger whenever its size
+                // permits it. Oversized valuables are centered, which still gives
+                // the trigger the largest possible overlap.
+                const float safeHalfX = Hax::Min(objectExtents.X + 0.06f, Hax::Max(0.08f, area.Extents.X - 0.06f));
+                const float safeHalfZ = Hax::Min(objectExtents.Z + 0.06f, Hax::Max(0.08f, area.Extents.Z - 0.06f));
+                centerX = Hax::Clamp(centerX, areaMin.X + safeHalfX, areaMax.X - safeHalfX);
+                centerZ = Hax::Clamp(centerZ, areaMin.Z + safeHalfZ, areaMax.Z - safeHalfZ);
+
+                float centerY = areaMin.Y + 0.12f + objectExtents.Y + (float)layer * stepY;
+                const float maxCenterY = areaMax.Y - Hax::Min(objectExtents.Y, Hax::Max(0.08f, area.Extents.Y - 0.06f));
+                centerY = Hax::Min(centerY, maxCenterY);
+
+                const Unity::Vector3 position = Unity::Vector3(centerX, centerY, centerZ) - colliderOffset;
+                if (body)
+                    body.SetVelocity(Unity::Vector3::zero());
+                if (phys)
+                    phys.Teleport(position, transform.GetRotation());
+                else
+                    transform.SetPosition(position);
+                if (body)
+                    body.SetVelocity(Unity::Vector3::zero());
+                ++index;
+            }
+            return;
+        }
+
+        Unity::Vector3 target{};
+        bool hasTarget = false;
+        if (action == LootGodCommand::BringToPlayer && avatar)
+        {
+            target = avatar.GetTransform().GetPosition() + avatar.GetTransform().GetForward() * 2.f;
+            hasTarget = true;
+        }
+        else if (action == LootGodCommand::BringToTruck)
+            hasTarget = GetTruckPosition(target);
+
+        int index = 0;
+        for (ValuableObject valuable : valuables)
+        {
+            if (!valuable)
+                continue;
+
+            if (hasTarget)
+            {
+                const float x = ((float)(index % 6) - 2.5f) * 0.65f;
+                const float z = (float)(index / 6) * 0.65f;
+                valuable.GetTransform().SetPosition(target + Unity::Vector3(x, 0.5f, z));
+                ++index;
+            }
+            else if (action == LootGodCommand::DiscoverAll)
+                valuable.Discover(1);
+            else if (action == LootGodCommand::ApplyValueMultiplier)
+                valuable.dollarValueCurrent() = Hax::Clamp(valuable.dollarValueCurrent() * G->GodLootValuePercent / 100.f, 0.f, 10000000.f);
+        }
+    }
+
+    static void ProcessPlayerGodTools(PlayerAvatar localPlayer)
+    {
+        PlayerGodCommand action = G->PlayerGodAction;
+        G->PlayerGodAction = PlayerGodCommand::None;
+        if (action == PlayerGodCommand::None || G->IsClient)
+            return;
+
+        GameDirector director = GameDirector::instance();
+        System::List<PlayerAvatar> players{};
+        if (director)
+            players = director.PlayerList();
+        if (players == null)
+            return;
+
+        Unity::Vector3 gatherPos = localPlayer ? localPlayer.GetTransform().GetPosition() : Unity::Vector3::zero();
+        int index = 0;
+        for (PlayerAvatar player : players)
+        {
+            if (!player)
+                continue;
+
+            if (action == PlayerGodCommand::HealAll && !player.deadSet())
+            {
+                if (PlayerHealth health = player.playerHealth())
+                    health.HealOther(99999, true);
+            }
+            else if (action == PlayerGodCommand::ReviveAll && player.deadSet())
+                player.Revive(false);
+            else if (action == PlayerGodCommand::GatherAll && localPlayer && player != localPlayer)
+                player.GetTransform().SetPosition(gatherPos + Unity::Vector3((float)(++index) * 0.8f, 0.25f, 1.5f));
+            else if (action == PlayerGodCommand::ApplyScaleAll)
+            {
+                float scale = G->GodAllPlayerScalePercent / 100.f;
+                Unity::Transform transform = player.playerTransform() ? player.playerTransform() : player.GetTransform();
+                transform.SetLocalScale(Unity::Vector3(scale, scale, scale));
+            }
+        }
+    }
+
+    static void ProcessGodObjectCommands()
+    {
+        GodObjectCommand action = G->GodObjectAction;
+        G->GodObjectAction = GodObjectCommand::None;
+
+        if (action == GodObjectCommand::LockAimed)
+            SetGodTarget(G->GodAimedObject, G->GodAimedObjectNetworked);
+        else if (action == GodObjectCommand::ClearTarget)
+        {
+            ReleaseGodTelekinesis();
+            SetGodTarget(null, false);
+        }
+        else if (action == GodObjectCommand::Undo)
+            UndoLastGodAction();
+
+        Unity::GameObject target = G->GodTargetObject;
+        if (!target)
+        {
+            if (G->GodTelekinesisActive)
+                ReleaseGodTelekinesis();
+            SetGodTarget(null, false);
+            return;
+        }
+
+        Unity::Transform transform = target.GetTransform();
+        ProcessGodGizmoDrag(target, transform);
+        Unity::Rigidbody body = target.GetComponent<Unity::Rigidbody>();
+        if (action == GodObjectCommand::ToggleTelekinesis)
+        {
+            if (G->GodTelekinesisActive)
+                ReleaseGodTelekinesis();
+            else
+            {
+                PushGodUndo(GodUndoType::Transform, target);
+                s_HeldObject = target;
+                s_HeldBody = body;
+                if (body)
+                {
+                    s_HeldBodyKinematic = body.GetIsKinematic();
+                    s_HeldBodyGravity = body.GetUseGravity();
+                    body.SetVelocity(Unity::Vector3::zero());
+                    body.SetUseGravity(false);
+                    body.SetIsKinematic(true);
+                }
+                G->GodTelekinesisActive = true;
+            }
+        }
+        else if (action == GodObjectCommand::Pull && transform)
+        {
+            PushGodUndo(GodUndoType::Transform, target);
+            if (Unity::Camera camera = SemiFunc::MainCamera())
+                transform.SetPosition(camera.GetTransform().GetPosition() + camera.GetTransform().GetForward() * 2.f);
+        }
+        else if (action == GodObjectCommand::Push && transform)
+        {
+            PushGodUndo(GodUndoType::Transform, target);
+            if (Unity::Camera camera = SemiFunc::MainCamera())
+            {
+                Unity::Vector3 force = camera.GetTransform().GetForward() * (float)G->GodThrowForce;
+                if (body)
+                {
+                    body.SetIsKinematic(false);
+                    body.SetUseGravity(true);
+                    body.AddForce(force, Unity::ForceMode::VelocityChange);
+                }
+                else
+                    transform.SetPosition(transform.GetPosition() + force * 0.15f);
+            }
+        }
+        else if (action == GodObjectCommand::FreezeToggle && body)
+        {
+            const bool freeze = !body.GetIsKinematic();
+            body.SetVelocity(Unity::Vector3::zero());
+            body.SetUseGravity(!freeze);
+            body.SetIsKinematic(freeze);
+        }
+        else if (action == GodObjectCommand::Duplicate && transform)
+        {
+            Unity::Vector3 pos = transform.GetPosition();
+            if (Unity::Camera camera = SemiFunc::MainCamera())
+                pos = pos + camera.GetTransform().GetRotation() * Unity::Vector3::right();
+            Unity::GameObject clone = Unity::Object::Instantiate<Unity::GameObject>(target, pos, transform.GetRotation());
+            if (clone)
+            {
+                clone.SetActive(true);
+                PushGodUndo(GodUndoType::DestroyClone, clone);
+                SetGodTarget(clone, false);
+            }
+        }
+        else if (action == GodObjectCommand::ApplyTransform && transform)
+        {
+            PushGodUndo(GodUndoType::Transform, target);
+            transform.SetLocalScale(Unity::Vector3(
+                G->GodScaleXPercent / 100.f,
+                G->GodScaleYPercent / 100.f,
+                G->GodScaleZPercent / 100.f));
+            transform.SetRotation(Unity::Quaternion::Euler((float)G->GodRotationX, (float)G->GodRotationY, (float)G->GodRotationZ));
+            SyncGodTargetPose(target, transform);
+        }
+        else if (action == GodObjectCommand::DeleteTarget && !G->IsClient)
+        {
+            ReleaseGodTelekinesis();
+            DeleteGodObject(target, G->GodTargetNetworked);
+            SetGodTarget(null, false);
+        }
+
+        if (G->GodTelekinesisActive && s_HeldObject)
+        {
+            Unity::Camera camera = SemiFunc::MainCamera();
+            Unity::Transform heldTransform = s_HeldObject.GetTransform();
+            if (camera && heldTransform)
+            {
+                Unity::Transform cameraTransform = camera.GetTransform();
+                heldTransform.SetPosition(cameraTransform.GetPosition() + cameraTransform.GetForward() * (float)G->GodHoldDistance);
+                if (s_HeldBody)
+                    s_HeldBody.SetVelocity(Unity::Vector3::zero());
+            }
+        }
+
+        RefreshGodTargetSnapshot(G->GodTargetObject);
+        UpdateGodGizmoProjection(G->GodTargetObject, G->GodTargetObject ? G->GodTargetObject.GetTransform() : null);
+    }
+
+    static void ProcessGodTools(PlayerAvatar avatar)
+    {
+        if (!G->IsInGame)
+        {
+            DiscardGodSceneReferences();
+            G->GodTargetingEnabled = false;
+            G->WorldFreezePhysics = false;
+            G->GodEnemiesFrozen = false;
+            G->GodLootFrozen = false;
+            G->GodEnemiesPacified = false;
+            G->GodEnemiesPacifiedChanged = false;
+            G->GodAllPlayers = false;
+            G->GodAllPlayersNoTumble = false;
+            G->WorldGravityOverride = false;
+            G->WorldLightAction = WorldLightCommand::None;
+        }
+
+        ProcessWorldGodTools();
+        if (!G->IsInGame)
+            return;
+
+        ProcessGodObjectCommands();
+        ProcessEnemyGodTools();
+        ProcessLootGodTools(avatar);
+        ProcessPlayerGodTools(avatar);
     }
 
     struct EyeLaserPrefabState
@@ -2339,6 +3487,7 @@ namespace Cheat
         RunManager runManager = RunManager::instance();
         GameDirector gameDirector = GameDirector::instance();
         return runManager && PlayerAvatar::instance() && gameDirector
+            && runManager.runStarted()
             && runManager.levelCurrent() != runManager.levelLobbyMenu()
             && runManager.levelCurrent() != runManager.levelMainMenu()
             && gameDirector.currentState() == GameDirector_gameState::Main();
