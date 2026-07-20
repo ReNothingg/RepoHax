@@ -10,6 +10,8 @@ namespace Cheat
 {
     void Initialize(HMODULE hCheatDll);
 
+    inline constexpr int MaxSafeRunCurrency = 2147483; // 32-bit int.
+
     enum class UpgradeType : int { Rest, Jump, Range, Speed, Stamina, Strength, Tumble, Wings, Health, Map, Climb, Battery, N };
     enum class AidType { Small, Medium, Large, N };
     enum class ChatPref { None = -1, Alive = 0, Dead = 1 };
@@ -146,6 +148,9 @@ namespace Cheat
         PlayerAvatar                        PlayerToTumble = null;
         PlayerAvatar                        PlayerToRevive = null;
         PlayerAvatar                        PlayerToKill = null;
+        PlayerAvatar                        PlayerToHeal = null;
+        PlayerAvatar                        ProtectedPlayers[16]{};
+        PlayerAvatar                        NoTumblePlayers[16]{};
         ChatPref                            ChatPrefered = ChatPref::None;
         size_t SelectedEnemySetup;
 
@@ -185,6 +190,12 @@ namespace Cheat
         int                                 VkSpawnItem = VK_F6;
         Item                                SelectedItem = null;
         Item                                ItemToSpawn = null;
+        bool                                ObjectRemoverEnabled;
+        int                                 VkDeleteObject = VK_F10;
+        int                                 ObjectRemoverRange = 25;
+        bool                                DeleteObjectRequested;
+        bool                                ObjectRemoverTargetValid;
+        float                               ObjectRemoverTargetDistance;
 
         // Levels
         Hax::Vector<LevelBan>               LevelBans;
@@ -212,6 +223,7 @@ namespace Cheat
         int                                 CurrencyChangeAmount = 1000;
         int                                 CurrencyDeltaPending;
         bool                                CurrencySetZero;
+        bool                                CurrencyRepairOverflow;
         TeleportQuickAction                 TeleportAction = TeleportQuickAction::None;
         PlayerAvatar                        SelectedTeleportPlayer = null;
         int                                 SavePositionSlot = -1;

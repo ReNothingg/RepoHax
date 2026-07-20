@@ -37,6 +37,7 @@ namespace Unity::Photon
         static System::Type             typeof();
 
         static Player                   GetMasterClient();
+        static void                     Destroy(Unity::GameObject target);
         static Unity::GameObject        InstantiateRoomObject(System::String name,
                                                               const Unity::Vector3& position,
                                                               const Unity::Quaternion& rotation,

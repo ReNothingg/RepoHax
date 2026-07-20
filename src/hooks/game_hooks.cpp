@@ -60,8 +60,13 @@ namespace Cheat
     static void ProcessWorldSessionCommands(PlayerAvatar avatar);
     static void ProcessCurrencyCommands();
     static void ProcessTeleportCommands(PlayerAvatar avatar);
+    static void ProcessObjectRemover(PlayerAvatar avatar);
+    static void MaintainFriendEffects();
     static void UpdateEyeLasers();
     static void DrawPlayerChams(PlayerAvatar player, Unity::CommandBuffer cb, Unity::Material aliveMat, Unity::Material deadMat);
+
+    static bool s_ForcedPlayerDeath;
+    static bool s_ForcedPlayerTumble;
 
     void HookMonoRuntimeInvoke()
     {
@@ -394,6 +399,7 @@ namespace Cheat
         G->PlayerToTumble = null;
         G->PlayerToKill = null;
         G->PlayerToRevive = null;
+        G->PlayerToHeal = null;
         G->SetToZero = false;
         G->SetToMax = false;
         G->ActivateNextPoint = false;
@@ -404,6 +410,8 @@ namespace Cheat
         G->ClearSavedPositionSlot = -1;
         G->CurrencyDeltaPending = 0;
         G->CurrencySetZero = false;
+        G->CurrencyRepairOverflow = false;
+        G->DeleteObjectRequested = false;
     }
 
     static void ResetSessionState()
@@ -414,7 +422,13 @@ namespace Cheat
         G->DisableOcclusionCulling = false;
         G->NoFog = false;
         G->NoTumble = false;
+        G->ObjectRemoverEnabled = false;
+        G->ObjectRemoverTargetValid = false;
         G->DisableAllPlayersDeadCheck = false;
+        for (PlayerAvatar& player : G->ProtectedPlayers)
+            player = null;
+        for (PlayerAvatar& player : G->NoTumblePlayers)
+            player = null;
         ClearOneShotCommands();
         SetSessionAction(G->Loc[LocKey_ActionSafetyReset]);
     }
@@ -434,6 +448,12 @@ namespace Cheat
         {
             G->FlightEnabled = false;
             G->EyeLasersEnabled = false;
+            G->ObjectRemoverTargetValid = false;
+            G->DeleteObjectRequested = false;
+            for (PlayerAvatar& player : G->ProtectedPlayers)
+                player = null;
+            for (PlayerAvatar& player : G->NoTumblePlayers)
+                player = null;
             G->TeleportAction = TeleportQuickAction::None;
             G->TeleportToTruck = false;
             return;
@@ -458,6 +478,7 @@ namespace Cheat
             if (G->EnemyToSpawn || G->ItemToSpawn || G->RarityToSpawn || G->ForceNextLevel ||
                 G->ReloadCurrentLevel || G->UnlockExtractionPoints || G->PlayerToKill ||
                 G->PlayerToRevive || G->PlayerToTumble ||
+                G->PlayerToHeal || G->DeleteObjectRequested ||
                 G->TeleportAction == TeleportQuickAction::SelectedPlayerToMe)
             {
                 hadUnsafe = true;
@@ -472,6 +493,8 @@ namespace Cheat
             G->PlayerToKill = null;
             G->PlayerToRevive = null;
             G->PlayerToTumble = null;
+            G->PlayerToHeal = null;
+            G->DeleteObjectRequested = false;
             if (G->TeleportAction == TeleportQuickAction::SelectedPlayerToMe)
                 G->TeleportAction = TeleportQuickAction::None;
 
@@ -533,6 +556,7 @@ namespace Cheat
             G->CurrentRunCurrency = 0;
             G->CurrencyDeltaPending = 0;
             G->CurrencySetZero = false;
+            G->CurrencyRepairOverflow = false;
             return;
         }
 
@@ -540,13 +564,15 @@ namespace Cheat
         if (stats)
             G->CurrentRunCurrency = SemiFunc::StatGetRunCurrency();
 
-        if (G->CurrencyDeltaPending == 0 && !G->CurrencySetZero)
+        if (G->CurrencyDeltaPending == 0 && !G->CurrencySetZero && !G->CurrencyRepairOverflow)
             return;
 
         const int delta = G->CurrencyDeltaPending;
         const bool setZero = G->CurrencySetZero;
+        const bool repairOverflow = G->CurrencyRepairOverflow;
         G->CurrencyDeltaPending = 0;
         G->CurrencySetZero = false;
+        G->CurrencyRepairOverflow = false;
 
         if (G->IsClient)
         {
@@ -561,10 +587,12 @@ namespace Cheat
         }
 
         long long target = setZero ? 0LL : (long long)G->CurrentRunCurrency + (long long)delta;
+        if (repairOverflow)
+            target = Hax::Min<long long>(target, MaxSafeRunCurrency);
         if (target < 0)
             target = 0;
-        if (target > INT_MAX)
-            target = INT_MAX;
+        if (target > MaxSafeRunCurrency)
+            target = MaxSafeRunCurrency;
 
         G->CurrentRunCurrency = SemiFunc::StatSetRunCurrency((int)target);
         stats.SaveFileSave();
@@ -713,6 +741,8 @@ namespace Cheat
             ProcessWorldSessionCommands(avatar);
             ProcessCurrencyCommands();
             ProcessTeleportCommands(avatar);
+            ProcessObjectRemover(avatar);
+            MaintainFriendEffects();
 
             if (G->IsInGame)
             {
@@ -739,6 +769,20 @@ namespace Cheat
                 G->HealToMax = false;
                 if (health)
                     health.HealOther(99999, true);
+            }
+
+            if (G->PlayerToHeal)
+            {
+                PlayerAvatar player = G->PlayerToHeal;
+                G->PlayerToHeal = null;
+                if (!G->IsClient && player && !player.deadSet())
+                {
+                    if (PlayerHealth targetHealth = player.playerHealth())
+                    {
+                        targetHealth.HealOther(99999, true);
+                        SetSessionAction(G->Loc[LocKey_ActionPlayerHealed]);
+                    }
+                }
             }
 
             if (G->UpgradeToToggle)
@@ -897,7 +941,11 @@ namespace Cheat
                 PlayerAvatar player = G->PlayerToTumble;
                 G->PlayerToTumble = nullptr;
                 if (player && !player.isDisabled())
+                {
+                    s_ForcedPlayerTumble = true;
                     player.tumble().TumbleRequest(true, false);
+                    s_ForcedPlayerTumble = false;
+                }
             }
 
             if (G->PlayerToKill)
@@ -905,7 +953,11 @@ namespace Cheat
                 PlayerAvatar player = G->PlayerToKill;
                 G->PlayerToKill = nullptr;
                 if (player && !player.deadSet() && !G->IsClient)
+                {
+                    s_ForcedPlayerDeath = true;
                     player.PlayerDeath(-1);
+                    s_ForcedPlayerDeath = false;
+                }
             }
 
             if (G->PlayerToRevive)
@@ -956,9 +1008,85 @@ namespace Cheat
         G->EventSystem_Update_Hook.unsafe_call<void, Unity::EventSystem>(__this);
     }
 
+    static bool IsPlayerInRuntimeSlots(PlayerAvatar player, PlayerAvatar (&slots)[16])
+    {
+        if (!player)
+            return false;
+
+        for (PlayerAvatar entry : slots)
+            if (entry == player)
+                return true;
+        return false;
+    }
+
+    static bool IsProtectedHealth(PlayerHealth health)
+    {
+        if (!health)
+            return false;
+
+        GameDirector director = GameDirector::instance();
+        System::List<PlayerAvatar> players{};
+        if (director)
+            players = director.PlayerList();
+        if (players == null)
+            return false;
+
+        for (PlayerAvatar player : players)
+        {
+            if (player && player.playerHealth() == health && IsPlayerInRuntimeSlots(player, G->ProtectedPlayers))
+                return true;
+        }
+        return false;
+    }
+
+    static bool IsPlayerPresent(PlayerAvatar player, System::List<PlayerAvatar> players)
+    {
+        if (!player || players == null)
+            return false;
+
+        for (PlayerAvatar current : players)
+            if (current == player)
+                return true;
+        return false;
+    }
+
+    static void MaintainFriendEffects()
+    {
+        if (!G->IsInGame || G->IsClient)
+            return;
+
+        GameDirector director = GameDirector::instance();
+        System::List<PlayerAvatar> players{};
+        if (director)
+            players = director.PlayerList();
+        if (players == null)
+            return;
+
+        for (PlayerAvatar& player : G->ProtectedPlayers)
+        {
+            if (!IsPlayerPresent(player, players))
+            {
+                player = null;
+                continue;
+            }
+
+            if (!player.deadSet())
+            {
+                PlayerHealth health = player.playerHealth();
+                if (health && health.health() < health.maxHealth())
+                    health.HealOther(health.maxHealth() - health.health(), false);
+            }
+        }
+
+        for (PlayerAvatar& player : G->NoTumblePlayers)
+            if (!IsPlayerPresent(player, players))
+                player = null;
+    }
+
     static void Hooked__PlayerHealth_Hurt(PlayerHealth __this, int damage, bool savingGrace, int enemyIndex)
     {
-        if (G->Godmode)
+        PlayerAvatar localPlayer = PlayerAvatar::instance();
+        if ((G->Godmode && localPlayer && localPlayer.playerHealth() == __this) || IsProtectedHealth(__this))
             return;
 
         G->PlayerHealth_Hurt_Hook.unsafe_call<void, PlayerHealth, int, bool, int>(__this, damage, savingGrace, enemyIndex);
@@ -966,7 +1094,8 @@ namespace Cheat
 
     static void Hooked__PlayerAvatar_PlayerDeath(PlayerAvatar __this, int enemyIndex)
     {
-        if (G->Godmode && __this.isLocal())
+        if (!s_ForcedPlayerDeath &&
+            ((G->Godmode && __this.isLocal()) || IsPlayerInRuntimeSlots(__this, G->ProtectedPlayers)))
             return;
 
         G->PlayerAvatar_PlayerDeath_Hook.unsafe_call<void, PlayerAvatar, int>(__this, enemyIndex);
@@ -1023,6 +1152,7 @@ namespace Cheat
                 if (state.Value)
                     state.Value.SetEnabled(state.WasEnabled);
             }
+
             s_ColliderStates.Clear();
 
             if (s_FlightBody)
@@ -1202,10 +1332,13 @@ namespace Cheat
 
     static void Hooked__PlayerTumble_TumbleRequest(PlayerTumble __this, bool isTumbling, bool playerInput)
     {
+        PlayerAvatar player = __this.playerAvatar();
+
         if (G->FlightEnabled && __this.playerAvatar().isLocal())
             return;
 
-        if (G->NoTumble && __this.playerAvatar().isLocal() && !playerInput)
+        if (!s_ForcedPlayerTumble && !playerInput &&
+            ((G->NoTumble && player.isLocal()) || IsPlayerInRuntimeSlots(player, G->NoTumblePlayers)))
             return;
 
         G->PlayerTumble_TumbleRequest_Hook.unsafe_call<void, PlayerTumble, bool, bool>(__this, isTumbling, playerInput);
@@ -1358,6 +1491,135 @@ namespace Cheat
 
         static auto s_GetIsTrigger = Unity::Collider::typeof().GetMethod("get_isTrigger", nullptr, true).Wrap();
         return s_GetIsTrigger.Call<bool>(collider);
+    }
+
+    struct GameObjectRemovalTarget
+    {
+        Unity::GameObject Object = null;
+        bool Networked = false;
+    };
+
+    static GameObjectRemovalTarget FindGameObjectRemovalTarget(Unity::Transform transform)
+    {
+        GameObjectRemovalTarget target{};
+        if (!transform)
+            return target;
+
+        // For an ordinary scene collider, delete the exact GameObject that was hit.
+        target.Object = transform.GetGameObject();
+
+        for (int depth = 0; transform && depth < 20; ++depth)
+        {
+            // Never allow a parent hierarchy containing a player or enemy to become a target.
+            if (transform.GetComponent<PlayerAvatar>() ||
+                transform.GetComponent<PlayerTumble>() ||
+                transform.GetComponent<EnemyRigidbody>())
+            {
+                return {};
+            }
+
+            // Interactive props often keep their actual object root on the impact detector.
+            if (PhysGrabObjectImpactDetector detector = transform.GetComponent<PhysGrabObjectImpactDetector>())
+                target.Object = detector.GetGameObject();
+
+            // The closest Photon root identifies the complete network object. Stop here so a
+            // held item is not rejected merely because it is temporarily parented to a player.
+            if (Unity::Photon::PhotonView view = transform.GetComponent<Unity::Photon::PhotonView>())
+            {
+                target.Object = view.GetGameObject();
+                target.Networked = true;
+                return target;
+            }
+
+            transform = transform.GetParent();
+        }
+
+        return target;
+    }
+
+    static void ProcessObjectRemover(PlayerAvatar avatar)
+    {
+        G->ObjectRemoverTargetValid = false;
+        G->ObjectRemoverTargetDistance = 0.f;
+
+        if (!G->ObjectRemoverEnabled || !G->IsInGame)
+        {
+            G->DeleteObjectRequested = false;
+            return;
+        }
+
+        if (G->IsClient)
+        {
+            if (G->DeleteObjectRequested)
+                SetSessionAction(G->Loc[LocKey_ActionObjectHostOnly]);
+            G->DeleteObjectRequested = false;
+            return;
+        }
+
+        Unity::Camera camera = SemiFunc::MainCamera();
+        if (!camera || !avatar)
+        {
+            G->DeleteObjectRequested = false;
+            return;
+        }
+
+        Unity::Transform cameraTransform = camera.GetTransform();
+        const Unity::Vector3 origin = cameraTransform.GetPosition();
+        const Unity::Vector3 forward = cameraTransform.GetForward().GetNormalized();
+        System::Array<Unity::RaycastHit> hits = Unity::Physics::SphereCastAll(
+            origin, 0.035f, forward, (float)G->ObjectRemoverRange, -1);
+
+        GameObjectRemovalTarget target{};
+        float closestDistance = (float)G->ObjectRemoverRange;
+        if (hits != null)
+        {
+            Unity::Transform avatarRoot = avatar.GetTransform();
+            Unity::Transform controllerRoot = PlayerController::instance() ? PlayerController::instance().GetTransform() : null;
+
+            for (Unity::RaycastHit& hit : hits)
+            {
+                if (hit.m_Distance < 0.05f || hit.m_Distance >= closestDistance)
+                    continue;
+
+                Unity::Transform hitTransform = hit.GetTransform();
+                if (!hitTransform || IsTransformBelow(hitTransform, avatarRoot) ||
+                    (controllerRoot && IsTransformBelow(hitTransform, controllerRoot)))
+                {
+                    continue;
+                }
+
+                Unity::Collider collider = hitTransform.GetComponent<Unity::Collider>();
+                if (collider && IsTriggerCollider(collider))
+                    continue;
+
+                GameObjectRemovalTarget candidate = FindGameObjectRemovalTarget(hitTransform);
+                if (!candidate.Object)
+                    continue;
+
+                target = candidate;
+                closestDistance = hit.m_Distance;
+            }
+        }
+
+        G->ObjectRemoverTargetValid = target.Object != null;
+        G->ObjectRemoverTargetDistance = target.Object ? closestDistance : 0.f;
+
+        if (!G->DeleteObjectRequested)
+            return;
+        G->DeleteObjectRequested = false;
+
+        if (!target.Object)
+        {
+            SetSessionAction(G->Loc[LocKey_ActionObjectNoTarget]);
+            return;
+        }
+
+        if (target.Networked && SemiFunc::IsMultiplayer())
+            Unity::Photon::PhotonNetwork::Destroy(target.Object);
+        else
+            Unity::Object::Destroy(target.Object);
+        G->ObjectRemoverTargetValid = false;
+        SetSessionAction(G->Loc[LocKey_ActionObjectDeleted]);
     }
 
     struct EyeLaserPrefabState

@@ -9,6 +9,43 @@
 
 namespace Cheat
 {
+    static PlayerAvatar s_SelectedPlayer;
+
+    static bool PlayerInSlots(PlayerAvatar player, PlayerAvatar (&slots)[16])
+    {
+        if (!player)
+            return false;
+
+        for (PlayerAvatar entry : slots)
+            if (entry == player)
+                return true;
+        return false;
+    }
+
+    static void SetPlayerInSlots(PlayerAvatar player, PlayerAvatar (&slots)[16], bool enabled)
+    {
+        for (PlayerAvatar& entry : slots)
+        {
+            if (entry != player)
+                continue;
+            if (!enabled)
+                entry = null;
+            return;
+        }
+
+        if (enabled)
+        {
+            for (PlayerAvatar& entry : slots)
+            {
+                if (!entry)
+                {
+                    entry = player;
+                    return;
+                }
+            }
+        }
+    }
+
     static void UpToDatePlayer(PlayerAvatar& player)
     {
         if (GameDirector dir = GameDirector::instance())
@@ -104,8 +141,6 @@ namespace Cheat
                 HorizontalLine(1_px);
 
                 {
-                    static PlayerAvatar s_SelectedPlayer;
-
                     GameDirector dir = GameDirector::instance();
                     System::List<PlayerAvatar> players{}; if (dir) players = dir.PlayerList();
 
@@ -186,6 +221,30 @@ namespace Cheat
                     }
                     Hax::Gui::EndVertical();
                 }
+            }
+            EndPanel();
+
+            BeginPanel(LINE_ID);
+            PanelHeader(G->Loc[LocKey_FriendTools], G->Loc[LocKey_FriendToolsDesc]);
+            {
+                const bool canManage = G->IsInGame && !G->IsClient && s_SelectedPlayer;
+
+                bool protectedPlayer = PlayerInSlots(s_SelectedPlayer, G->ProtectedPlayers);
+                if (ToggleEx(LINE_ID, protectedPlayer, G->Loc[LocKey_ProtectPlayer], G->Loc[LocKey_ProtectPlayerDesc], {.Disabled = !canManage}))
+                    SetPlayerInSlots(s_SelectedPlayer, G->ProtectedPlayers, protectedPlayer);
+
+                HorizontalLine(1_px);
+
+                bool protectedTumble = PlayerInSlots(s_SelectedPlayer, G->NoTumblePlayers);
+                if (ToggleEx(LINE_ID, protectedTumble, G->Loc[LocKey_ProtectPlayerTumble], G->Loc[LocKey_ProtectPlayerTumbleDesc], {.Disabled = !canManage}))
+                    SetPlayerInSlots(s_SelectedPlayer, G->NoTumblePlayers, protectedTumble);
+
+                HorizontalLine(1_px);
+
+                PlayerHealth health = s_SelectedPlayer ? s_SelectedPlayer.playerHealth() : null;
+                const bool canHeal = canManage && health && !s_SelectedPlayer.deadSet() && health.health() < health.maxHealth();
+                if (Button(LINE_ID, G->Loc[LocKey_HealPlayer], G->Loc[LocKey_HostOnly], {.Enabled = canHeal, .MinW = Hax::Gui::GetContentRegionAvail().X}))
+                    G->PlayerToHeal = s_SelectedPlayer;
             }
             EndPanel();
         }

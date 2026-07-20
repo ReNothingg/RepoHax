@@ -92,6 +92,14 @@ X(LocKey_Tumble, L"Tumble", L"Уронить") \
 X(LocKey_Kill, L"Kill", L"Убить") \
 X(LocKey_HostOnly, L"Host only", L"Только хост") \
 X(LocKey_Revive, L"Revive", L"Воскресить") \
+X(LocKey_FriendTools, L"FRIEND TOOLS", L"ИНСТРУМЕНТЫ ДЛЯ ДРУЗЕЙ") \
+X(LocKey_FriendToolsDesc, L"Host-side effects for the selected player", L"Эффекты хоста для выбранного игрока") \
+X(LocKey_ProtectPlayer, L"Godmode", L"Бессмертие") \
+X(LocKey_ProtectPlayerDesc, L"Block damage and death for this player", L"Блокировать урон и смерть для этого игрока") \
+X(LocKey_ProtectPlayerTumble, L"Anti-tumble", L"Защита от падения") \
+X(LocKey_ProtectPlayerTumbleDesc, L"Block forced tumbles for this player", L"Блокировать принудительные падения этого игрока") \
+X(LocKey_HealPlayer, L"Heal to max", L"Вылечить полностью") \
+X(LocKey_ActionPlayerHealed, L"Selected player healed", L"Выбранный игрок полностью вылечен") \
 X(LocKey_VoiceChat, L"Voice chat", L"Голосовой чат") \
 X(LocKey_Alive, L"Alive", L"Живых") \
 X(LocKey_Dead, L"Dead", L"Мертвых") \
@@ -103,6 +111,16 @@ X(LocKey_MapFilterDesc, L"Select maps that will not be set. Available if you are
 X(LocKey_GUNS, L"GUNS", L"ОРУЖИЕ") \
 X(LocKey_MaxBatteryGun, L"Max battery", L"Максимальная батарея") \
 X(LocKey_LaserCrosshair, L"Laser crosshair", L"Лазерный прицел") \
+X(LocKey_OBJECT_REMOVER, L"OBJECT REMOVER", L"УДАЛЕНИЕ ОБЪЕКТОВ") \
+X(LocKey_ObjectRemover, L"Aim remover", L"Удаление по прицелу") \
+X(LocKey_ObjectRemoverDesc, L"Delete the aimed GameObject; Photon objects are removed for everyone", L"Удаляет GameObject под прицелом; Photon-объекты удаляются у всех") \
+X(LocKey_ObjectRemoverRange, L"Targeting range", L"Дальность наведения") \
+X(LocKey_DeleteTarget, L"Delete aimed object", L"Удалить объект под прицелом") \
+X(LocKey_TargetReady, L"Target acquired", L"Цель найдена") \
+X(LocKey_NoTarget, L"No GameObject target", L"Нет цели GameObject") \
+X(LocKey_ActionObjectDeleted, L"Aimed object deleted", L"Объект под прицелом удалён") \
+X(LocKey_ActionObjectNoTarget, L"Delete skipped: no removable target", L"Удаление пропущено: подходящая цель не найдена") \
+X(LocKey_ActionObjectHostOnly, L"Delete skipped: host only", L"Удаление пропущено: только для хоста") \
 X(LocKey_SPAWN, L"SPAWN", L"СПАВН") \
 X(LocKey_TRUCK, L"TRUCK", L"ФУРГОН") \
 X(LocKey_TeleportTruck, L"Teleport to truck", L"Телепортироваться в фургон") \
@@ -154,6 +172,8 @@ X(LocKey_CurrencyChangeAmount, L"Change amount", L"Сумма изменения
 X(LocKey_SubtractMoney, L"Subtract", L"Убавить") \
 X(LocKey_AddMoney, L"Add", L"Добавить") \
 X(LocKey_SetBalanceZero, L"Set balance to zero", L"Обнулить баланс") \
+X(LocKey_RepairBalance, L"Repair overflowed balance", L"Исправить переполненный баланс") \
+X(LocKey_RepairBalanceDesc, L"Clamp the balance to the maximum value safe for the shop", L"Ограничить баланс максимальным безопасным для магазина значением") \
 X(LocKey_ActionCurrencyChangedFmt, L"Balance changed: $%dK", L"Баланс изменён: $%dK") \
 X(LocKey_ActionCurrencyHostOnly, L"Balance change skipped: host only", L"Изменение баланса пропущено: только хост") \
 X(LocKey_ActionCurrencyNotReady, L"Balance change failed: run stats are not ready", L"Баланс не изменён: статистика забега не готова") \

@@ -266,6 +266,12 @@ namespace Cheat
 
                 if (Button(LINE_ID, G->Loc[LocKey_SetBalanceZero], G->Loc[LocKey_HostOnly], {.Enabled = canChange, .MinW = w}))
                     G->CurrencySetZero = true;
+
+                if (G->CurrentRunCurrency > MaxSafeRunCurrency &&
+                    Button(LINE_ID, G->Loc[LocKey_RepairBalance], G->Loc[LocKey_RepairBalanceDesc], {.Enabled = canChange, .MinW = w}))
+                {
+                    G->CurrencyRepairOverflow = true;
+                }
             }
             EndPanel();
 

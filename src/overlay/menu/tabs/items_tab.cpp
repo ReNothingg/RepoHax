@@ -95,6 +95,30 @@ namespace Cheat
                 HotkeyEx(Hax::Hash(L"SpawnItemHotkeyEditor"), G->VkSpawnItem, G->Loc[LocKey_Hotkey], G->Loc[LocKey_Spawn]);
             }
             EndPanel();
+
+            BeginPanel(LINE_ID);
+            PanelHeader(G->Loc[LocKey_OBJECT_REMOVER], G->Loc[LocKey_ObjectRemoverDesc]);
+            {
+                ToggleEx(LINE_ID, G->ObjectRemoverEnabled, G->Loc[LocKey_ObjectRemover], G->Loc[LocKey_HostOnly], {.Disabled = G->IsClient});
+
+                HorizontalLine(1_px);
+
+                Hax::char16 range[32]{};
+                swprintf_s(range, _countof(range), G->Loc[LocKey_Meters].Data(), G->ObjectRemoverRange);
+                SliderEx(LINE_ID, G->Loc[LocKey_ObjectRemoverRange], range, &G->ObjectRemoverRange, 3, 100, SliderConvertInt);
+
+                HorizontalLine(1_px);
+
+                MainLabel(G->ObjectRemoverTargetValid ? G->Loc[LocKey_TargetReady] : G->Loc[LocKey_NoTarget],
+                    G->ObjectRemoverTargetValid ? 0xFF7272FF : 0x8D96A8FF);
+
+                const bool canDelete = G->IsInGame && !G->IsClient && G->ObjectRemoverEnabled && G->ObjectRemoverTargetValid;
+                if (Button(LINE_ID, G->Loc[LocKey_DeleteTarget], G->Loc[LocKey_HostOnly], {.Enabled = canDelete, .MinW = Hax::Gui::GetContentRegionAvail().X}))
+                    G->DeleteObjectRequested = true;
+
+                HotkeyEx(Hax::Hash(L"DeleteObjectHotkeyEditor"), G->VkDeleteObject, G->Loc[LocKey_Hotkey], G->Loc[LocKey_DeleteTarget]);
+            }
+            EndPanel();
         }
         Hax::Gui::Dummy({0.f, 0.f});
         Hax::Gui::EndVertical();

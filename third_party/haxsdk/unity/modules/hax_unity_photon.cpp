@@ -50,4 +50,13 @@ namespace Unity::Photon
         static auto s_Method = typeof().GetMethod("get_MasterClient", nullptr, true).Wrap();
         return s_Method.Call<Player>();
     }
+
+    void PhotonNetwork::Destroy(Unity::GameObject target)
+    {
+        if (!target)
+            return;
+
+        static auto s_Method = typeof().GetMethod("Destroy", "System.Void(UnityEngine.GameObject)", true).Wrap();
+        s_Method.Call<void>(target);
+    }
 }

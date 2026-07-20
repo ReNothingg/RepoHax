@@ -111,6 +111,10 @@ namespace Cheat
         Hax::IniAddEntry(ini, "Vision",     "FlashInCrouch",       &G->Flashlight.InCrouch, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Vision",     "MaxHeadBattery",      &G->MaxHeadBattery,      Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
 
+        Hax::IniAddEntry(ini, "Items",      "ObjectRemoverEnabled", &G->ObjectRemoverEnabled, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Items",      "VkDeleteObject",      &G->VkDeleteObject,      Hax::IniFileWrite_Int,  IniFileRead_IntClamped<VK_F10, 0, 255>);
+        Hax::IniAddEntry(ini, "Items",      "ObjectRemoverRange",  &G->ObjectRemoverRange,  Hax::IniFileWrite_Int,  IniFileRead_IntClamped<25, 3, 100>);
+
         Hax::IniAddEntry(ini, "Valuables",  "ValuablesEsp",        &G->ValuablesEsp,        Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Valuables",  "ValuablesEspRange",   &G->ValuablesEspRange,   Hax::IniFileWrite_Int,  IniFileRead_IntClamped<50, 5, 500>);
         Hax::IniAddEntry(ini, "Valuables",  "ValuablesChams",      &G->ValuablesChams,      Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
