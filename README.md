@@ -9,12 +9,12 @@ RepoHax is an internal C++ mod and developer toolbox for **R.E.P.O.** It uses a 
 
 ## Official sources
 
-Only download builds from trusted project pages:
-
-- [This repository](https://github.com/ReNothingg/RepoHax)
-- [Upstream GitHub repository](https://github.com/Sacracia/RepoHax)
-- [Nexus Mods](https://www.nexusmods.com/repo/mods/214)
-- [Playground](https://users.playground.ru/3241576/posts)
+> [!CAUTION]
+> Only download builds from trusted project pages:
+> [This repository](https://github.com/ReNothingg/RepoHax)
+> [Upstream GitHub repository](https://github.com/Sacracia/RepoHax)
+> [Nexus Mods](https://www.nexusmods.com/repo/mods/214)
+> [Playground](https://users.playground.ru/3241576/posts)
 
 ## Interface
 
