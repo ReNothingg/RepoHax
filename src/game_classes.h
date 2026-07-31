@@ -163,11 +163,18 @@ struct PlayerTumble : Unity::MonoBehaviour
         s_TumbleForce.Call<void>(*this, System::Box(force));
     }
 
+    void TumbleSet(bool isTumbling, bool playerInput)
+    {
+        THROW_IF_NULL();
+        s_TumbleSet.Call<void>(*this, isTumbling, playerInput);
+    }
+
     FIELD(tumbleLaunch, int);
     FIELD(playerAvatar, PlayerAvatar);
 
     METHOD_WRAPPER(TumbleRequest);
     METHOD_WRAPPER(TumbleForce);
+    METHOD_WRAPPER(TumbleSet);
 };
 
 struct FlashlightController : Unity::MonoBehaviour

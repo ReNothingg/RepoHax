@@ -1230,6 +1230,101 @@ namespace Cheat
         G->PlayerAvatar_PlayerDeath_Hook.unsafe_call<void, PlayerAvatar, int>(__this, enemyIndex);
     }
 
+    struct NoclipColliderState
+    {
+        Unity::Collider Value;
+        bool WasEnabled;
+    };
+
+    struct NoclipRuntimeState
+    {
+        Hax::Vector<NoclipColliderState> Colliders;
+        Unity::Rigidbody Body = null;
+        Unity::Vector3 OriginPosition{};
+        Unity::Quaternion OriginRotation = Unity::Quaternion::identity();
+        Unity::Vector3 Position{};
+        float CurrentSpeed{};
+        bool BodyUsedGravity{true};
+        bool BodyDetectedCollisions{true};
+        bool BodyWasKinematic{};
+        bool PoseCaptured{};
+        bool WasFlying{};
+    };
+
+    static NoclipRuntimeState s_Noclip;
+
+    static void RestoreNoclipPhysics()
+    {
+        for (NoclipColliderState& state : s_Noclip.Colliders)
+        {
+            try
+            {
+                if (state.Value)
+                    state.Value.SetEnabled(state.WasEnabled);
+            }
+            catch (System::Exception&)
+            {
+            }
+        }
+        s_Noclip.Colliders.Clear();
+
+        try
+        {
+            if (s_Noclip.Body)
+            {
+                s_Noclip.Body.SetIsKinematic(s_Noclip.BodyWasKinematic);
+                s_Noclip.Body.SetUseGravity(s_Noclip.BodyUsedGravity);
+                s_Noclip.Body.SetDetectCollisions(s_Noclip.BodyDetectedCollisions);
+                s_Noclip.Body.SetVelocity(Unity::Vector3::zero());
+            }
+        }
+        catch (System::Exception&)
+        {
+        }
+        s_Noclip.Body = null;
+    }
+
+    static void StopNoclip(PlayerController controller, PlayerAvatar avatar, bool forceStanding)
+    {
+        RestoreNoclipPhysics();
+
+        try
+        {
+            if (forceStanding && avatar && avatar.isTumbling() && avatar.tumble())
+                avatar.tumble().TumbleSet(false, false);
+
+            if (s_Noclip.PoseCaptured)
+            {
+                if (controller && controller.GetTransform())
+                {
+                    controller.GetTransform().SetPosition(s_Noclip.OriginPosition);
+                    controller.GetTransform().SetRotation(s_Noclip.OriginRotation);
+                    if (Unity::Rigidbody body = controller.GetComponent<Unity::Rigidbody>())
+                        body.SetVelocity(Unity::Vector3::zero());
+                }
+
+                if (avatar && avatar.GetTransform())
+                {
+                    avatar.GetTransform().SetPosition(s_Noclip.OriginPosition);
+                    avatar.GetTransform().SetRotation(s_Noclip.OriginRotation);
+                    if (Unity::Rigidbody body = avatar.GetComponent<Unity::Rigidbody>())
+                        body.SetVelocity(Unity::Vector3::zero());
+                }
+            }
+        }
+        catch (System::Exception& ex)
+        {
+            System::String message = ex.Message();
+            Hax::LogError(G->Logger, L"Noclip restore: %ls",
+                message != null ? message.ToString().GetRawStringData() : L"Exception without message");
+        }
+
+        s_Noclip.Position = {};
+        s_Noclip.CurrentSpeed = 0.f;
+        s_Noclip.PoseCaptured = false;
+        s_Noclip.WasFlying = false;
+    }
+
     static void Hooked__PlayerController_FixedUpdate(PlayerController __this)
     {
         try
@@ -1261,49 +1356,12 @@ namespace Cheat
             G->PlayerController_FixedUpdate_Hook.unsafe_call<void, PlayerController>(__this);
         }
 
-        struct ColliderState
-        {
-            Unity::Collider Value;
-            bool WasEnabled;
-        };
-
-        static bool s_WasFlying = false;
-        static Hax::Vector<ColliderState> s_ColliderStates;
-        static Unity::Rigidbody s_FlightBody;
-        static bool s_BodyUsedGravity = true;
-        static bool s_BodyDetectedCollisions = true;
-        static bool s_BodyWasKinematic = false;
-
-        auto restorePhysics = [&]()
-        {
-            for (ColliderState& state : s_ColliderStates)
-            {
-                if (state.Value)
-                    state.Value.SetEnabled(state.WasEnabled);
-            }
-
-            s_ColliderStates.Clear();
-
-            if (s_FlightBody)
-            {
-                s_FlightBody.SetIsKinematic(s_BodyWasKinematic);
-                s_FlightBody.SetUseGravity(s_BodyUsedGravity);
-                s_FlightBody.SetDetectCollisions(s_BodyDetectedCollisions);
-                s_FlightBody = null;
-            }
-        };
-
         try
         {
             if (!G->FlightEnabled || !G->IsInGame)
             {
-                if (s_WasFlying)
-                {
-                    restorePhysics();
-                    if (Unity::Rigidbody body = __this.GetComponent<Unity::Rigidbody>())
-                        body.SetVelocity(Unity::Vector3::zero());
-                }
-                s_WasFlying = false;
+                if (s_Noclip.WasFlying || s_Noclip.PoseCaptured)
+                    StopNoclip(__this, PlayerAvatar::instance(), true);
                 return;
             }
 
@@ -1312,18 +1370,29 @@ namespace Cheat
             Unity::Rigidbody body = __this.GetComponent<Unity::Rigidbody>();
             if (!avatar || avatar.deadSet() || avatar.isDisabled() || !camera || !body)
             {
-                restorePhysics();
+                StopNoclip(__this, avatar, true);
                 G->FlightEnabled = false;
-                s_WasFlying = false;
                 return;
             }
 
-            if (!s_FlightBody)
+            if (!s_Noclip.PoseCaptured)
             {
-                s_FlightBody = body;
-                s_BodyUsedGravity = body.GetUseGravity();
-                s_BodyDetectedCollisions = body.GetDetectCollisions();
-                s_BodyWasKinematic = body.GetIsKinematic();
+                if (avatar.isTumbling() && avatar.tumble())
+                    avatar.tumble().TumbleSet(false, false);
+
+                Unity::Transform transform = __this.GetTransform();
+                s_Noclip.OriginPosition = transform.GetPosition();
+                s_Noclip.OriginRotation = transform.GetRotation();
+                s_Noclip.Position = s_Noclip.OriginPosition;
+                s_Noclip.PoseCaptured = true;
+            }
+
+            if (!s_Noclip.Body)
+            {
+                s_Noclip.Body = body;
+                s_Noclip.BodyUsedGravity = body.GetUseGravity();
+                s_Noclip.BodyDetectedCollisions = body.GetDetectCollisions();
+                s_Noclip.BodyWasKinematic = body.GetIsKinematic();
             }
             body.SetUseGravity(false);
             body.SetDetectCollisions(false);
@@ -1337,7 +1406,7 @@ namespace Cheat
                         continue;
 
                     bool alreadyTracked = false;
-                    for (const ColliderState& state : s_ColliderStates)
+                    for (const NoclipColliderState& state : s_Noclip.Colliders)
                     {
                         if (state.Value == collider)
                         {
@@ -1354,7 +1423,7 @@ namespace Cheat
                     else
                     {
                         bool wasEnabled = collider.GetEnabled();
-                        s_ColliderStates.PushBack({collider, wasEnabled});
+                        s_Noclip.Colliders.PushBack({collider, wasEnabled});
                         if (wasEnabled)
                             collider.SetEnabled(false);
                     }
@@ -1363,24 +1432,19 @@ namespace Cheat
             disableColliders(__this);
             disableColliders(avatar);
 
-            s_WasFlying = true;
+            s_Noclip.WasFlying = true;
         }
         catch (System::Exception& ex)
         {
             System::String message = ex.Message();
             Hax::LogError(G->Logger, L"Noclip: %ls", message != null ? message.ToString().GetRawStringData() : L"Exception without message");
-            restorePhysics();
+            StopNoclip(__this, PlayerAvatar::instance(), true);
             G->FlightEnabled = false;
-            s_WasFlying = false;
         }
     }
 
     static void Hooked__PlayerController_Update(PlayerController __this)
     {
-        static bool s_NoclipPositionInitialized = false;
-        static Unity::Vector3 s_NoclipPosition;
-        static float s_NoclipCurrentSpeed = 0.f;
-
         int& jumps = __this.JumpExtra();
         int cachedJumps = jumps;
         if (G->InfJumps)
@@ -1392,8 +1456,8 @@ namespace Cheat
 
         if (!G->FlightEnabled || !G->IsInGame)
         {
-            s_NoclipPositionInitialized = false;
-            s_NoclipCurrentSpeed = 0.f;
+            if (s_Noclip.WasFlying || s_Noclip.PoseCaptured)
+                StopNoclip(__this, PlayerAvatar::instance(), true);
             return;
         }
 
@@ -1405,15 +1469,16 @@ namespace Cheat
             if (!avatar || avatar.deadSet() || avatar.isDisabled() || !camera || !playerTransform)
             {
                 G->FlightEnabled = false;
-                s_NoclipPositionInitialized = false;
-                s_NoclipCurrentSpeed = 0.f;
+                StopNoclip(__this, avatar, true);
                 return;
             }
 
-            if (!s_NoclipPositionInitialized)
+            if (!s_Noclip.PoseCaptured)
             {
-                s_NoclipPosition = playerTransform.GetPosition();
-                s_NoclipPositionInitialized = true;
+                s_Noclip.OriginPosition = playerTransform.GetPosition();
+                s_Noclip.OriginRotation = playerTransform.GetRotation();
+                s_Noclip.Position = s_Noclip.OriginPosition;
+                s_Noclip.PoseCaptured = true;
             }
 
             Unity::Vector3 direction = Unity::Vector3::zero();
@@ -1438,24 +1503,23 @@ namespace Cheat
                     targetSpeed *= (float)G->FlightSprintBoost;
 
                 float dt = Unity::Time::GetDeltaTime();
-                s_NoclipCurrentSpeed = Hax::Lerp(s_NoclipCurrentSpeed, targetSpeed, Hax::Clamp(dt * 8.f, 0.f, 1.f));
-                s_NoclipPosition = s_NoclipPosition + direction.GetNormalized() * s_NoclipCurrentSpeed * dt;
+                s_Noclip.CurrentSpeed = Hax::Lerp(s_Noclip.CurrentSpeed, targetSpeed, Hax::Clamp(dt * 8.f, 0.f, 1.f));
+                s_Noclip.Position = s_Noclip.Position + direction.GetNormalized() * s_Noclip.CurrentSpeed * dt;
             }
             else
             {
                 float dt = Unity::Time::GetDeltaTime();
-                s_NoclipCurrentSpeed = Hax::Lerp(s_NoclipCurrentSpeed, 0.f, Hax::Clamp(dt * 12.f, 0.f, 1.f));
+                s_Noclip.CurrentSpeed = Hax::Lerp(s_Noclip.CurrentSpeed, 0.f, Hax::Clamp(dt * 12.f, 0.f, 1.f));
             }
 
-            playerTransform.SetPosition(s_NoclipPosition);
+            playerTransform.SetPosition(s_Noclip.Position);
         }
         catch (System::Exception& ex)
         {
             System::String message = ex.Message();
             Hax::LogError(G->Logger, L"Noclip position: %ls", message != null ? message.ToString().GetRawStringData() : L"Exception without message");
             G->FlightEnabled = false;
-            s_NoclipPositionInitialized = false;
-            s_NoclipCurrentSpeed = 0.f;
+            StopNoclip(__this, PlayerAvatar::instance(), true);
         }
     }
 
@@ -1463,8 +1527,18 @@ namespace Cheat
     {
         PlayerAvatar player = __this.playerAvatar();
 
-        if (G->FlightEnabled && __this.playerAvatar().isLocal())
+        if (G->FlightEnabled && player && player.isLocal())
+        {
+            if (!isTumbling)
+                return;
+
+            PlayerController controller = PlayerController::instance();
+            G->FlightEnabled = false;
+            StopNoclip(controller, player, true);
+            G->PlayerTumble_TumbleRequest_Hook.unsafe_call<void, PlayerTumble, bool, bool>(
+                __this, true, playerInput);
             return;
+        }
 
         if (!s_ForcedPlayerTumble && !playerInput &&
             (G->GodAllPlayersNoTumble || (G->NoTumble && player.isLocal()) || IsPlayerInRuntimeSlots(player, G->NoTumblePlayers)))
