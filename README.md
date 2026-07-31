@@ -254,8 +254,9 @@ Saved-position slots are intentionally cleared when the game is restarted.
 
 - Controls labelled **Host only** require the master client or single-player mode.
 - Unsafe host-only actions are rejected on clients when session safety is enabled.
+- Host eye lasers use room-owned Photon Blasters, and host gravity uses the game's player impulse RPC. Unmodified clients can therefore see the beams and receive the gravity correction without installing RepoHax. Because the laser carrier is a real game item, stock clients may also see its weapon model and standard effects.
 - Item and object position / rotation changes use the game's existing Photon synchronization where a compatible network component exists.
-- Unity does not replicate arbitrary Transform scale through the game's standard Photon transform stream. Scale changes may therefore remain local unless every peer uses a compatible receiver modification.
+- Unity does not replicate arbitrary Transform scale or edits to non-networked room geometry through the game's standard Photon stream. Those changes remain local on unmodified clients.
 - Local visual options such as FOV, fog, occlusion, flashlight changes, ESP, and chams affect only the local client.
 
 ## Installation

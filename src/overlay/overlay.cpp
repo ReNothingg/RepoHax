@@ -208,9 +208,16 @@ namespace Cheat
 
         if (interactive)
         {
-            if (GizmoKeyJustPressed('W')) G->GodGizmoModeCurrent = GodGizmoMode::Move;
-            if (GizmoKeyJustPressed('E')) G->GodGizmoModeCurrent = GodGizmoMode::Rotate;
-            if (GizmoKeyJustPressed('R')) G->GodGizmoModeCurrent = GodGizmoMode::Scale;
+            auto isGameplayHotkey = [](int vk)
+            {
+                return G->VkToggleFlight == vk || G->VkToggleEyeLasers == vk ||
+                    G->VkTeleportPlayerToCamera == vk || G->VkSpawnItem == vk ||
+                    G->VkDeleteObject == vk || G->VkLockGodTarget == vk;
+            };
+
+            if (!isGameplayHotkey('W') && GizmoKeyJustPressed('W')) G->GodGizmoModeCurrent = GodGizmoMode::Move;
+            if (!isGameplayHotkey('E') && GizmoKeyJustPressed('E')) G->GodGizmoModeCurrent = GodGizmoMode::Rotate;
+            if (!isGameplayHotkey('R') && GizmoKeyJustPressed('R')) G->GodGizmoModeCurrent = GodGizmoMode::Scale;
 
             const Hax::Vector2 boxMin = Hax::Gui::GetViewportCenter() + Hax::Vector2(-155_px, -Hax::Gui::GetViewportSize().Y / 2.f + 18_px);
             const Hax::Vector2 boxMax = boxMin + Hax::Vector2(310_px, 34_px);

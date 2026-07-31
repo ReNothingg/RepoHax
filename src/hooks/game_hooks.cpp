@@ -315,7 +315,6 @@ namespace Cheat
                 if (point && !point.isLocked())
                     return point;
             }
-
             for (Unity::GameObject go : points)
             {
                 if (go)
@@ -2125,6 +2124,7 @@ namespace Cheat
                     ? s_GizmoStartRotation * delta
                     : delta * s_GizmoStartRotation);
             }
+
         }
 
         if (G->GodGizmoDragEndRequested)
@@ -2241,6 +2241,47 @@ namespace Cheat
         states.Clear();
     }
 
+    static void ApplyRemotePlayerGravity()
+    {
+        static uint64_t s_LastUpdate;
+
+        if (!G->IsInGame || G->IsClient || !G->WorldGravityOverride || !SemiFunc::IsMultiplayer())
+        {
+            s_LastUpdate = 0;
+            return;
+        }
+
+        const uint64_t now = ::GetTickCount64();
+        if (!s_LastUpdate)
+        {
+            s_LastUpdate = now;
+            return;
+        }
+
+        const uint64_t elapsedMs = now - s_LastUpdate;
+        if (elapsedMs < 75)
+            return;
+
+        s_LastUpdate = now;
+        const float elapsed = Hax::Clamp((float)elapsedMs / 1000.f, 0.f, 0.25f);
+        const float originalGravityY = s_GravityWasOverridden ? s_OriginalGravity.Y : Unity::Physics::GetGravity().Y;
+        const Unity::Vector3 correction(0.f, ((float)G->WorldGravityY - originalGravityY) * elapsed, 0.f);
+
+        GameDirector director = GameDirector::instance();
+        if (!director || director.PlayerList() == null)
+            return;
+
+        for (PlayerAvatar player : director.PlayerList())
+        {
+            if (!IsPlayerUsable(player) || player.isLocal())
+                continue;
+
+            player.ForceImpulse(correction);
+            if (player.isTumbling() && player.tumble())
+                player.tumble().TumbleForce(correction);
+        }
+    }
+
     static void ProcessWorldGodTools()
     {
         if (G->IsInGame && G->WorldTimeScalePercent != 100)
@@ -2268,6 +2309,8 @@ namespace Cheat
             Unity::Physics::SetGravity(s_OriginalGravity);
             s_GravityWasOverridden = false;
         }
+
+        ApplyRemotePlayerGravity();
 
         // Scene objects are already being destroyed once IsInGame turns false.
         // Never inspect or restore cached Components during that unload window.
@@ -2416,6 +2459,165 @@ namespace Cheat
         }
     }
 
+    struct ExtractionPackingJob
+    {
+        Hax::Vector<ValuableObject> Items;
+        Hax::Vector<BodyState> Bodies;
+        Unity::Bounds Area{};
+        size_t Next{};
+        int Columns{1};
+        int Rows{1};
+        int Layers{1};
+        size_t Moved{};
+        int Failures{};
+        bool Active{};
+    };
+
+    static ExtractionPackingJob s_ExtractionPacking;
+
+    static void ResetExtractionPacking(bool restoreBodies)
+    {
+        if (restoreBodies)
+        {
+            for (BodyState& state : s_ExtractionPacking.Bodies)
+            {
+                try
+                {
+                    if (!state.Body)
+                        continue;
+                    state.Body.SetIsKinematic(state.Kinematic);
+                    state.Body.SetUseGravity(state.UseGravity);
+                }
+                catch (System::Exception&)
+                {
+                    // Extraction may destroy a valuable before the delayed
+                    // restore pass reaches its cached rigidbody.
+                }
+            }
+        }
+
+        s_ExtractionPacking.Items.Clear();
+        s_ExtractionPacking.Bodies.Clear();
+        s_ExtractionPacking = {};
+    }
+
+    static bool StartExtractionPacking(System::List<ValuableObject> valuables)
+    {
+        ResetExtractionPacking(true);
+        if (!GetExtractionPackingBounds(s_ExtractionPacking.Area))
+            return false;
+
+        for (ValuableObject valuable : valuables)
+        {
+            try
+            {
+                if (valuable && valuable.GetEnabled())
+                    s_ExtractionPacking.Items.PushBack(valuable);
+            }
+            catch (System::Exception&)
+            {
+                ++s_ExtractionPacking.Failures;
+            }
+        }
+
+        const int count = (int)s_ExtractionPacking.Items.Size();
+        if (count == 0)
+            return false;
+
+        const Unity::Vector3 size = s_ExtractionPacking.Area.GetSize();
+        const float width = Hax::Max(0.25f, size.X - 0.16f);
+        const float height = Hax::Max(0.25f, size.Y - 0.16f);
+        const float depth = Hax::Max(0.25f, size.Z - 0.16f);
+        const float density = cbrtf((float)count / Hax::Max(0.015625f, width * height * depth));
+
+        s_ExtractionPacking.Columns = Hax::Max(1, (int)ceilf(width * density));
+        s_ExtractionPacking.Rows = Hax::Max(1, (int)ceilf(depth * density));
+        const int perLayer = Hax::Max(1, s_ExtractionPacking.Columns * s_ExtractionPacking.Rows);
+        s_ExtractionPacking.Layers = Hax::Max(1, (count + perLayer - 1) / perLayer);
+        s_ExtractionPacking.Active = true;
+
+        Hax::Log(G->Logger, L"Extraction packing: %d valuables into %dx%dx%d", count,
+            s_ExtractionPacking.Columns, s_ExtractionPacking.Layers, s_ExtractionPacking.Rows);
+        return true;
+    }
+
+    static void ProcessExtractionPacking()
+    {
+        if (!s_ExtractionPacking.Active)
+            return;
+
+        constexpr size_t BatchSize = 32;
+        const Unity::Vector3 areaMin = s_ExtractionPacking.Area.GetMin();
+        const Unity::Vector3 size = s_ExtractionPacking.Area.GetSize();
+        const float padding = 0.08f;
+        const float usableWidth = Hax::Max(0.08f, size.X - padding * 2.f);
+        const float usableHeight = Hax::Max(0.08f, size.Y - padding * 2.f);
+        const float usableDepth = Hax::Max(0.08f, size.Z - padding * 2.f);
+        const int perLayer = Hax::Max(1, s_ExtractionPacking.Columns * s_ExtractionPacking.Rows);
+        const size_t end = Hax::Min(s_ExtractionPacking.Items.Size(), s_ExtractionPacking.Next + BatchSize);
+
+        while (s_ExtractionPacking.Next < end)
+        {
+            const size_t index = s_ExtractionPacking.Next++;
+            ValuableObject valuable = s_ExtractionPacking.Items[index];
+            try
+            {
+                if (!valuable || !valuable.GetEnabled())
+                    continue;
+
+                Unity::Transform transform = valuable.GetTransform();
+                PhysGrabObject phys = valuable.physGrabObject();
+                if (!transform)
+                    continue;
+
+                const int layer = (int)index / perLayer;
+                const int slot = (int)index % perLayer;
+                const int row = slot / s_ExtractionPacking.Columns;
+                const int column = slot % s_ExtractionPacking.Columns;
+
+                // Put each collider centre at a unique point strictly inside the
+                // extraction trigger. The grid becomes denser as loot count grows
+                // instead of collapsing excess layers onto one coordinate.
+                const Unity::Vector3 colliderCenter(
+                    areaMin.X + padding + ((float)column + 0.5f) * usableWidth / (float)s_ExtractionPacking.Columns,
+                    areaMin.Y + padding + ((float)layer + 0.5f) * usableHeight / (float)s_ExtractionPacking.Layers,
+                    areaMin.Z + padding + ((float)row + 0.5f) * usableDepth / (float)s_ExtractionPacking.Rows);
+
+                Unity::Vector3 colliderOffset{};
+                Unity::Collider collider = phys ? phys.GetComponentInChildren<Unity::Collider>() : null;
+                if (collider && collider.GetEnabled())
+                    colliderOffset = collider.GetBounds().Center - transform.GetPosition();
+                const Unity::Vector3 position = colliderCenter - colliderOffset;
+
+                Unity::Rigidbody body = phys ? phys.GetComponent<Unity::Rigidbody>() : null;
+                if (body)
+                {
+                    s_ExtractionPacking.Bodies.PushBack({body, body.GetIsKinematic(), body.GetUseGravity()});
+                    body.SetVelocity(Unity::Vector3::zero());
+                    body.SetUseGravity(false);
+                    body.SetIsKinematic(true);
+                }
+
+                if (phys)
+                    phys.Teleport(position, transform.GetRotation());
+                else
+                    transform.SetPosition(position);
+                ++s_ExtractionPacking.Moved;
+            }
+            catch (System::Exception&)
+            {
+                ++s_ExtractionPacking.Failures;
+            }
+        }
+
+        if (s_ExtractionPacking.Next >= s_ExtractionPacking.Items.Size())
+        {
+            s_ExtractionPacking.Active = false;
+            Hax::Log(G->Logger, L"Extraction packing complete: %zu moved, %d skipped",
+                s_ExtractionPacking.Moved, s_ExtractionPacking.Failures);
+        }
+    }
+
     static void ProcessLootGodTools(PlayerAvatar avatar)
     {
         ValuableDirector director = ValuableDirector::instance();
@@ -2448,108 +2650,19 @@ namespace Cheat
 
         LootGodCommand action = G->LootGodAction;
         G->LootGodAction = LootGodCommand::None;
-        if (action == LootGodCommand::None)
-            return;
 
         if (action == LootGodCommand::BringToExtraction)
         {
-            Unity::Bounds area{};
-            if (!GetExtractionPackingBounds(area))
-                return;
-
-            int valuableCount = 0;
-            float horizontalSpacing = 0.78f;
-            float verticalSpacing = 0.62f;
-            for (ValuableObject valuable : valuables)
-            {
-                if (valuable && valuable.GetEnabled())
-                {
-                    ++valuableCount;
-                    PhysGrabObject phys = valuable.physGrabObject();
-                    Unity::Collider collider = phys ? phys.GetComponentInChildren<Unity::Collider>() : null;
-                    if (collider && collider.GetEnabled())
-                    {
-                        const Unity::Vector3 extents = collider.GetBounds().Extents;
-                        horizontalSpacing = Hax::Max(horizontalSpacing,
-                            Hax::Min(1.25f, Hax::Max(extents.X, extents.Z) * 2.f + 0.14f));
-                        verticalSpacing = Hax::Max(verticalSpacing,
-                            Hax::Min(1.2f, extents.Y * 2.f + 0.12f));
-                    }
-                }
-            }
-            if (valuableCount == 0)
-                return;
-
-            // Build a centered three-dimensional grid from the extraction trigger's
-            // real world bounds. The old code grew rows only along +Z, so every row
-            // after the first few was guaranteed to leave the quota zone.
-            const float edgePadding = 0.32f;
-            const float usableWidth = Hax::Max(0.4f, area.GetSize().X - edgePadding * 2.f);
-            const float usableDepth = Hax::Max(0.4f, area.GetSize().Z - edgePadding * 2.f);
-            const int columns = Hax::Clamp((int)(usableWidth / horizontalSpacing) + 1, 1, 7);
-            const int rows = Hax::Clamp((int)(usableDepth / horizontalSpacing) + 1, 1, 7);
-            const int perLayer = Hax::Max(1, columns * rows);
-            const int layers = Hax::Max(1, (valuableCount + perLayer - 1) / perLayer);
-            const float stepX = columns > 1 ? Hax::Min(horizontalSpacing, usableWidth / (float)(columns - 1)) : 0.f;
-            const float stepZ = rows > 1 ? Hax::Min(horizontalSpacing, usableDepth / (float)(rows - 1)) : 0.f;
-            const float usableHeight = Hax::Max(0.65f, area.GetSize().Y - 0.3f);
-            const float stepY = Hax::Min(verticalSpacing, Hax::Max(0.58f, usableHeight / (float)layers));
-            const Unity::Vector3 areaMin = area.GetMin();
-            const Unity::Vector3 areaMax = area.GetMax();
-
-            int index = 0;
-            for (ValuableObject valuable : valuables)
-            {
-                if (!valuable || !valuable.GetEnabled())
-                    continue;
-
-                Unity::Transform transform = valuable.GetTransform();
-                PhysGrabObject phys = valuable.physGrabObject();
-                Unity::Rigidbody body = phys ? phys.GetComponent<Unity::Rigidbody>() : null;
-
-                const int layer = index / perLayer;
-                const int slot = index % perLayer;
-                const int row = slot / columns;
-                const int column = slot % columns;
-
-                Unity::Vector3 colliderOffset{};
-                Unity::Vector3 objectExtents(0.22f, 0.22f, 0.22f);
-                Unity::Collider objectCollider = phys ? phys.GetComponentInChildren<Unity::Collider>() : null;
-                if (objectCollider && objectCollider.GetEnabled())
-                {
-                    const Unity::Bounds objectBounds = objectCollider.GetBounds();
-                    objectExtents = objectBounds.Extents;
-                    colliderOffset = objectBounds.Center - transform.GetPosition();
-                }
-
-                float centerX = area.Center.X + ((float)column - (float)(columns - 1) * 0.5f) * stepX;
-                float centerZ = area.Center.Z + ((float)row - (float)(rows - 1) * 0.5f) * stepZ;
-
-                // Keep the measured collider inside the trigger whenever its size
-                // permits it. Oversized valuables are centered, which still gives
-                // the trigger the largest possible overlap.
-                const float safeHalfX = Hax::Min(objectExtents.X + 0.06f, Hax::Max(0.08f, area.Extents.X - 0.06f));
-                const float safeHalfZ = Hax::Min(objectExtents.Z + 0.06f, Hax::Max(0.08f, area.Extents.Z - 0.06f));
-                centerX = Hax::Clamp(centerX, areaMin.X + safeHalfX, areaMax.X - safeHalfX);
-                centerZ = Hax::Clamp(centerZ, areaMin.Z + safeHalfZ, areaMax.Z - safeHalfZ);
-
-                float centerY = areaMin.Y + 0.12f + objectExtents.Y + (float)layer * stepY;
-                const float maxCenterY = areaMax.Y - Hax::Min(objectExtents.Y, Hax::Max(0.08f, area.Extents.Y - 0.06f));
-                centerY = Hax::Min(centerY, maxCenterY);
-
-                const Unity::Vector3 position = Unity::Vector3(centerX, centerY, centerZ) - colliderOffset;
-                if (body)
-                    body.SetVelocity(Unity::Vector3::zero());
-                if (phys)
-                    phys.Teleport(position, transform.GetRotation());
-                else
-                    transform.SetPosition(position);
-                if (body)
-                    body.SetVelocity(Unity::Vector3::zero());
-                ++index;
-            }
+            StartExtractionPacking(valuables);
+            ProcessExtractionPacking();
             return;
         }
+
+        if (s_ExtractionPacking.Active && action != LootGodCommand::None)
+            ResetExtractionPacking(true);
+        ProcessExtractionPacking();
+        if (action == LootGodCommand::None)
+            return;
 
         Unity::Vector3 target{};
         bool hasTarget = false;
@@ -2747,6 +2860,7 @@ namespace Cheat
     {
         if (!G->IsInGame)
         {
+            ResetExtractionPacking(false);
             DiscardGodSceneReferences();
             G->GodTargetingEnabled = false;
             G->WorldFreezePhysics = false;
@@ -2775,6 +2889,7 @@ namespace Cheat
         SemiLaser Template = null;
         SemiLaser Left = null;
         SemiLaser Right = null;
+        Item NetworkItem = null;
         bool SearchFailureLogged;
     };
 
@@ -2799,6 +2914,7 @@ namespace Cheat
             if (gunLaser && gunLaser.semiLaser())
             {
                 Hax::Log(G->Logger, L"Eye lasers: using game prefab from %ls", item.itemName().GetRawStringData());
+                s_EyeLaserPrefab.NetworkItem = item;
                 return gunLaser.semiLaser();
             }
         }
@@ -2856,10 +2972,132 @@ namespace Cheat
         hurt.playerCausingHurtOverride() = avatar;
     }
 
+    struct NetworkEyeLaserCarrier
+    {
+        Unity::GameObject Object = null;
+        PhysGrabObject Phys = null;
+        ItemGun Gun = null;
+        ItemGunLaser GunLaser = null;
+        ItemBattery Battery = null;
+        Unity::Vector3 MuzzleOffset{};
+        Unity::Quaternion MuzzleRotationOffset = Unity::Quaternion::identity();
+        uint64_t ReadyAt{};
+    };
+
+    static NetworkEyeLaserCarrier s_LeftNetworkEyeLaser;
+    static NetworkEyeLaserCarrier s_RightNetworkEyeLaser;
+
+    static void DestroyLocalEyeLasers()
+    {
+        if (s_EyeLaserPrefab.Left)
+            Unity::Object::Destroy(s_EyeLaserPrefab.Left.GetGameObject());
+        if (s_EyeLaserPrefab.Right)
+            Unity::Object::Destroy(s_EyeLaserPrefab.Right.GetGameObject());
+        s_EyeLaserPrefab.Left = null;
+        s_EyeLaserPrefab.Right = null;
+    }
+
+    static void DestroyNetworkEyeLaser(NetworkEyeLaserCarrier& carrier)
+    {
+        if (carrier.Object && G->IsInGame && !G->IsClient && SemiFunc::IsMultiplayer())
+            Unity::Photon::PhotonNetwork::Destroy(carrier.Object);
+        carrier = {};
+    }
+
+    static void DestroyNetworkEyeLasers()
+    {
+        DestroyNetworkEyeLaser(s_LeftNetworkEyeLaser);
+        DestroyNetworkEyeLaser(s_RightNetworkEyeLaser);
+    }
+
+    static bool CreateNetworkEyeLaser(NetworkEyeLaserCarrier& carrier, const Unity::Vector3& position)
+    {
+        if (!s_EyeLaserPrefab.NetworkItem || s_EyeLaserPrefab.NetworkItem.prefab() == null)
+            return false;
+
+        carrier.Object = Unity::Photon::PhotonNetwork::InstantiateRoomObject(
+            s_EyeLaserPrefab.NetworkItem.prefab().resourcePath(), position, Unity::Quaternion::identity());
+        if (!carrier.Object)
+            return false;
+
+        carrier.Phys = carrier.Object.GetComponent<PhysGrabObject>();
+        if (!carrier.Phys)
+            carrier.Phys = carrier.Object.GetTransform().GetComponentInChildren<PhysGrabObject>();
+        carrier.Gun = carrier.Object.GetComponent<ItemGun>();
+        if (!carrier.Gun)
+            carrier.Gun = carrier.Object.GetTransform().GetComponentInChildren<ItemGun>();
+        carrier.GunLaser = carrier.Object.GetComponent<ItemGunLaser>();
+        if (!carrier.GunLaser)
+            carrier.GunLaser = carrier.Object.GetTransform().GetComponentInChildren<ItemGunLaser>();
+
+        if (!carrier.Phys || !carrier.Gun || !carrier.GunLaser || !carrier.GunLaser.muzzleTransform())
+        {
+            DestroyNetworkEyeLaser(carrier);
+            return false;
+        }
+
+        carrier.Battery = carrier.Gun.itemBattery();
+        Unity::Transform root = carrier.Object.GetTransform();
+        Unity::Transform muzzle = carrier.GunLaser.muzzleTransform();
+        carrier.MuzzleOffset = muzzle.GetPosition() - root.GetPosition();
+        carrier.MuzzleRotationOffset = muzzle.GetRotation();
+        carrier.ReadyAt = ::GetTickCount64() + 500;
+        return true;
+    }
+
+    static bool EnsureNetworkEyeLasers(const Unity::Vector3& leftEye, const Unity::Vector3& rightEye)
+    {
+        if (!s_LeftNetworkEyeLaser.Object && !CreateNetworkEyeLaser(s_LeftNetworkEyeLaser, leftEye))
+            return false;
+        if (!s_RightNetworkEyeLaser.Object && !CreateNetworkEyeLaser(s_RightNetworkEyeLaser, rightEye))
+        {
+            DestroyNetworkEyeLaser(s_LeftNetworkEyeLaser);
+            return false;
+        }
+        return true;
+    }
+
+    static Unity::Quaternion InverseUnitQuaternion(const Unity::Quaternion& value)
+    {
+        const float squaredLength = value.X * value.X + value.Y * value.Y + value.Z * value.Z + value.W * value.W;
+        if (squaredLength <= 0.000001f)
+            return Unity::Quaternion::identity();
+        const float inverseLength = 1.f / squaredLength;
+        return Unity::Quaternion(-value.X * inverseLength, -value.Y * inverseLength,
+            -value.Z * inverseLength, value.W * inverseLength);
+    }
+
+    static void UpdateNetworkEyeLaser(NetworkEyeLaserCarrier& carrier, const Unity::Vector3& eye,
+        const Unity::Quaternion& muzzleRotation, PlayerAvatar avatar)
+    {
+        if (!carrier.Object || !carrier.Phys || !carrier.Gun || !carrier.GunLaser)
+            return;
+        if (::GetTickCount64() < carrier.ReadyAt)
+            return;
+
+        const Unity::Quaternion rootRotation = muzzleRotation * InverseUnitQuaternion(carrier.MuzzleRotationOffset);
+        const Unity::Vector3 rootPosition = eye - rootRotation * carrier.MuzzleOffset;
+        carrier.Phys.Teleport(rootPosition, rootRotation);
+
+        carrier.Gun.gunRange() = (float)G->EyeLaserRange;
+        ConfigureEyeLaserDamage(carrier.GunLaser.semiLaser(), avatar);
+
+        if (carrier.Battery && carrier.Battery.batteryLifeInt() <= 1)
+            carrier.Battery.BatteryFullPercentChange(carrier.Battery.batteryBars(), true);
+
+        if (carrier.Gun.stateCurrent() != 3 && carrier.Gun.photonView())
+        {
+            System::Array<System::Object> parameters = { System::Int32(3) };
+            carrier.Gun.photonView().RPC(System::String::New("StateSetRPC"), Unity::Photon::RpcTarget::All, parameters);
+        }
+    }
+
     static void UpdateEyeLasers()
     {
+        const wchar_t* stage = L"startup";
         try
         {
+            stage = L"prefab lookup";
             if (!s_EyeLaserPrefab.Template && !G->ItemsPool.Empty())
                 s_EyeLaserPrefab.Template = FindEyeLaserTemplate();
 
@@ -2873,10 +3111,15 @@ namespace Cheat
                 return;
             }
 
-            if (!G->EyeLasersEnabled || !G->IsInGame || G->MenuVisible)
-                return;
-
             PlayerAvatar avatar = PlayerAvatar::instance();
+            if (!G->EyeLasersEnabled || !G->IsInGame || G->MenuVisible)
+            {
+                stage = L"network cleanup";
+                DestroyNetworkEyeLasers();
+                return;
+            }
+
+            stage = L"camera pose";
             Unity::Camera camera = SemiFunc::MainCamera();
             if (!IsPlayerUsable(avatar) || !camera)
                 return;
@@ -2892,6 +3135,26 @@ namespace Cheat
             Unity::Vector3 eyeCenter = rayOrigin + forward * 0.16f - up * 0.025f;
             Unity::Vector3 leftEye = eyeCenter - right * 0.055f;
             Unity::Vector3 rightEye = eyeCenter + right * 0.055f;
+
+            // A room-owned Photon Blaster is understood by stock clients: its
+            // native transform stream and ItemGun state RPC make the game itself
+            // draw the beams. No RepoHax receiver is needed on other players.
+            if (SemiFunc::IsMultiplayer() && !G->IsClient)
+            {
+                stage = L"local cleanup";
+                DestroyLocalEyeLasers();
+                stage = L"network spawn";
+                if (!EnsureNetworkEyeLasers(leftEye, rightEye))
+                    return;
+
+                stage = L"left network update";
+                UpdateNetworkEyeLaser(s_LeftNetworkEyeLaser, leftEye, rotation, avatar);
+                stage = L"right network update";
+                UpdateNetworkEyeLaser(s_RightNetworkEyeLaser, rightEye, rotation, avatar);
+                return;
+            }
+
+            DestroyNetworkEyeLasers();
 
             if (!s_EyeLaserPrefab.Left)
                 s_EyeLaserPrefab.Left = CreateEyeLaserFromPrefab(s_EyeLaserPrefab.Template, leftEye);
@@ -2942,7 +3205,8 @@ namespace Cheat
         catch (System::Exception& ex)
         {
             System::String message = ex.Message();
-            Hax::LogError(G->Logger, L"Eye laser prefab: %ls", message != null ? message.ToString().GetRawStringData() : L"Exception without message");
+            Hax::LogError(G->Logger, L"Eye lasers (%ls): %ls", stage,
+                message != null ? message.ToString().GetRawStringData() : L"Exception without message");
             G->EyeLasersEnabled = false;
         }
     }

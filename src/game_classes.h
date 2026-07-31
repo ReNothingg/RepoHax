@@ -74,6 +74,12 @@ struct PlayerAvatar : Unity::MonoBehaviour
         s_Revive.Call<void>(*this, revivedByTruck);
     }
 
+    void ForceImpulse(const Unity::Vector3& force)
+    {
+        THROW_IF_NULL();
+        s_ForceImpulse.Call<void>(*this, System::Box(force));
+    }
+
     STATIC_FIELD(instance, PlayerAvatar);
     FIELD(playerHealth, PlayerHealth);
     FIELD(isLocal, bool);
@@ -88,6 +94,7 @@ struct PlayerAvatar : Unity::MonoBehaviour
     FIELD(upgradeMapPlayerCount, int);
     FIELD(isCrouching, bool);
     FIELD(isDisabled, bool);
+    FIELD(isTumbling, bool);
     FIELD(spectatePoint, Unity::Transform);
     FIELD(mapToolController, MapToolController);
     FIELD(playerTransform, Unity::Transform);
@@ -97,6 +104,7 @@ struct PlayerAvatar : Unity::MonoBehaviour
     METHOD_WRAPPER(OnDestroy);
     METHOD_WRAPPER(PlayerDeath);
     METHOD_WRAPPER(Revive);
+    METHOD_WRAPPER(ForceImpulse);
 };
 
 struct PlayerVoiceChat : Unity::MonoBehaviour
@@ -149,10 +157,17 @@ struct PlayerTumble : Unity::MonoBehaviour
         s_TumbleRequest.Call<void, PlayerTumble, bool, bool>(*this, _isTumbling, _playerInput); 
     }
 
+    void TumbleForce(const Unity::Vector3& force)
+    {
+        THROW_IF_NULL();
+        s_TumbleForce.Call<void>(*this, System::Box(force));
+    }
+
     FIELD(tumbleLaunch, int);
     FIELD(playerAvatar, PlayerAvatar);
 
     METHOD_WRAPPER(TumbleRequest);
+    METHOD_WRAPPER(TumbleForce);
 };
 
 struct FlashlightController : Unity::MonoBehaviour
@@ -802,6 +817,9 @@ struct ItemGun : Unity::MonoBehaviour
     FIELD(physGrabObject, PhysGrabObject);
     FIELD(gunMuzzle, Unity::Transform);
     FIELD(gunRange, float);
+    FIELD(itemBattery, ItemBattery);
+    FIELD(photonView, Unity::Photon::PhotonView);
+    FIELD(stateCurrent, int);
 
     METHOD_WRAPPER(Shoot);
     METHOD_WRAPPER(Update);
