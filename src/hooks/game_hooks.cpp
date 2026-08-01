@@ -70,6 +70,8 @@ namespace Cheat
 
     static bool s_ForcedPlayerDeath;
     static bool s_ForcedPlayerTumble;
+    static bool s_RerollingRunLevel;
+    static Level s_RunLevelToAvoid = null;
 
     void HookMonoRuntimeInvoke()
     {
@@ -590,7 +592,14 @@ namespace Cheat
             else
             {
                 G->FlightEnabled = false;
-                manager.RestartScene();
+                // ChangeLevelType::RunLevel (1) runs SetRunLevel, broadcasts the
+                // selected level through the game's buffered RPC, then reloads
+                // the scene without counting the current level as completed.
+                s_RerollingRunLevel = true;
+                s_RunLevelToAvoid = manager.levelCurrent();
+                manager.ChangeLevel(false, false, 1);
+                s_RerollingRunLevel = false;
+                s_RunLevelToAvoid = null;
                 SetSessionAction(G->Loc[LocKey_ActionReloadRequested]);
             }
         }
@@ -1286,6 +1295,16 @@ namespace Cheat
 
     static void StopNoclip(PlayerController controller, PlayerAvatar avatar, bool forceStanding)
     {
+        Unity::Vector3 exitPosition = s_Noclip.Position;
+        try
+        {
+            if (controller && controller.GetTransform())
+                exitPosition = controller.GetTransform().GetPosition();
+        }
+        catch (System::Exception&)
+        {
+        }
+
         RestoreNoclipPhysics();
 
         try
@@ -1297,16 +1316,17 @@ namespace Cheat
             {
                 if (controller && controller.GetTransform())
                 {
-                    controller.GetTransform().SetPosition(s_Noclip.OriginPosition);
-                    controller.GetTransform().SetRotation(s_Noclip.OriginRotation);
+                    // Leaving noclip must keep the place reached in flight. The
+                    // old origin restore caused an unexpected teleport all the
+                    // way back to where noclip had been enabled.
+                    controller.GetTransform().SetPosition(exitPosition);
                     if (Unity::Rigidbody body = controller.GetComponent<Unity::Rigidbody>())
                         body.SetVelocity(Unity::Vector3::zero());
                 }
 
                 if (avatar && avatar.GetTransform())
                 {
-                    avatar.GetTransform().SetPosition(s_Noclip.OriginPosition);
-                    avatar.GetTransform().SetRotation(s_Noclip.OriginRotation);
+                    avatar.GetTransform().SetPosition(exitPosition);
                     if (Unity::Rigidbody body = avatar.GetComponent<Unity::Rigidbody>())
                         body.SetVelocity(Unity::Vector3::zero());
                 }
@@ -2623,7 +2643,7 @@ namespace Cheat
         constexpr size_t BatchSize = 32;
         const Unity::Vector3 areaMin = s_ExtractionPacking.Area.GetMin();
         const Unity::Vector3 size = s_ExtractionPacking.Area.GetSize();
-        const float padding = 0.08f;
+        const float padding = 0.12f;
         const float usableWidth = Hax::Max(0.08f, size.X - padding * 2.f);
         const float usableHeight = Hax::Max(0.08f, size.Y - padding * 2.f);
         const float usableDepth = Hax::Max(0.08f, size.Z - padding * 2.f);
@@ -2652,15 +2672,50 @@ namespace Cheat
                 // Put each collider centre at a unique point strictly inside the
                 // extraction trigger. The grid becomes denser as loot count grows
                 // instead of collapsing excess layers onto one coordinate.
-                const Unity::Vector3 colliderCenter(
+                Unity::Vector3 colliderCenter(
                     areaMin.X + padding + ((float)column + 0.5f) * usableWidth / (float)s_ExtractionPacking.Columns,
                     areaMin.Y + padding + ((float)layer + 0.5f) * usableHeight / (float)s_ExtractionPacking.Layers,
                     areaMin.Z + padding + ((float)row + 0.5f) * usableDepth / (float)s_ExtractionPacking.Rows);
 
                 Unity::Vector3 colliderOffset{};
-                Unity::Collider collider = phys ? phys.GetComponentInChildren<Unity::Collider>() : null;
-                if (collider && collider.GetEnabled())
-                    colliderOffset = collider.GetBounds().Center - transform.GetPosition();
+                Unity::Vector3 colliderExtents{};
+                bool hasColliderBounds = false;
+                Unity::Bounds colliderBounds{};
+                if (phys)
+                {
+                    for (Unity::Collider collider : phys.GetComponentsInChildren<Unity::Collider>(true))
+                    {
+                        if (!collider || !collider.GetEnabled())
+                            continue;
+
+                        Unity::Bounds bounds = collider.GetBounds();
+                        if (!hasColliderBounds)
+                        {
+                            colliderBounds = bounds;
+                            hasColliderBounds = true;
+                        }
+                        else
+                            colliderBounds.Encapsulate(bounds);
+                    }
+                }
+
+                if (hasColliderBounds)
+                {
+                    colliderOffset = colliderBounds.Center - transform.GetPosition();
+                    colliderExtents = colliderBounds.Extents;
+
+                    const Unity::Vector3 areaMax = s_ExtractionPacking.Area.GetMax();
+                    const float minX = areaMin.X + padding + colliderExtents.X;
+                    const float maxX = areaMax.X - padding - colliderExtents.X;
+                    const float minY = areaMin.Y + padding + colliderExtents.Y;
+                    const float maxY = areaMax.Y - padding - colliderExtents.Y;
+                    const float minZ = areaMin.Z + padding + colliderExtents.Z;
+                    const float maxZ = areaMax.Z - padding - colliderExtents.Z;
+
+                    colliderCenter.X = minX <= maxX ? Hax::Clamp(colliderCenter.X, minX, maxX) : s_ExtractionPacking.Area.Center.X;
+                    colliderCenter.Y = minY <= maxY ? Hax::Clamp(colliderCenter.Y, minY, maxY) : s_ExtractionPacking.Area.Center.Y;
+                    colliderCenter.Z = minZ <= maxZ ? Hax::Clamp(colliderCenter.Z, minZ, maxZ) : s_ExtractionPacking.Area.Center.Z;
+                }
                 const Unity::Vector3 position = colliderCenter - colliderOffset;
 
                 Unity::Rigidbody body = phys ? phys.GetComponent<Unity::Rigidbody>() : null;
@@ -3755,16 +3810,53 @@ namespace Cheat
         {
             if (G->LevelBans.Size() > 0)
             {
-                List<Level> levels = RunManager::instance().levels();
+                List<Level> levels = __this.levels();
+                Level levelToAvoid = s_RerollingRunLevel ? s_RunLevelToAvoid : __this.previousRunLevel();
+                s_RerollingRunLevel = false;
+                s_RunLevelToAvoid = null;
 
-                LevelBan* levelBan = &G->LevelBans[0];
-                Level prevLevel = __this.previousRunLevel();
+                int candidateCount = 0;
+                for (const LevelBan& ban : G->LevelBans)
+                {
+                    if (!ban.Allowed || ban.Index < 0 || ban.Index >= levels.Count())
+                        continue;
 
-                while (!levelBan->Allowed || ((G->LevelBans.Size() - G->TotalBans) > 1 && prevLevel && levels[levelBan->Index] == prevLevel))
-                    levelBan = &G->LevelBans[rand() % G->LevelBans.Size()];
+                    Level level = levels[ban.Index];
+                    if (level && (!levelToAvoid || level != levelToAvoid))
+                        ++candidateCount;
+                }
 
-                __this.levelCurrent() = levels[levelBan->Index];
-                return;
+                // If the filter leaves only the current map enabled, using it is
+                // preferable to bypassing the filter or looping forever.
+                if (candidateCount == 0)
+                {
+                    levelToAvoid = null;
+                    for (const LevelBan& ban : G->LevelBans)
+                    {
+                        if (ban.Allowed && ban.Index >= 0 && ban.Index < levels.Count() && levels[ban.Index])
+                            ++candidateCount;
+                    }
+                }
+
+                if (candidateCount > 0)
+                {
+                    int selectedCandidate = rand() % candidateCount;
+                    for (const LevelBan& ban : G->LevelBans)
+                    {
+                        if (!ban.Allowed || ban.Index < 0 || ban.Index >= levels.Count())
+                            continue;
+
+                        Level level = levels[ban.Index];
+                        if (!level || (levelToAvoid && level == levelToAvoid))
+                            continue;
+
+                        if (selectedCandidate-- == 0)
+                        {
+                            __this.levelCurrent() = level;
+                            return;
+                        }
+                    }
+                }
             }
         }
         catch (Exception& ex)
@@ -3772,6 +3864,9 @@ namespace Cheat
             String message = ex.Message();
             Hax::LogError(G->Logger, L"%d: %ls", __LINE__, message != null ? message.ToString().GetRawStringData() : L"Exception without message");
         }
+
+        s_RerollingRunLevel = false;
+        s_RunLevelToAvoid = null;
 
         G->RunManager_SetRunLevel_Hook.unsafe_call<void, RunManager>(__this);
     }

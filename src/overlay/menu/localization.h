@@ -270,7 +270,7 @@ X(LocKey_ActionCurrencyChangedFmt, L"Balance changed: $%dK", L"Баланс из
 X(LocKey_ActionCurrencyHostOnly, L"Balance change skipped: host only", L"Изменение баланса пропущено: только хост") \
 X(LocKey_ActionCurrencyNotReady, L"Balance change failed: run stats are not ready", L"Баланс не изменён: статистика забега не готова") \
 X(LocKey_SaveNow, L"Save now", L"Сохранить сейчас") \
-X(LocKey_ReloadLevel, L"Reload level", L"Перезагрузить уровень") \
+X(LocKey_ReloadLevel, L"Restart with a new map", L"Перезапустить с новой картой") \
 X(LocKey_UnlockExtractionPoints, L"Unlock extraction points", L"Открыть точки сбора") \
 X(LocKey_WorldSessionStatus, L"WORLD / SESSION STATUS", L"СТАТУС МИРА / СЕССИИ") \
 X(LocKey_WorldSessionTools, L"WORLD / SESSION TOOLS", L"ИНСТРУМЕНТЫ МИРА / СЕССИИ") \
@@ -286,9 +286,9 @@ X(LocKey_ActionSafetyReset, L"Safety reset applied", L"Защитный сбро
 X(LocKey_ActionUnsafeCancelled, L"Unsafe host-only action cancelled on client", L"Опасное host-only действие отменено на клиенте") \
 X(LocKey_ActionSaveDone, L"Save completed", L"Сохранение выполнено") \
 X(LocKey_ActionSaveFailedStats, L"Save failed: StatsManager is not ready", L"Сохранение не выполнено: StatsManager не готов") \
-X(LocKey_ActionReloadNotInGame, L"Reload skipped: not in game", L"Перезагрузка пропущена: вы не в игре") \
-X(LocKey_ActionReloadHostOnly, L"Reload skipped: host only", L"Перезагрузка пропущена: только хост") \
-X(LocKey_ActionReloadRequested, L"Level reload requested", L"Перезагрузка уровня запрошена") \
+X(LocKey_ActionReloadNotInGame, L"Map reroll skipped: not in game", L"Смена карты пропущена: вы не в игре") \
+X(LocKey_ActionReloadHostOnly, L"Map reroll skipped: host only", L"Смена карты пропущена: только хост") \
+X(LocKey_ActionReloadRequested, L"Restart with a new map requested", L"Перезапуск с новой картой запрошен") \
 X(LocKey_ActionExtractionNotReady, L"Extraction unlock skipped: round is not ready", L"Открытие точек сбора пропущено: раунд не готов") \
 X(LocKey_ActionExtractionHostOnly, L"Extraction unlock skipped: host only", L"Открытие точек сбора пропущено: только хост") \
 X(LocKey_ActionExtractionUnlocked, L"Extraction points unlocked", L"Точки сбора открыты") \
