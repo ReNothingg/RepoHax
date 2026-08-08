@@ -789,6 +789,7 @@ struct ValuableObject : Unity::MonoBehaviour
 
     FIELD(physGrabObject, PhysGrabObject);
     FIELD(dollarValueCurrent, float);
+    FIELD(dollarValueOverride, int);
 
 private:
     METHOD_WRAPPER(Discover);
@@ -883,6 +884,18 @@ struct StatsManager : Unity::MonoBehaviour
     METHOD_WRAPPER(LoadItemsFromFolder);
 private:
     METHOD_WRAPPER(SaveFileSave);
+};
+
+struct AssetManager : Unity::MonoBehaviour
+{
+    using Unity::MonoBehaviour::MonoBehaviour;
+
+    META("Assembly-CSharp", "", "AssetManager");
+
+    STATIC_FIELD(instance, AssetManager);
+    FIELD(surplusValuableSmall, Unity::GameObject);
+    FIELD(surplusValuableMedium, Unity::GameObject);
+    FIELD(surplusValuableBig, Unity::GameObject);
 };
 
 struct PunManager : Unity::MonoBehaviour

@@ -315,6 +315,8 @@ namespace Cheat
         int                                 CurrentQuota;
         int                                 QuotaTarget = 10000;
         bool                                QuotaApplyRequested;
+        int                                 SurplusBagAmount = 5000;
+        bool                                SurplusBagSpawnRequested;
         TeleportQuickAction                 TeleportAction = TeleportQuickAction::None;
         PlayerAvatar                        SelectedTeleportPlayer = null;
         int                                 SavePositionSlot = -1;

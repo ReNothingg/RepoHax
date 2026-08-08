@@ -12,6 +12,31 @@ namespace Cheat
 {
     static PlayerAvatar s_SelectedPlayer;
 
+    static Hax::WStringView LocalizedEnemyName(Hax::WStringView name)
+    {
+        if (G->Language != Lang_Ru)
+            return name;
+
+        struct EnemyName { Hax::WStringView English; Hax::WStringView Russian; };
+        static constexpr EnemyName names[] =
+        {
+            {L"Animal", L"Зверь"}, {L"Beamer", L"Лучевик"}, {L"Birthday Boy", L"Именинник"},
+            {L"Bomb Thrower", L"Подрывник"}, {L"Bowtie", L"Бабочка"}, {L"Ceiling Eye", L"Потолочный глаз"},
+            {L"Duck", L"Утка"}, {L"Elsa", L"Эльза"}, {L"Floater", L"Парящий"},
+            {L"Head Grabber", L"Головохват"}, {L"Heart Hugger", L"Сердцеед"}, {L"Hidden", L"Невидимка"},
+            {L"Hunter", L"Охотник"}, {L"Oogly", L"Глазастик"}, {L"Robe", L"Мантия"},
+            {L"Runner", L"Бегун"}, {L"Shadow", L"Тень"}, {L"Slow Mouth", L"Пасть"},
+            {L"Slow Walker", L"Тихоход"}, {L"Spinny", L"Крутилка"}, {L"Thin Man", L"Тонкий человек"},
+            {L"Tick", L"Клещ"}, {L"Tricycle", L"Трёхколёсник"}, {L"Tumbler", L"Кувыркун"},
+            {L"Upscream", L"Крикун"}, {L"Valuable Thrower", L"Метатель ценностей"}
+        };
+
+        for (const EnemyName& entry : names)
+            if (name == entry.English)
+                return entry.Russian;
+        return name;
+    }
+
     static bool PlayerInSlots(PlayerAvatar player, PlayerAvatar (&slots)[16])
     {
         if (!player)
@@ -87,7 +112,7 @@ namespace Cheat
                     {
                         Hax::WStringView view = L"-";
                         if (G->SelectedEnemySetup < G->EnemiesPool.Size())
-                            view = G->EnemiesPool.begin()[G->SelectedEnemySetup].key;
+                            view = LocalizedEnemyName(G->EnemiesPool.begin()[G->SelectedEnemySetup].key);
 
                         if (DropdownBtn(LINE_ID, view, dropListW))
                             OpenPopup(dropListId, Hax::Gui::GetCursorPos());
@@ -99,7 +124,7 @@ namespace Cheat
                         float w = Hax::Gui::GetContentRegionAvail().X;
                         for (size_t i = 0; i < G->EnemiesPool.Size(); ++i)
                         {
-                            if (Selectable(LINE_ID + i * 10000, G->EnemiesPool.begin()[i].key,
+                            if (Selectable(LINE_ID + i * 10000, LocalizedEnemyName(G->EnemiesPool.begin()[i].key),
                                 G->SelectedEnemySetup == i, { .MinW = w }))
                             {
                                 G->SelectedEnemySetup = i;
@@ -120,10 +145,11 @@ namespace Cheat
                 ToggleEx(LINE_ID, G->NoGrabMaxTime, G->Loc[LocKey_NoGrabLimit], G->Loc[LocKey_AvailableIfHost], { .Disabled = G->IsClient });
                 HorizontalLine(1_px);
                 ToggleEx(LINE_ID, G->EnemiesEsp, G->Loc[LocKey_DisplayThroughWalls]);
+
+                HorizontalLine(1_px);
+                DrawEnemyDirectorControls();
             }
             EndPanel();
-
-            DrawEnemyDirectorPanel();
         }
         Hax::Gui::Dummy({ 0.f, 0.f });
         Hax::Gui::EndVertical();

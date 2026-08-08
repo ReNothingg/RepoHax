@@ -10,10 +10,10 @@
 
 namespace Cheat
 {
-    static void StatusLine(Hax::WStringView name, Hax::WStringView value, Hax::Gui::Color valueColor = 0xD8DCE5FF)
+    static void StatusLine(Hax::WStringView name, Hax::WStringView value, Hax::Gui::Color valueColor = 0xD8D0ACFF)
     {
         Hax::Gui::BeginHorizontal();
-        MainLabel(name, 0x8D96A8FF);
+        MainLabel(name, 0x978D67FF);
         const Hax::Vector2 valueSize = CalcMainLabelSize(value);
         Hax::Gui::Space(Hax::Max(0.f, Hax::Gui::GetContentRegionAvail().X - valueSize.X));
         MainLabel(value, valueColor);
@@ -95,31 +95,34 @@ namespace Cheat
         EndPanel();
     }
 
-    void DrawEnemyDirectorPanel()
+    void DrawEnemyDirectorControls()
     {
         const bool host = G->IsInGame && !G->IsClient;
+        if (ToggleEx(LINE_ID, G->GodEnemiesPacified, G->Loc[LocKey_PacifyEnemies], G->Loc[LocKey_HostOnly], {.Disabled = !host}))
+            G->GodEnemiesPacifiedChanged = true;
+        HorizontalLine(1_px);
+        const bool frozenBefore = G->GodEnemiesFrozen;
+        if (ToggleEx(LINE_ID, G->GodEnemiesFrozen, G->Loc[LocKey_FreezeEnemies], G->Loc[LocKey_HostOnly], {.Disabled = !host}) && frozenBefore != G->GodEnemiesFrozen)
+            G->GodEnemiesFreezeChanged = true;
+
+        if (Button(LINE_ID, G->Loc[LocKey_GatherEnemies], {}, {.Enabled = host, .MinW = Hax::Gui::GetContentRegionAvail().X}))
+            G->EnemyGodAction = EnemyGodCommand::Gather;
+
+        const float gap = 5_px;
+        const float half = (Hax::Gui::GetContentRegionAvail().X - gap) / 2.f;
+        Hax::Gui::BeginHorizontal(gap);
+        if (Button(LINE_ID, G->Loc[LocKey_KillAllEnemies], {}, {.Enabled = host, .MinW = half}))
+            G->EnemyGodAction = EnemyGodCommand::KillAll;
+        if (Button(LINE_ID, G->Loc[LocKey_DeleteAllEnemies], {}, {.Enabled = host, .MinW = half}))
+            G->EnemyGodAction = EnemyGodCommand::DeleteAll;
+        Hax::Gui::EndHorizontal();
+    }
+
+    void DrawEnemyDirectorPanel()
+    {
         BeginPanel(LINE_ID);
         PanelHeader(G->Loc[LocKey_ENEMY_DIRECTOR], G->Loc[LocKey_HostOnly]);
-        {
-            if (ToggleEx(LINE_ID, G->GodEnemiesPacified, G->Loc[LocKey_PacifyEnemies], G->Loc[LocKey_HostOnly], {.Disabled = !host}))
-                G->GodEnemiesPacifiedChanged = true;
-            HorizontalLine(1_px);
-            const bool frozenBefore = G->GodEnemiesFrozen;
-            if (ToggleEx(LINE_ID, G->GodEnemiesFrozen, G->Loc[LocKey_FreezeEnemies], G->Loc[LocKey_HostOnly], {.Disabled = !host}) && frozenBefore != G->GodEnemiesFrozen)
-                G->GodEnemiesFreezeChanged = true;
-
-            if (Button(LINE_ID, G->Loc[LocKey_GatherEnemies], {}, {.Enabled = host, .MinW = Hax::Gui::GetContentRegionAvail().X}))
-                G->EnemyGodAction = EnemyGodCommand::Gather;
-
-            const float gap = 5_px;
-            const float half = (Hax::Gui::GetContentRegionAvail().X - gap) / 2.f;
-            Hax::Gui::BeginHorizontal(gap);
-            if (Button(LINE_ID, G->Loc[LocKey_KillAllEnemies], {}, {.Enabled = host, .MinW = half}))
-                G->EnemyGodAction = EnemyGodCommand::KillAll;
-            if (Button(LINE_ID, G->Loc[LocKey_DeleteAllEnemies], {}, {.Enabled = host, .MinW = half}))
-                G->EnemyGodAction = EnemyGodCommand::DeleteAll;
-            Hax::Gui::EndHorizontal();
-        }
+        DrawEnemyDirectorControls();
         EndPanel();
     }
 
@@ -227,13 +230,13 @@ namespace Cheat
                 HorizontalLine(1_px);
 
                 StatusLine(G->Loc[LocKey_AimedObject], G->GodAimedObjectName,
-                    G->GodAimedObjectValid ? 0xFFD36EFF : 0x8D96A8FF);
+                    G->GodAimedObjectValid ? 0xE8A52DFF : 0x978D67FF);
                 StatusLine(G->Loc[LocKey_LockedObject], G->GodTargetName,
-                    G->GodTargetObjectValid ? 0x7EE787FF : 0x8D96A8FF);
+                    G->GodTargetObjectValid ? 0x9ED52AFF : 0x978D67FF);
                 Hax::WStringView authority = !G->GodTargetObjectValid ? Hax::WStringView(L"-") :
                     (G->GodTargetNetworked ? G->Loc[LocKey_NetworkObject] : G->Loc[LocKey_LocalObject]);
                 StatusLine(G->Loc[LocKey_ObjectAuthority], authority,
-                    G->GodTargetNetworked ? 0x65B8FFFF : 0xC2C8D4FF);
+                    G->GodTargetNetworked ? 0xE8B93FFF : 0xC9C09AFF);
 
                 if (G->GodTargetObjectValid)
                 {
@@ -255,7 +258,7 @@ namespace Cheat
             EndPanel();
 
             BeginPanel(LINE_ID);
-            PanelHeader(G->Loc[LocKey_TRANSFORM_GIZMO]);
+            PanelHeader(G->Loc[LocKey_TRANSFORM_GIZMO], G->Loc[LocKey_GizmoControls]);
             {
                 const bool hasTarget = inGame && G->GodTargetObjectValid;
                 ToggleEx(LINE_ID, G->GodGizmoVisible, G->Loc[LocKey_GizmoVisible]);
@@ -292,7 +295,6 @@ namespace Cheat
                     G->GodGizmoSpaceCurrent == GodGizmoSpace::Local ? L"●" : L"", {.Enabled = hasTarget, .MinW = half}))
                     G->GodGizmoSpaceCurrent = GodGizmoSpace::Local;
                 Hax::Gui::EndHorizontal();
-                DescLabel(G->Loc[LocKey_GizmoControls]);
             }
             EndPanel();
 

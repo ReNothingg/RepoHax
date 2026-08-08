@@ -18,6 +18,7 @@ namespace Cheat
     void DrawBalancePanel();
     void DrawWorldControlPanel();
     void DrawEnemyDirectorPanel();
+    void DrawEnemyDirectorControls();
     void DrawLootControlPanel();
     void DrawTeamControlPanel();
 }

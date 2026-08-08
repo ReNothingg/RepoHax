@@ -106,7 +106,7 @@ namespace Cheat
         Hax::IniAddEntry(ini, "Vision",     "RenderDistance",      &G->RenderDistance,      Hax::IniFileWrite_Int,  IniFileRead_IntClamped<200, 32, 500>);
         Hax::IniAddEntry(ini, "Vision",     "ThirdPerson",         &G->ThirdPerson,         Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Vision",     "Fov",                 &G->Fov,                 Hax::IniFileWrite_Int,  IniFileRead_IntClamped<60, 60, 140>);
-        Hax::IniAddEntry(ini, "Vision",     "FlashlightIntensity", &G->Flashlight.Intensity,Hax::IniFileWrite_Int,  IniFileRead_IntClamped<10, 10, 20>);
+        Hax::IniAddEntry(ini, "Vision",     "FlashlightIntensity", &G->Flashlight.Intensity,Hax::IniFileWrite_Int,  IniFileRead_IntClamped<10, 10, 100>);
         Hax::IniAddEntry(ini, "Vision",     "FlashAngle",          &G->Flashlight.Angle,    Hax::IniFileWrite_Int,  IniFileRead_IntClamped<60, 60, 120>);
         Hax::IniAddEntry(ini, "Vision",     "FlashInCrouch",       &G->Flashlight.InCrouch, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Vision",     "MaxHeadBattery",      &G->MaxHeadBattery,      Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
@@ -125,6 +125,7 @@ namespace Cheat
         Hax::IniAddEntry(ini, "Valuables",  "ValuablesChams",      &G->ValuablesChams,      Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Valuables",  "Unbreakable",         &G->Unbreakable,         Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Valuables",  "ExtrPointsEsp",       &G->ExtrPointsEsp,       Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Valuables",  "SurplusBagAmount",     &G->SurplusBagAmount,     Hax::IniFileWrite_Int,  IniFileRead_IntClamped<5000, 1, 10000000>);
 
         Hax::IniAddEntry(ini, "Items",      "InfBattery",          &G->InfBattery,          Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Items",      "UseLaser",            &G->UseLaser,            Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);

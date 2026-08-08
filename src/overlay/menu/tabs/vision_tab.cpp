@@ -79,7 +79,7 @@ namespace Cheat
                     Hax::char16 buf[16] = {};
                     swprintf_s(buf, _countof(buf), intensity < 11 ? G->Loc[LocKey_Default].Data() : L"x%.1f", intensity / 10.f);
 
-                    SliderEx(LINE_ID, G->Loc[LocKey_LightIntensity], buf, &intensity, 10, 20, SliderConvertInt);
+                    SliderEx(LINE_ID, G->Loc[LocKey_LightIntensity], buf, &intensity, 10, 100, SliderConvertInt);
                 }
 
                 HorizontalLine(1_px);

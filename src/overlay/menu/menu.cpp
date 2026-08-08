@@ -59,10 +59,10 @@ namespace Cheat
         {
             .TrackWidth = 8_px,
             .ThumbPadding = 1_px,
-            .TrackCol = 0x151820FF,
-            .ThumbCol = 0x66738AFF,
-            .ThumbHovCol = 0x8492ACFF,
-            .ThumbActiveCol = 0xA1AEC4FF
+            .TrackCol = 0x0D0E09FF,
+            .ThumbCol = 0x725A27FF,
+            .ThumbHovCol = 0xAE7D25FF,
+            .ThumbActiveCol = 0xE09A20FF
         };
     }
 
@@ -135,22 +135,22 @@ namespace Cheat
             {
                 const float sidePanelWidth = Hax::Gui::GetContentRegionAvail().X;
 
-                Hax::Gui::Space(27_px);
+                Hax::Gui::Space(19_px);
 
                 // Compact product identity leaves more room for navigation.
                 {
                     Hax::Gui::BeginHorizontal();
                     {
-                        Hax::Gui::Space(20_px);
-                        Hax::Gui::BeginVertical(2_px);
-                        Label(G->NunitoSans_ExtraBold, L"REPOHAX", 22_px, 0xF5F7FBFF);
-                        Label(G->NunitoSans_SemiBold, G->Loc[LocKey_ControlCenter], 10_px, 0x5A8DFFFF);
+                        Hax::Gui::Space(17_px);
+                        Hax::Gui::BeginVertical(3_px);
+                        Label(G->NunitoSans_ExtraBold, L"REPOHAX", 23_px, 0xE8B93FFF);
+                        Label(G->NunitoSans_ExtraBold, G->Loc[LocKey_ControlCenter], 9_px, 0xA77A27FF);
                         Hax::Gui::EndVertical();
                     }
                     Hax::Gui::EndHorizontal();
                 }
 
-                Hax::Gui::Space(28_px);
+                Hax::Gui::Space(18_px);
 
                 const float padding = 12_px;
                 Hax::Gui::BeginHorizontal();
@@ -160,7 +160,7 @@ namespace Cheat
                     {
                         Hax::Gui::BeginVertical(5_px);
                         {
-                            DescLabel(G->Loc[LocKey_Navigation]);
+                            Label(G->NunitoSans_ExtraBold, G->Loc[LocKey_Navigation], 10_px, 0x9F8D58FF);
                             Hax::Gui::Space(5_px);
 
                             for (size_t i = 0; i < _countof(g_TabGroups); ++i)
@@ -176,15 +176,15 @@ namespace Cheat
                                 }
                             }
 
-                            Hax::Gui::Space(18_px);
+                            Hax::Gui::Space(14_px);
                             HorizontalLine(1_px);
                             Hax::Gui::Space(10_px);
-                            DescLabel(G->Loc[LocKey_SessionStatus]);
+                            Label(G->NunitoSans_ExtraBold, G->Loc[LocKey_SessionStatus], 10_px, 0x9F8D58FF);
                             Hax::Gui::Space(4_px);
                             MainLabel(G->IsInGame ? G->Loc[LocKey_InGame] : G->Loc[LocKey_MainMenuStatus],
-                                G->IsInGame ? 0x7EE787FF : 0x8D96A8FF);
+                                G->IsInGame ? 0x9ED52AFF : 0x8F8769FF);
                             MainLabel(G->IsClient ? G->Loc[LocKey_Client] : G->Loc[LocKey_HostSingleplayer],
-                                G->IsClient ? 0xFFD36EFF : 0x65B8FFFF);
+                                G->IsClient ? 0xE8A52DFF : 0xA9D83AFF);
                         }
                         Hax::Gui::EndVertical();
                     }
@@ -199,23 +199,6 @@ namespace Cheat
             Hax::Gui::BeginVertical();
             {
                 const TabGroup& activeGroup = g_TabGroups[g_ActiveGroup];
-
-                // Every page has a stable title and purpose. The content beneath it
-                // owns the only vertical scrollbar in the main area.
-                Hax::Gui::BeginContainer(Hax::Hash("Page header"), {.H = 78_px});
-                {
-                    Hax::Gui::BeginVertical(5_px);
-                    Hax::Gui::Space(17_px);
-                    Hax::Gui::BeginHorizontal();
-                    Hax::Gui::Space(20_px);
-                    Hax::Gui::BeginVertical(3_px);
-                    Label(G->NunitoSans_ExtraBold, G->Loc[g_Tabs[g_ActiveTab].Loc], 20_px, 0xF5F7FBFF);
-                    DescLabel(G->Loc[g_Tabs[g_ActiveTab].Desc]);
-                    Hax::Gui::EndVertical();
-                    Hax::Gui::EndHorizontal();
-                    Hax::Gui::EndVertical();
-                }
-                Hax::Gui::EndContainer();
 
                 if (activeGroup.Count > 1)
                 {
@@ -239,7 +222,7 @@ namespace Cheat
                         Hax::Gui::EndVertical();
                     }
                     Hax::Gui::EndContainer();
-                    Hax::Gui::HorizontalLine(1_px, 0x252A35FF);
+                    Hax::Gui::HorizontalLine(1_px, 0x594A28FF);
                 }
 
                 // The whole active page owns scrolling. Tab columns use auto-height so both

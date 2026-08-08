@@ -10,11 +10,11 @@
 
 namespace Cheat
 {
-    static void StatusLine(Hax::WStringView name, Hax::WStringView value, Hax::Gui::Color valueColor = 0xD8DCE5FF)
+    static void StatusLine(Hax::WStringView name, Hax::WStringView value, Hax::Gui::Color valueColor = 0xD8D0ACFF)
     {
         Hax::Gui::BeginHorizontal();
         {
-            MainLabel(name, 0x8D96A8FF);
+            MainLabel(name, 0x978D67FF);
             const Hax::Vector2 valueSize = CalcMainLabelSize(value);
             Hax::Gui::Space(Hax::Max(0.f, Hax::Gui::GetContentRegionAvail().X - valueSize.X));
             MainLabel(value, valueColor);
@@ -46,8 +46,8 @@ namespace Cheat
                 RunManager manager = RunManager::instance();
                 System::String levelName = (manager && manager.levelCurrent()) ? manager.levelCurrent().NarrativeName() : null;
                 StatusLine(G->Loc[LocKey_LevelName], levelName != null ? levelName.ToHaxView() : Hax::WStringView(L"-"));
-                StatusLine(G->Loc[LocKey_InGame], G->IsInGame ? G->Loc[LocKey_Yes] : G->Loc[LocKey_No], G->IsInGame ? 0x7EE787FF : 0xFF8A8AFF);
-                StatusLine(G->Loc[LocKey_Authority], G->IsClient ? G->Loc[LocKey_Client] : G->Loc[LocKey_HostSingleplayer], G->IsClient ? 0xFFD36EFF : 0x7EE787FF);
+                StatusLine(G->Loc[LocKey_InGame], G->IsInGame ? G->Loc[LocKey_Yes] : G->Loc[LocKey_No], G->IsInGame ? 0x9ED52AFF : 0xE34B22FF);
+                StatusLine(G->Loc[LocKey_Authority], G->IsClient ? G->Loc[LocKey_Client] : G->Loc[LocKey_HostSingleplayer], G->IsClient ? 0xE8A52DFF : 0x9ED52AFF);
 
                 Hax::char16 buf[64]{};
                 swprintf_s(buf, _countof(buf), L"%d", manager ? manager.levelsCompleted() : 0);
@@ -78,7 +78,7 @@ namespace Cheat
                 StatsManager stats = StatsManager::instance();
                 System::String saveName = stats ? stats.saveFileCurrent() : null;
                 StatusLine(G->Loc[LocKey_SaveFile], saveName != null ? saveName.ToHaxView() : Hax::WStringView(L"-"));
-                StatusLine(G->Loc[LocKey_LastAction], LastActionText(), 0xC2C8D4FF);
+                StatusLine(G->Loc[LocKey_LastAction], LastActionText(), 0xC9C09AFF);
             }
             EndPanel();
 
@@ -124,30 +124,17 @@ namespace Cheat
                     RunManager manager = RunManager::instance();
                     int levelsCompl = manager ? manager.levelsCompleted() : 0;
 
-                    Hax::char16 buf[16] = {};
-                    int nChars = swprintf_s(buf, _countof(buf), L"%d", levelsCompl);
-
-                    if (nChars > 0)
+                    const float fieldWidth = 64_px;
+                    const float fieldHeight = CalcButtonHeight();
+                    Hax::Gui::BeginHorizontal(5_px);
                     {
-                        Hax::WStringView valTxt = { buf, (size_t)nChars };
-                        Hax::Vector2 valTxtSize = CalcMainLabelSize(valTxt);
-
-                        float spacing = 2_px;
-                        Hax::Vector2 btnSize = CalcRepeatBtnSize(L"+");
-
-                        Hax::Gui::BeginHorizontal(spacing);
-                        {
-                            bool disabled = !manager || G->IsClient || !G->IsInGame;
-
-                            MainLabelAlignedByH(G->Loc[LocKey_LevelsCompleted], btnSize.Y);
-                            Hax::Gui::Space(Hax::Gui::GetContentRegionAvail().X - valTxtSize.X - spacing * 2.f - btnSize.X * 2.f - 8_px);
-                            MainLabelAlignedByH(buf, btnSize.Y);
-                            Hax::Gui::Space(8_px);
-                            if (RepeatBtn(LINE_ID, L"-", !disabled && levelsCompl > 0)) manager.levelsCompleted()--;
-                            if (RepeatBtn(LINE_ID, L"+", !disabled && levelsCompl < 100)) manager.levelsCompleted()++;
-                        }
-                        Hax::Gui::EndHorizontal();
+                        MainLabelAlignedByH(G->Loc[LocKey_LevelsCompleted], fieldHeight);
+                        Hax::Gui::Space(Hax::Max(0.f, Hax::Gui::GetContentRegionAvail().X - fieldWidth));
+                        int target = levelsCompl;
+                        if (IntInput(LINE_ID, target, 0, 100, fieldWidth, manager && !G->IsClient && G->IsInGame))
+                            manager.levelsCompleted() = target;
                     }
+                    Hax::Gui::EndHorizontal();
                 }
 
                 HorizontalLine(1_px);

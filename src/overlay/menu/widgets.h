@@ -34,7 +34,6 @@ namespace Cheat
     void MainLabel(Hax::WStringView text);
     void MainLabel(Hax::WStringView text, const Hax::Gui::Color& col);
     Hax::Vector2 CalcMainLabelSize(Hax::WStringView text);
-    void DescLabel(Hax::WStringView text);
     void LabelAlignedByH(Hax::Gui::FontHandle hFont, Hax::WStringView label, float fontH, const Hax::Gui::Color& col, float h);
     void MainLabelAlignedByH(Hax::WStringView label, float h);
     void BeginWindow();
@@ -68,6 +67,7 @@ namespace Cheat
     float CalcWidgetEqWidth(size_t nWidgets);
     Hax::Vector2 CalcRepeatBtnSize(Hax::WStringView label);
     bool RepeatBtn(size_t id, Hax::WStringView label, bool enabled = true);
+    bool IntInput(size_t id, int& value, int min, int max, float width, bool enabled = true);
     bool Hotkey(size_t id, int& key);
     bool HotkeyEx(size_t id, int& key, Hax::WStringView label, Hax::WStringView desc = {});
     bool Checkbox(size_t id, bool& val);
@@ -120,13 +120,16 @@ namespace Cheat
 
         Hax::Vector2 trackMin = bounds.Min; trackMin.Y += r - trackH / 2.f;
         Hax::Vector2 trackMax = bounds.Max; trackMax.Y -= r - trackH / 2.f;
-        Hax::Gui::DrawRect(trackMin, trackMax, {.FillColor = 0x282829FF, .Rounding = 8_px});
+        Hax::Gui::DrawRect(trackMin, trackMax, {.BorderColor = 0x514322FF, .BorderTh = 1_px, .FillColor = 0x0C0D09FF, .Rounding = 1_px});
 
         r *= Hax::Lerp(1.f, 1.3f, state.Progress);
 
         trackMax.X = Hax::Max(thumbPosX, Hax::Lerp(bounds.Min.X, bounds.Max.X, t));
-        Hax::Gui::DrawRect(trackMin, trackMax, {.FillColor = 0x2B69FFFF, .Rounding = 8_px});
-        Hax::Gui::DrawCircle(Hax::Vector2(thumbPosX, bounds.GetCenter().Y), r, {.FillColor = Hax::Gui::Color::White});
+        Hax::Gui::DrawRect(trackMin, trackMax, {.FillColor = 0xD98212FF, .Rounding = 1_px});
+        const Hax::Vector2 thumbHalf = {3_px, r};
+        Hax::Gui::DrawRect(Hax::Vector2(thumbPosX, bounds.GetCenter().Y) - thumbHalf,
+            Hax::Vector2(thumbPosX, bounds.GetCenter().Y) + thumbHalf,
+            {.BorderColor = 0xF4C34DFF, .BorderTh = 1_px, .FillColor = 0x241F10FF, .Rounding = 1_px});
 
         return *val != tmp;
     }
@@ -136,10 +139,10 @@ namespace Cheat
     {
         Hax::Gui::BeginVertical(4_px);
         Hax::Gui::BeginHorizontal();
-        MainLabel(text, 0xC2C2C2FF);
+        MainLabel(text, 0xC9C09AFF);
         const Hax::Vector2 valTextSize = CalcMainLabelSize(valTxt);
         Hax::Gui::Space(Hax::Gui::GetContentRegionAvail().X - valTextSize.X);
-        MainLabel(valTxt, Hax::Gui::Color::White);
+        MainLabel(valTxt, 0xF0B52DFF);
         Hax::Gui::EndHorizontal();
         bool changed = Slider(id, val, min, max, func, Hax::Gui::GetContentRegionAvail().X);
         Hax::Gui::EndVertical();

@@ -31,30 +31,19 @@ namespace Cheat
     {
         int level = G->PlayerUpgradeLevels[(int)type];
         bool ready = G->IsInGame && G->PlayerUpgradeToChange == PlayerUpgradeType::N;
-
-        const Hax::Vector2 buttonSize = CalcRepeatBtnSize(L"+");
-        constexpr float valueWidth = 38.f;
+        constexpr float fieldWidth = 64.f;
+        const float fieldHeight = CalcButtonHeight();
 
         Hax::Gui::BeginHorizontal(5_px);
         {
-            MainLabelAlignedByH(label, buttonSize.Y);
-            const float controlsWidth = buttonSize.X * 2.f + valueWidth + 10_px;
-            Hax::Gui::Space(Hax::Max(0.f, Hax::Gui::GetContentRegionAvail().X - controlsWidth));
+            MainLabelAlignedByH(label, fieldHeight);
+            Hax::Gui::Space(Hax::Max(0.f, Hax::Gui::GetContentRegionAvail().X - fieldWidth));
 
-            if (RepeatBtn(id, L"-", ready && level > 0))
+            int target = level;
+            if (IntInput(id, target, 0, 100, fieldWidth, ready))
             {
                 G->PlayerUpgradeToChange = type;
-                G->PlayerUpgradeDelta = -1;
-            }
-
-            Hax::char16 value[16]{};
-            swprintf_s(value, _countof(value), L"%d", level);
-            MainLabelAlignedByH(value, buttonSize.Y);
-
-            if (RepeatBtn(id + 1, L"+", ready))
-            {
-                G->PlayerUpgradeToChange = type;
-                G->PlayerUpgradeDelta = 1;
+                G->PlayerUpgradeDelta = target - level;
             }
         }
         Hax::Gui::EndHorizontal();
@@ -209,28 +198,28 @@ namespace Cheat
             BeginPanel(LINE_ID);
             PanelHeader(G->Loc[LocKey_PlayerUpgrades]);
             {
-                static const Hax::WStringView labels[(int)PlayerUpgradeType::N] =
+                static constexpr LocKey labels[(int)PlayerUpgradeType::N] =
                 {
-                    L"Health Upgrade",
-                    L"Stamina Upgrade",
-                    L"Extra Jump Upgrade",
-                    L"Map Player Count Upgrade",
-                    L"Tumble Launch Upgrade",
-                    L"Tumble Climb Upgrade",
-                    L"Death Head Battery Upgrade",
-                    L"Tumble Wings Upgrade",
-                    L"Sprint Speed Upgrade",
-                    L"Crouch Rest Upgrade",
-                    L"Strength Upgrade",
-                    L"Throw Strength Upgrade",
-                    L"Range Upgrade"
+                    LocKey_Health,
+                    LocKey_Stamina,
+                    LocKey_ExtraJump,
+                    LocKey_PlayersCount,
+                    LocKey_Launch,
+                    LocKey_Climb,
+                    LocKey_HeadBattery,
+                    LocKey_Wings,
+                    LocKey_SprintSpeed,
+                    LocKey_CrouchRest,
+                    LocKey_Strength,
+                    LocKey_ThrowForce,
+                    LocKey_Range
                 };
 
                 for (int i = 0; i < (int)PlayerUpgradeType::N; ++i)
                 {
                     if (i > 0)
                         HorizontalLine(1_px);
-                    DrawPlayerUpgradeRow(LINE_ID + (size_t)i * 10, (PlayerUpgradeType)i, labels[i]);
+                    DrawPlayerUpgradeRow(LINE_ID + (size_t)i * 10, (PlayerUpgradeType)i, G->Loc[labels[i]]);
                 }
             }
             EndPanel();

@@ -37,6 +37,13 @@ X(LocKey_QuotaDesc, L"Updates every extraction point; host only", L"Обновл
 X(LocKey_ActionQuotaChangedFmt, L"Quota changed: $%dK", L"Квота изменена: $%dK") \
 X(LocKey_ActionQuotaHostOnly, L"Quota change skipped: host only", L"Изменение квоты пропущено: только хост") \
 X(LocKey_ActionQuotaNotReady, L"Quota change failed: extraction is not ready", L"Квота не изменена: эвакуация не готова") \
+X(LocKey_SURPLUS_BAG, L"SURPLUS PAYOUT", L"МЕШОЧЕК С ОСТАТКОМ") \
+X(LocKey_SurplusBagDesc, L"Creates the same money bag returned after meeting quota", L"Создаёт такой же мешочек, который выдаётся за остаток после квоты") \
+X(LocKey_SpawnSurplusBag, L"DISPENSE MONEY BAG", L"ВЫДАТЬ МЕШОЧЕК") \
+X(LocKey_SurplusBagHostHint, L"Drops in front of you; host only", L"Появится перед вами; только хост") \
+X(LocKey_ActionSurplusBagSpawnedFmt, L"Money bag created: $%dK", L"Мешочек создан: $%dK") \
+X(LocKey_ActionSurplusBagHostOnly, L"Money bag creation skipped: host only", L"Создание мешочка пропущено: только хост") \
+X(LocKey_ActionSurplusBagNotReady, L"Money bag creation failed: assets are not ready", L"Мешочек не создан: игровые ресурсы не готовы") \
 X(LocKey_TARGET_INSPECTOR, L"TARGET INSPECTOR", L"ИНСПЕКТОР ЦЕЛИ") \
 X(LocKey_TargetingEnabled, L"Aim targeting", L"Наведение на объекты") \
 X(LocKey_AimedObject, L"Aimed object", L"Объект под прицелом") \

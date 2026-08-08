@@ -110,7 +110,7 @@ namespace Cheat
                 HorizontalLine(1_px);
 
                 MainLabel(G->ObjectRemoverTargetValid ? G->Loc[LocKey_TargetReady] : G->Loc[LocKey_NoTarget],
-                    G->ObjectRemoverTargetValid ? 0xFF7272FF : 0x8D96A8FF);
+                    G->ObjectRemoverTargetValid ? 0xE34B22FF : 0x978D67FF);
 
                 const bool canDelete = G->IsInGame && !G->IsClient && G->ObjectRemoverEnabled && G->ObjectRemoverTargetValid;
                 if (Button(LINE_ID, G->Loc[LocKey_DeleteTarget], G->Loc[LocKey_HostOnly], {.Enabled = canDelete, .MinW = Hax::Gui::GetContentRegionAvail().X}))

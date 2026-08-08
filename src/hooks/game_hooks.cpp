@@ -60,6 +60,7 @@ namespace Cheat
     static void ProcessWorldSessionCommands(PlayerAvatar avatar);
     static void ProcessCurrencyCommands();
     static void ProcessQuotaCommands();
+    static void ProcessSurplusBagCommand();
     static void ProcessTeleportCommands(PlayerAvatar avatar);
     static void ProcessObjectRemover(PlayerAvatar avatar);
     static void MaintainFriendEffects();
@@ -190,7 +191,7 @@ namespace Cheat
         G->PlayerUpgradeDelta = 0;
 
         PunManager manager = PunManager::instance();
-        if (!avatar || !manager || (delta != -1 && delta != 1))
+        if (!avatar || !manager || delta == 0)
             return;
 
         int& current = G->PlayerUpgradeLevels[(int)type];
@@ -444,6 +445,7 @@ namespace Cheat
         G->CurrencySetZero = false;
         G->CurrencyRepairOverflow = false;
         G->QuotaApplyRequested = false;
+        G->SurplusBagSpawnRequested = false;
         G->DeleteObjectRequested = false;
         G->GodObjectAction = GodObjectCommand::None;
         G->EnemyGodAction = EnemyGodCommand::None;
@@ -723,6 +725,67 @@ namespace Cheat
         SetSessionActionF(G->Loc[LocKey_ActionQuotaChangedFmt].Data(), target);
     }
 
+    static void ProcessSurplusBagCommand()
+    {
+        if (!G->IsInGame)
+        {
+            G->SurplusBagSpawnRequested = false;
+            return;
+        }
+
+        if (!G->SurplusBagSpawnRequested)
+            return;
+        G->SurplusBagSpawnRequested = false;
+
+        if (G->IsClient)
+        {
+            SetSessionAction(G->Loc[LocKey_ActionSurplusBagHostOnly]);
+            return;
+        }
+
+        AssetManager assets = AssetManager::instance();
+        Unity::Camera camera = SemiFunc::MainCamera();
+        if (!assets || !camera)
+        {
+            SetSessionAction(G->Loc[LocKey_ActionSurplusBagNotReady]);
+            return;
+        }
+
+        const int amount = Hax::Clamp(G->SurplusBagAmount, 1, 10000000);
+        Unity::GameObject prefab = assets.surplusValuableSmall();
+        if (amount > 10000)
+            prefab = assets.surplusValuableBig();
+        else if (amount > 5000)
+            prefab = assets.surplusValuableMedium();
+
+        if (!prefab)
+        {
+            SetSessionAction(G->Loc[LocKey_ActionSurplusBagNotReady]);
+            return;
+        }
+
+        Unity::Transform cameraTransform = camera.GetTransform();
+        const Unity::Vector3 position = cameraTransform.GetPosition() + cameraTransform.GetForward() * 2.f - cameraTransform.GetUp() * 0.45f;
+        Unity::GameObject bag = null;
+        if (SemiFunc::IsMultiplayer())
+        {
+            System::String resourcePath = System::String::Concat(System::String::New(L"Valuables/"), prefab.GetName());
+            bag = Unity::Photon::PhotonNetwork::InstantiateRoomObject(resourcePath, position, Unity::Quaternion::identity());
+        }
+        else
+            bag = Unity::Object::Instantiate<Unity::GameObject>(prefab, position, Unity::Quaternion::identity());
+
+        ValuableObject valuable = bag ? bag.GetComponent<ValuableObject>() : null;
+        if (!valuable)
+        {
+            SetSessionAction(G->Loc[LocKey_ActionSurplusBagNotReady]);
+            return;
+        }
+
+        valuable.dollarValueOverride() = amount;
+        SetSessionActionF(G->Loc[LocKey_ActionSurplusBagSpawnedFmt].Data(), amount);
+    }
+
     static void ProcessTeleportCommands(PlayerAvatar avatar)
     {
         if (G->TeleportToTruck)
@@ -865,6 +928,7 @@ namespace Cheat
             ProcessWorldSessionCommands(avatar);
             ProcessCurrencyCommands();
             ProcessQuotaCommands();
+            ProcessSurplusBagCommand();
             ProcessTeleportCommands(avatar);
             ProcessObjectRemover(avatar);
             ProcessGodTools(avatar);
