@@ -31,13 +31,16 @@ namespace Cheat
     {
         int level = G->PlayerUpgradeLevels[(int)type];
         bool ready = G->IsInGame && G->PlayerUpgradeToChange == PlayerUpgradeType::N;
+        const bool isHealth = type == PlayerUpgradeType::Health;
+        const bool isSprintSpeed = type == PlayerUpgradeType::SprintSpeed;
         constexpr float fieldWidth = 64.f;
+        const float staminaToggleWidth = 39_px;
         const float fieldHeight = CalcButtonHeight();
 
         Hax::Gui::BeginHorizontal(5_px);
         {
             MainLabelAlignedByH(label, fieldHeight);
-            Hax::Gui::Space(Hax::Max(0.f, Hax::Gui::GetContentRegionAvail().X - fieldWidth));
+            Hax::Gui::Space(Hax::Max(0.f, Hax::Gui::GetContentRegionAvail().X - fieldWidth - ((isHealth || isSprintSpeed) ? staminaToggleWidth : 0.f)));
 
             int target = level;
             if (IntInput(id, target, 0, 100, fieldWidth, ready))
@@ -45,8 +48,65 @@ namespace Cheat
                 G->PlayerUpgradeToChange = type;
                 G->PlayerUpgradeDelta = target - level;
             }
+
+            // Feature toggles are placed beside their corresponding upgrades.
+            if (isHealth || isSprintSpeed)
+            {
+                Hax::Gui::BeginVertical();
+                {
+                    Hax::Gui::Space(Hax::Max(0.f, (fieldHeight - 20_px) / 2.f));
+                    Toggle(id + 1, isHealth ? G->Godmode : G->InfStamina, G->IsInGame);
+                }
+                Hax::Gui::EndVertical();
+            }
         }
         Hax::Gui::EndHorizontal();
+
+        if (isHealth)
+        {
+            HorizontalLine(1_px);
+
+            PlayerAvatar avatar = PlayerAvatar::instance();
+            PlayerHealth health = avatar ? avatar.playerHealth() : nullptr;
+            const bool disabled = !G->IsInGame || !avatar || !health || health.health() >= health.maxHealth();
+            if (Button(id + 2, G->Loc[LocKey_HealToMax], {}, {.Enabled = !disabled, .MinW = Hax::Gui::GetContentRegionAvail().X}))
+                G->HealToMax = true;
+        }
+
+        if (type == PlayerUpgradeType::ExtraJump)
+        {
+            HorizontalLine(1_px);
+            ToggleEx(id + 1, G->InfJumps, G->Loc[LocKey_InfiniteJumps]);
+        }
+
+        // Keep all movement multipliers under the sprint-speed upgrade rather
+        // than in a separate movement panel.
+        if (isSprintSpeed)
+        {
+            HorizontalLine(1_px);
+
+            {
+                Hax::char16 buf[16]{};
+                swprintf_s(buf, _countof(buf), G->Accel.Walking == 1 ? G->Loc[LocKey_Default].Data() : L"%dx", G->Accel.Walking);
+                SliderEx(id + 2, G->Loc[LocKey_WalkingSpeed], buf, &G->Accel.Walking, 1, 5, SliderConvertInt);
+            }
+
+            HorizontalLine(1_px);
+
+            {
+                Hax::char16 buf[16]{};
+                swprintf_s(buf, _countof(buf), G->Accel.Sprinting == 1 ? G->Loc[LocKey_Default].Data() : L"%dx", G->Accel.Sprinting);
+                SliderEx(id + 3, G->Loc[LocKey_RunningSpeed], buf, &G->Accel.Sprinting, 1, 5, SliderConvertInt);
+            }
+
+            HorizontalLine(1_px);
+
+            {
+                Hax::char16 buf[16]{};
+                swprintf_s(buf, _countof(buf), G->Accel.Crouching == 1 ? G->Loc[LocKey_Default].Data() : L"%dx", G->Accel.Crouching);
+                SliderEx(id + 4, G->Loc[LocKey_CrouchingSpeed], buf, &G->Accel.Crouching, 1, 5, SliderConvertInt);
+            }
+        }
     }
 
     void DrawStatsTab()
@@ -56,7 +116,6 @@ namespace Cheat
         const Hax::Vector2 columnSize = {(mainAreaSize.X - 3 * spacing) / 2, mainAreaSize.Y};
 
         PlayerAvatar avatar = PlayerAvatar::instance();
-        PlayerHealth health = avatar ? avatar.playerHealth() : nullptr;
 
         // Column 1
         Hax::Gui::Space(spacing);
@@ -65,77 +124,9 @@ namespace Cheat
         Hax::Gui::Dummy({0.f, 0.f});
         {
             BeginPanel(LINE_ID);
-            PanelHeader(G->Loc[LocKey_HEALTH]);
-            {
-                ToggleEx(LINE_ID, G->Godmode, G->Loc[LocKey_Godmode]);
-
-                HorizontalLine(1_px);
-
-                bool disabled = !G->IsInGame || !avatar || !health || health.health() >= health.maxHealth();
-                if (Button(LINE_ID, G->Loc[LocKey_HealToMax], {}, {.Enabled = !disabled, .MinW = Hax::Gui::GetContentRegionAvail().X}))
-                    G->HealToMax = true;
-            }
-            EndPanel();
-
-            BeginPanel(LINE_ID);
             PanelHeader(G->Loc[LocKey_MOVEMENT]);
             {
-                ToggleEx(LINE_ID, G->InfStamina, G->Loc[LocKey_InfiniteStamina]);
-
-                HorizontalLine(1_px);
-
-                {
-                    Hax::char16 buf[16]{};
-                    swprintf_s(buf, _countof(buf), G->Accel.Walking == 1 ? G->Loc[LocKey_Default].Data() : L"%dx", G->Accel.Walking);
-
-                    SliderEx(LINE_ID, G->Loc[LocKey_WalkingSpeed], buf, &G->Accel.Walking, 1, 5, SliderConvertInt);
-                }
-
-                HorizontalLine(1_px);
-
-                {
-                    Hax::char16 buf[16]{};
-                    swprintf_s(buf, _countof(buf), G->Accel.Sprinting == 1 ? G->Loc[LocKey_Default].Data() : L"%dx", G->Accel.Sprinting);
-
-                    SliderEx(LINE_ID, G->Loc[LocKey_RunningSpeed], buf, &G->Accel.Sprinting, 1, 5, SliderConvertInt);
-                }
-
-                HorizontalLine(1_px);
-
-                {
-                    Hax::char16 buf[16]{};
-                    swprintf_s(buf, _countof(buf), G->Accel.Crouching == 1 ? G->Loc[LocKey_Default].Data() : L"%dx", G->Accel.Crouching);
-
-                    SliderEx(LINE_ID, G->Loc[LocKey_CrouchingSpeed], buf, &G->Accel.Crouching, 1, 5, SliderConvertInt);
-                }
-
-                HorizontalLine(1_px);
-
-                ToggleEx(LINE_ID, G->InfJumps, G->Loc[LocKey_InfiniteJumps]);
-
-                HorizontalLine(1_px);
-
                 ToggleEx(LINE_ID, G->FlightEnabled, G->Loc[LocKey_Flight], G->Loc[LocKey_FlightControls], {.Disabled = !G->IsInGame});
-
-                {
-                    Hax::char16 buf[16]{};
-                    swprintf_s(buf, _countof(buf), L"%d", G->FlightSpeed);
-                    SliderEx(LINE_ID, G->Loc[LocKey_FlightSpeed], buf, &G->FlightSpeed, 1, 30, SliderConvertInt);
-                }
-
-                {
-                    Hax::char16 buf[16]{};
-                    swprintf_s(buf, _countof(buf), L"%dx", G->FlightSprintBoost);
-                    SliderEx(LINE_ID, G->Loc[LocKey_SprintBoost], buf, &G->FlightSprintBoost, 1, 6, SliderConvertInt);
-                }
-
-                HotkeyEx(Hax::Hash(L"ToggleFlightHotkeyEditor"), G->VkToggleFlight, G->Loc[LocKey_Hotkey], G->Loc[LocKey_ToggleFlight]);
-
-                HotkeyEx(Hax::Hash(L"TeleportCameraHotkeyEditor"), G->VkTeleportPlayerToCamera, G->Loc[LocKey_Hotkey], G->Loc[LocKey_PlayerToCamera]);
-
-                HorizontalLine(1_px);
-
-                ToggleEx(LINE_ID, G->NoTumble, G->Loc[LocKey_DontTumble], G->Loc[LocKey_DisableTumbling]);
             }
             EndPanel();
 
