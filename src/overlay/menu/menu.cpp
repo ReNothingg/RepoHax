@@ -32,7 +32,8 @@ namespace Cheat
         {DrawCosmeticTab, LocKey_Cosmetic, LocKey_CosmeticPageDesc, L''},
         {DrawMiscTab, LocKey_Misc, LocKey_TeleportPageDesc, L''},
         {DrawSettingsTab, LocKey_Settings, LocKey_SettingsPageDesc, L''},
-        {DrawGodToolsTab, LocKey_GodTools, LocKey_EditorPageDesc, L''}
+        {DrawGodToolsTab, LocKey_GodTools, LocKey_EditorPageDesc, L''},
+        {DrawFunTab, LocKey_FunTab, LocKey_FunPageDesc, L''}
     };
 
     struct TabGroup
@@ -49,6 +50,7 @@ namespace Cheat
         {LocKey_SessionCategory,L'', {5, 1, 0}, 2},
         {LocKey_EconomyCategory,L'', {3, 0, 0}, 1},
         {LocKey_ToolsCategory,  L'', {4, 7, 9}, 3},
+        {LocKey_FunCategory,    L'', {10, 0, 0}, 1},
         {LocKey_Settings,       L'', {8, 0, 0}, 1}
     };
 

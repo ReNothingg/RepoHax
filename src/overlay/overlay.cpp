@@ -214,7 +214,8 @@ namespace Cheat
                 return G->VkToggleFlight == vk || G->VkToggleEyeLasers == vk ||
                     G->VkTeleportPlayerToCamera == vk || G->VkSpawnItem == vk ||
                     G->VkDeleteObject == vk || G->VkLockGodTarget == vk || G->VkReviveSelf == vk ||
-                    G->VkDroneLaunch == vk || G->VkDroneDetonate == vk;
+                    G->VkDroneLaunch == vk || G->VkDroneDetonate == vk || G->VkDroneFpv == vk ||
+                    G->VkOrbitalStrike == vk || G->VkBlackHole == vk;
             };
 
             if (!isGameplayHotkey('W') && GizmoKeyJustPressed('W')) G->GodGizmoModeCurrent = GodGizmoMode::Move;
@@ -235,6 +236,139 @@ namespace Cheat
     static bool IsKeyJustDown(size_t id, Hax::uint8 vk)
     {
         return (G->KeyListenerId == 0 || G->KeyListenerId == id) && !IsTextInputActive() && Hax::Gui::IsKeyJustDown(vk);
+    }
+
+    static void DrawHudText(Hax::Gui::FontHandle font, Hax::WStringView text, Hax::Vector2 pos, float size, Hax::Gui::Color color)
+    {
+        // A dark copy underneath keeps the text readable on any background.
+        Hax::Gui::DrawString(font, text, pos + Hax::Vector2(1_px, 1_px), size, {.Color = 0x000000C0});
+        Hax::Gui::DrawString(font, text, pos, size, {.Color = color});
+    }
+
+    static void DrawHudTextCentered(Hax::Gui::FontHandle font, Hax::WStringView text, Hax::Vector2 center, float size, Hax::Gui::Color color)
+    {
+        const Hax::Vector2 textSize = Hax::Gui::CalcTextSize(font, text, size);
+        DrawHudText(font, text, center - textSize / 2.f, size, color);
+    }
+
+    // Drone FPV feed: scanlines, static that grows with distance from the pilot,
+    // telemetry, and a "signal lost" screen when the drone goes up in smoke.
+    static void RenderDroneFpvHud(uint64_t now)
+    {
+        if (!G->FpvActive || G->MenuVisible)
+            return;
+
+        const Hax::Vector2 size = Hax::Gui::GetViewportSize();
+        static uint32_t s_Rng = 0x1234567u;
+        auto random = [&](uint32_t range)
+        {
+            s_Rng ^= s_Rng << 13;
+            s_Rng ^= s_Rng >> 17;
+            s_Rng ^= s_Rng << 5;
+            return range ? s_Rng % range : 0u;
+        };
+
+        const bool lost = G->FpvSignalLost;
+        const float noise = lost ? 1.f : Hax::Clamp(1.f - G->FpvSignal, 0.f, 1.f);
+
+        if (lost)
+            Hax::Gui::DrawRect({}, size, {.FillColor = 0x1A1A1AE0});
+
+        for (float y = 0.f; y < size.Y; y += 4_px)
+            Hax::Gui::DrawRect({0.f, y}, {size.X, y + 1_px}, {.FillColor = 0x00000038});
+
+        const int specks = (int)(80.f + noise * (lost ? 2400.f : 900.f));
+        for (int i = 0; i < specks; ++i)
+        {
+            const float x = (float)random((uint32_t)size.X);
+            const float y = (float)random((uint32_t)size.Y);
+            const float w = (float)(1 + random(lost ? 6u : 3u)) * 1_px;
+            const uint32_t shade = 0x60 + random(0x9F);
+            const uint32_t alpha = 0x30 + (uint32_t)(noise * 0x90);
+            Hax::Gui::DrawRect({x, y}, {x + w, y + 1_px * (float)(1 + random(2))},
+                {.FillColor = (shade << 24) | (shade << 16) | (shade << 8) | alpha});
+        }
+
+        const Hax::Vector2 center = Hax::Gui::GetViewportCenter();
+        if (lost)
+        {
+            if ((now / 400) % 2 == 0)
+                DrawHudTextCentered(G->NunitoSans_ExtraBold, G->Loc[LocKey_FpvSignalLost], center, 42_px, 0xFF4D55FF);
+            return;
+        }
+
+        const Hax::Gui::Color hud = 0xE8F4E8E6;
+        const Hax::Gui::Color warn = 0xFF4D55FF;
+
+        // Corner brackets
+        const float margin = 34_px;
+        const float arm = 46_px;
+        const Hax::Vector2 corners[4] = {{margin, margin}, {size.X - margin, margin}, {margin, size.Y - margin}, {size.X - margin, size.Y - margin}};
+        for (int i = 0; i < 4; ++i)
+        {
+            const float sx = (i % 2 == 0) ? 1.f : -1.f;
+            const float sy = (i < 2) ? 1.f : -1.f;
+            Hax::Gui::DrawLine(corners[i], corners[i] + Hax::Vector2(arm * sx, 0.f), {.FillColor = hud, .Th = 2_px});
+            Hax::Gui::DrawLine(corners[i], corners[i] + Hax::Vector2(0.f, arm * sy), {.FillColor = hud, .Th = 2_px});
+        }
+
+        // Crosshair
+        const float gap = 6_px;
+        const float len = 16_px;
+        const Hax::Gui::Color crossCol = G->FpvArming ? warn : hud;
+        Hax::Gui::DrawLine(center + Hax::Vector2(-len - gap, 0.f), center + Hax::Vector2(-gap, 0.f), {.FillColor = crossCol, .Th = 2_px});
+        Hax::Gui::DrawLine(center + Hax::Vector2(gap, 0.f), center + Hax::Vector2(len + gap, 0.f), {.FillColor = crossCol, .Th = 2_px});
+        Hax::Gui::DrawLine(center + Hax::Vector2(0.f, -len - gap), center + Hax::Vector2(0.f, -gap), {.FillColor = crossCol, .Th = 2_px});
+        Hax::Gui::DrawLine(center + Hax::Vector2(0.f, gap), center + Hax::Vector2(0.f, len + gap), {.FillColor = crossCol, .Th = 2_px});
+
+        // REC + drone count
+        if ((now / 500) % 2 == 0)
+            Hax::Gui::DrawCircle({margin + 18_px, margin + 26_px}, 6_px, {.FillColor = warn});
+        Hax::char16 line[96]{};
+        swprintf_s(line, L"REC  FPV  %d", G->DronesInFlight);
+        DrawHudText(G->NunitoSans_Bold, line, {margin + 32_px, margin + 16_px}, 18_px, hud);
+
+        // Signal bars, top right
+        const int bars = (int)std::ceil(Hax::Clamp(G->FpvSignal, 0.f, 1.f) * 5.f);
+        for (int i = 0; i < 5; ++i)
+        {
+            const float h = (float)(i + 1) * 5_px;
+            const Hax::Vector2 base = {size.X - margin - 80_px + (float)i * 11_px, margin + 40_px};
+            Hax::Gui::DrawRect({base.X, base.Y - h}, {base.X + 7_px, base.Y},
+                {.FillColor = i < bars ? (bars <= 1 ? warn : hud) : 0xFFFFFF30});
+        }
+
+        // Telemetry, bottom left
+        const int seconds = (int)G->FpvFlightTime;
+        swprintf_s(line, L"SPD %3.0f m/s", G->FpvSpeed);
+        DrawHudText(G->NunitoSans_Bold, line, {margin + 10_px, size.Y - margin - 92_px}, 17_px, hud);
+        swprintf_s(line, L"DST %3.0f m", G->FpvDistance);
+        DrawHudText(G->NunitoSans_Bold, line, {margin + 10_px, size.Y - margin - 70_px}, 17_px, hud);
+        swprintf_s(line, L"RNG %3.0f m", G->FpvRange);
+        DrawHudText(G->NunitoSans_Bold, line, {margin + 10_px, size.Y - margin - 48_px}, 17_px, G->FpvSignal < 0.3f ? warn : hud);
+        swprintf_s(line, L"T+ %02d:%02d", seconds / 60, seconds % 60);
+        DrawHudText(G->NunitoSans_Bold, line, {margin + 10_px, size.Y - margin - 26_px}, 17_px, hud);
+
+        if (G->FpvArming && (now / 150) % 2 == 0)
+            DrawHudTextCentered(G->NunitoSans_ExtraBold, L"IMPACT", center + Hax::Vector2(0.f, 60_px), 34_px, warn);
+
+        if (G->FpvPiloting)
+            DrawHudTextCentered(G->NunitoSans_SemiBold, G->Loc[LocKey_FpvThrottleHint],
+                {center.X, size.Y - margin - 20_px}, 15_px, 0xE8F4E8B0);
+    }
+
+    static void RenderChaosBanner(uint64_t now)
+    {
+        if (now >= G->ChaosBannerUntil || G->ChaosBanner[0] == 0)
+            return;
+        const Hax::WStringView text = G->ChaosBanner;
+        const float fontSize = 26_px;
+        const Hax::Vector2 textSize = Hax::Gui::CalcTextSize(G->NunitoSans_ExtraBold, text, fontSize);
+        const Hax::Vector2 center = {Hax::Gui::GetViewportCenter().X, 90_px};
+        const Hax::Vector2 pad = {22_px, 12_px};
+        Hax::Gui::DrawRect(center - textSize / 2.f - pad, center + textSize / 2.f + pad,
+            {.BorderColor = Theme::Accent, .BorderTh = 2_px, .FillColor = 0x101215E6, .Rounding = 12_px});
+        DrawHudTextCentered(G->NunitoSans_ExtraBold, text, center, fontSize, Theme::Accent);
     }
 
     void RenderOverlay()
@@ -299,6 +433,20 @@ namespace Cheat
             G->DroneLaunchRequested = true;
         }
 
+        const bool funHotkeysLive = G->IsInGame && !G->IsClient && !G->MenuVisible;
+
+        constexpr size_t droneFpvHotkeyId = Hax::Hash(L"DroneFpvHotkeyAction");
+        if (G->VkDroneFpv != 0 && funHotkeysLive && IsKeyJustDown(droneFpvHotkeyId, (Hax::uint8)G->VkDroneFpv))
+            G->DroneFpvEnabled = !G->DroneFpvEnabled;
+
+        constexpr size_t orbitalHotkeyId = Hax::Hash(L"OrbitalHotkeyAction");
+        if (G->VkOrbitalStrike != 0 && funHotkeysLive && IsKeyJustDown(orbitalHotkeyId, (Hax::uint8)G->VkOrbitalStrike))
+            G->OrbitalRequested = true;
+
+        constexpr size_t blackHoleHotkeyId = Hax::Hash(L"BlackHoleHotkeyAction");
+        if (G->VkBlackHole != 0 && funHotkeysLive && IsKeyJustDown(blackHoleHotkeyId, (Hax::uint8)G->VkBlackHole))
+            G->BlackHoleRequested = true;
+
         constexpr size_t droneDetonateHotkeyId = Hax::Hash(L"DroneDetonateHotkeyAction");
         if (G->VkDroneDetonate != 0 &&
             G->IsInGame &&
@@ -331,6 +479,9 @@ namespace Cheat
         }
 
         Hax::Gui::SwitchLayer(L"Background");
+        const uint64_t hudNow = ::GetTickCount64();
+        RenderDroneFpvHud(hudNow);
+        RenderChaosBanner(hudNow);
         RenderEsp();
         RenderGodGizmo();
         if ((G->ObjectRemoverEnabled || G->GodTargetingEnabled) && G->IsInGame && !G->MenuVisible)

@@ -103,12 +103,24 @@ namespace Cheat
         Hax::IniAddEntry(ini, "Entities",   "VkReviveSelf",        &G->VkReviveSelf,        Hax::IniFileWrite_Int,  IniFileRead_IntClamped<VK_F7, 0, 255>);
         Hax::IniAddEntry(ini, "Drone",      "ManualMode",          &G->DroneManualMode,     Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Drone",      "Speed",               &G->DroneSpeed,          Hax::IniFileWrite_Int,  IniFileRead_IntClamped<14, 4, 40>);
-        Hax::IniAddEntry(ini, "Drone",      "SwarmSize",           &G->DroneSwarmSize,      Hax::IniFileWrite_Int,  IniFileRead_IntClamped<1, 1, 50>);
+        Hax::IniAddEntry(ini, "Drone",      "SwarmSize",           &G->DroneSwarmSize,      Hax::IniFileWrite_Int,  IniFileRead_IntClamped<1, 1, 100>);
         Hax::IniAddEntry(ini, "Drone",      "Warheads",            &G->DroneWarheads,       Hax::IniFileWrite_Int,  IniFileRead_IntClamped<1, 1, 3>);
         Hax::IniAddEntry(ini, "Drone",      "ThroughWalls",        &G->DroneThroughWalls,   Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Drone",      "Lethal",              &G->DroneLethal,         Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Drone",      "VkLaunch",            &G->VkDroneLaunch,       Hax::IniFileWrite_Int,  IniFileRead_IntClamped<VK_F5, 0, 255>);
         Hax::IniAddEntry(ini, "Drone",      "VkDetonate",          &G->VkDroneDetonate,     Hax::IniFileWrite_Int,  IniFileRead_IntClamped<VK_F4, 0, 255>);
+        Hax::IniAddEntry(ini, "Drone",      "Retarget",            &G->DroneRetarget,       Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Drone",      "Fpv",                 &G->DroneFpvEnabled,     Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Drone",      "VkFpv",               &G->VkDroneFpv,          Hax::IniFileWrite_Int,  IniFileRead_IntClamped<VK_F1, 0, 255>);
+        Hax::IniAddEntry(ini, "Fun",        "OrbitalPower",        &G->OrbitalPower,        Hax::IniFileWrite_Int,  IniFileRead_IntClamped<9, 3, 24>);
+        Hax::IniAddEntry(ini, "Fun",        "VkOrbitalStrike",     &G->VkOrbitalStrike,     Hax::IniFileWrite_Int,  IniFileRead_IntClamped<VK_F3, 0, 255>);
+        Hax::IniAddEntry(ini, "Fun",        "BlackHoleRadius",     &G->BlackHoleRadius,     Hax::IniFileWrite_Int,  IniFileRead_IntClamped<14, 4, 40>);
+        Hax::IniAddEntry(ini, "Fun",        "BlackHoleDuration",   &G->BlackHoleDuration,   Hax::IniFileWrite_Int,  IniFileRead_IntClamped<6, 2, 20>);
+        Hax::IniAddEntry(ini, "Fun",        "BlackHoleStrength",   &G->BlackHoleStrength,   Hax::IniFileWrite_Int,  IniFileRead_IntClamped<12, 3, 40>);
+        Hax::IniAddEntry(ini, "Fun",        "BlackHoleIncludeSelf",&G->BlackHoleIncludeSelf,Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Fun",        "VkBlackHole",         &G->VkBlackHole,         Hax::IniFileWrite_Int,  IniFileRead_IntClamped<VK_F2, 0, 255>);
+        Hax::IniAddEntry(ini, "Fun",        "ChaosInterval",       &G->ChaosInterval,       Hax::IniFileWrite_Int,  IniFileRead_IntClamped<25, 5, 300>);
+        Hax::IniAddEntry(ini, "Fun",        "ChaosSpareMe",        &G->ChaosSpareMe,        Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
 
         Hax::IniAddEntry(ini, "Vision",     "BetterVision",        &G->BetterVision,        Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Vision",     "NoFog",               &G->NoFog,               Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);

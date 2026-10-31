@@ -442,6 +442,52 @@ X(LocKey_DroneDetonate, L"Detonate all", L"Подорвать все") \
 X(LocKey_DroneLaunchHotkey, L"Drone launch key", L"Клавиша запуска дрона") \
 X(LocKey_DroneDetonateHotkey, L"Drone detonate key", L"Клавиша подрыва дронов") \
 X(LocKey_DronesInFlight, L"In the air", L"В воздухе") \
+X(LocKey_DronesQueued, L"queued", L"в очереди") \
+X(LocKey_DroneFpv, L"FPV camera", L"FPV-камера") \
+X(LocKey_DroneFpvDesc, L"Watch through the newest drone. In Crosshair mode you fly it: mouse steers, W/S throttle", L"Вид с последнего дрона. В режиме «По прицелу» им управляешь ты: мышь — руль, W/S — газ") \
+X(LocKey_DroneFpvHotkey, L"FPV camera key", L"Клавиша FPV-камеры") \
+X(LocKey_DroneRetarget, L"Hunt the next target", L"Искать следующую цель") \
+X(LocKey_DroneRetargetDesc, L"Off: when the target is gone the drone circles in place until detonated", L"Выкл: без цели дрон кружит на месте, пока не подорвёшь") \
+X(LocKey_FunTab, L"Fun & chaos", L"Приколы и хаос") \
+X(LocKey_FunCategory, L"Fun", L"Приколы") \
+X(LocKey_FunPageDesc, L"Drones, orbital strikes, black holes and chaos mode", L"Дроны, орбитальные удары, чёрные дыры и хаос-режим") \
+X(LocKey_ORBITAL, L"ORBITAL STRIKE", L"ОРБИТАЛЬНЫЙ УДАР") \
+X(LocKey_OrbitalDesc, L"A laser burns down from the ceiling, then a column of blasts hits the mark", L"С потолка бьёт лазер, затем по метке проходит столб взрывов") \
+X(LocKey_OrbitalPower, L"Shells per strike", L"Снарядов за удар") \
+X(LocKey_OrbitalAtCrosshair, L"At crosshair", L"По прицелу") \
+X(LocKey_OrbitalAtTarget, L"At drone target", L"По цели дрона") \
+X(LocKey_OrbitalHotkey, L"Orbital strike key", L"Клавиша орбитального удара") \
+X(LocKey_BLACKHOLE, L"BLACK HOLE", L"ЧЁРНАЯ ДЫРА") \
+X(LocKey_BlackHoleDesc, L"Sucks loot, items, enemies and players into a spiral, then blows it all apart", L"Затягивает лут, предметы, врагов и игроков в воронку, а потом всё разносит") \
+X(LocKey_BlackHoleRadius, L"Radius", L"Радиус") \
+X(LocKey_BlackHoleDuration, L"Duration", L"Длительность") \
+X(LocKey_BlackHoleStrength, L"Pull strength", L"Сила притяжения") \
+X(LocKey_BlackHoleIncludeSelf, L"Pull me in too", L"Затягивать и меня") \
+X(LocKey_BlackHoleOpen, L"Open at crosshair", L"Открыть по прицелу") \
+X(LocKey_BlackHoleCollapse, L"Collapse now", L"Схлопнуть") \
+X(LocKey_BlackHoleHotkey, L"Black hole key", L"Клавиша чёрной дыры") \
+X(LocKey_SecondsFmt, L"%d s", L"%d с") \
+X(LocKey_CHAOS, L"CHAOS MODE", L"ХАОС-РЕЖИМ") \
+X(LocKey_ChaosDesc, L"A random event every few seconds: gravity, darkness, drones, black holes...", L"Случайное событие каждые N секунд: гравитация, темнота, дроны, чёрные дыры...") \
+X(LocKey_ChaosInterval, L"Event every", L"Событие каждые") \
+X(LocKey_ChaosSpareMe, L"Spare me", L"Не трогать меня") \
+X(LocKey_ChaosNow, L"Chaos now", L"Хаос сейчас") \
+X(LocKey_ChaosNextFmt, L"next in %d s", L"следующее через %d с") \
+X(LocKey_ChaosGravityFlip, L"CHAOS: gravity flipped!", L"ХАОС: гравитация вверх!") \
+X(LocKey_ChaosZeroGravity, L"CHAOS: zero gravity", L"ХАОС: невесомость") \
+X(LocKey_ChaosBlackout, L"CHAOS: lights out", L"ХАОС: свет вырубили") \
+X(LocKey_ChaosSlowMotion, L"CHAOS: slow motion", L"ХАОС: замедление времени") \
+X(LocKey_ChaosTurbo, L"CHAOS: turbo time", L"ХАОС: турбо-время") \
+X(LocKey_ChaosTumbleAll, L"CHAOS: everybody falls over", L"ХАОС: все падают") \
+X(LocKey_ChaosDroneRaid, L"CHAOS: drone raid!", L"ХАОС: налёт дронов!") \
+X(LocKey_ChaosOrbital, L"CHAOS: orbital strike incoming", L"ХАОС: орбитальный удар!") \
+X(LocKey_ChaosBlackHole, L"CHAOS: a black hole opened", L"ХАОС: открылась чёрная дыра") \
+X(LocKey_ChaosSpawnEnemy, L"CHAOS: someone new is here...", L"ХАОС: кто-то пришёл...") \
+X(LocKey_ChaosLaunchEveryone, L"CHAOS: everybody to the ceiling!", L"ХАОС: все к потолку!") \
+X(LocKey_ActionOrbitalIncoming, L"Orbital strike incoming", L"Орбитальный удар запущен") \
+X(LocKey_ActionBlackHoleOpened, L"Black hole opened", L"Чёрная дыра открыта") \
+X(LocKey_FpvSignalLost, L"SIGNAL LOST", L"СИГНАЛ ПОТЕРЯН") \
+X(LocKey_FpvThrottleHint, L"W/S throttle · mouse steers", L"W/S — газ · мышь — руль") \
 X(LocKey_UnlockAll, L"Unlock all", L"Открыть все")\
 X(LocKey_ResetAll, L"Reset all", L"Сбросить все")
 

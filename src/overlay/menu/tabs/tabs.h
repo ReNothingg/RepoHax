@@ -12,6 +12,7 @@ namespace Cheat
     void DrawSettingsTab();
     void DrawCosmeticTab();
     void DrawGodToolsTab();
+    void DrawFunTab();
 
     // Shared feature panels. They live on the page that owns their domain,
     // instead of being duplicated across unrelated tabs.

@@ -66,6 +66,9 @@
     <ClCompile Include="src\overlay\menu\tabs\drone_panel.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
+    <ClCompile Include="src\overlay\menu\tabs\fun_tab.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
     <ClCompile Include="src\overlay\menu\tabs\vision_tab.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>

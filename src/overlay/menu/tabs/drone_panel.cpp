@@ -55,8 +55,11 @@ namespace Cheat
         if (G->DroneTargetEnemy && !DronePanelEnemyAlive(G->DroneTargetEnemy))
             G->DroneTargetEnemy = null;
 
-        Hax::char16 note[32]{};
-        if (G->DronesInFlight > 0)
+        Hax::char16 note[64]{};
+        if (G->DronesQueued > 0)
+            swprintf_s(note, L"%ls: %d · %ls: %d", G->Loc[LocKey_DronesInFlight].Data(), G->DronesInFlight,
+                G->Loc[LocKey_DronesQueued].Data(), G->DronesQueued);
+        else if (G->DronesInFlight > 0)
             swprintf_s(note, L"%ls: %d", G->Loc[LocKey_DronesInFlight].Data(), G->DronesInFlight);
 
         BeginPanel(LINE_ID);
@@ -139,7 +142,7 @@ namespace Cheat
             SliderEx(LINE_ID, G->Loc[LocKey_DroneSpeed], buf, &G->DroneSpeed, 4, 40, SliderConvertInt);
             HorizontalLine(1_px);
             swprintf_s(buf, L"%d", G->DroneSwarmSize);
-            SliderEx(LINE_ID, G->Loc[LocKey_DroneSwarm], buf, &G->DroneSwarmSize, 1, 50, SliderConvertInt);
+            SliderEx(LINE_ID, G->Loc[LocKey_DroneSwarm], buf, &G->DroneSwarmSize, 1, 100, SliderConvertInt);
             HorizontalLine(1_px);
             swprintf_s(buf, L"%d", G->DroneWarheads);
             SliderEx(LINE_ID, G->Loc[LocKey_DroneWarheads], buf, &G->DroneWarheads, 1, 3, SliderConvertInt);
@@ -147,6 +150,11 @@ namespace Cheat
             ToggleEx(LINE_ID, G->DroneThroughWalls, G->Loc[LocKey_DroneThroughWalls], G->Loc[LocKey_DroneThroughWallsDesc]);
             HorizontalLine(1_px);
             ToggleEx(LINE_ID, G->DroneLethal, G->Loc[LocKey_DroneLethal], G->Loc[LocKey_DroneLethalDesc]);
+            HorizontalLine(1_px);
+            ToggleEx(LINE_ID, G->DroneRetarget, G->Loc[LocKey_DroneRetarget], G->Loc[LocKey_DroneRetargetDesc]);
+            HorizontalLine(1_px);
+            ToggleEx(LINE_ID, G->DroneFpvEnabled, G->Loc[LocKey_DroneFpv], G->Loc[LocKey_DroneFpvDesc],
+                {.Hotkey = &G->VkDroneFpv, .HotkeyId = Hax::Hash(L"DroneFpvHotkeyEditor")});
             HorizontalLine(1_px);
 
             const bool hasTarget = G->DroneManualMode || G->DroneTargetPlayer || G->DroneTargetEnemy;
@@ -158,7 +166,7 @@ namespace Cheat
                     {.Enabled = host && hasTarget, .MinW = btnW, .Style = ButtonStyle::Danger, .Icon = Icon::Zap}))
                     G->DroneLaunchRequested = true;
                 if (Button(LINE_ID, G->Loc[LocKey_DroneDetonate], {},
-                    {.Enabled = host && G->DronesInFlight > 0, .MinW = btnW}))
+                    {.Enabled = host && (G->DronesInFlight > 0 || G->DronesQueued > 0), .MinW = btnW}))
                     G->DroneDetonateRequested = true;
             }
             Hax::Gui::EndHorizontal();

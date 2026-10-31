@@ -17,7 +17,6 @@ OUT = ROOT / "src" / "overlay" / "menu" / "search_index.h"
 FILE_TAB = {
     "stats_tab.cpp": 0,
     "entities_tab.cpp": 1,
-    "drone_panel.cpp": 1,
     "vision_tab.cpp": 2,
     "valuables_tab.cpp": 3,
     "items_tab.cpp": 4,
@@ -26,6 +25,8 @@ FILE_TAB = {
     "misc_tab.cpp": 7,
     "settings_tab.cpp": 8,
     "god_tools_tab.cpp": 9,
+    "fun_tab.cpp": 10,
+    "drone_panel.cpp": 10,
 }
 
 # Shared panels: the tab that actually shows them.

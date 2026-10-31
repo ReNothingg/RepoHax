@@ -331,7 +331,6 @@ namespace Cheat
         {
             DrawEnemiesCard();
             DrawTeamControlPanel();
-            DrawDroneStrikePanel();
         }
         EndColumns();
     }

@@ -193,7 +193,48 @@ namespace Cheat
         bool                                DroneLaunchRequested;
         bool                                DroneDetonateRequested;
         int                                 DronesInFlight;
+        int                                 DronesQueued;
         bool                                DronePrefabsMissing;
+        bool                                DroneRetarget = true;     // hunt the next target instead of loitering
+        bool                                DroneFpvEnabled;
+        int                                 VkDroneFpv = VK_F1;
+
+        // FPV feed state (game thread writes, overlay reads)
+        bool                                FpvActive;
+        bool                                FpvPiloting;
+        bool                                FpvSignalLost;
+        bool                                FpvArming;
+        float                               FpvSpeed;
+        float                               FpvDistance;
+        float                               FpvRange;
+        float                               FpvSignal;
+        float                               FpvFlightTime;
+
+        // Orbital strike
+        int                                 OrbitalPower = 9;         // grenades per strike
+        int                                 VkOrbitalStrike = VK_F3;
+        bool                                OrbitalRequested;         // at the crosshair
+        bool                                OrbitalAtTargetRequested; // at the drone target, tracking it
+        int                                 OrbitalsActive;
+
+        // Black hole
+        int                                 BlackHoleRadius = 14;
+        int                                 BlackHoleDuration = 6;
+        int                                 BlackHoleStrength = 12;
+        bool                                BlackHoleIncludeSelf;
+        int                                 VkBlackHole = VK_F2;
+        bool                                BlackHoleRequested;
+        bool                                BlackHoleStopRequested;
+        bool                                BlackHoleActive;
+
+        // Chaos mode
+        bool                                ChaosEnabled;
+        int                                 ChaosInterval = 25;       // seconds
+        bool                                ChaosSpareMe = true;
+        bool                                ChaosTriggerNow;
+        int                                 ChaosNextIn;
+        Hax::char16                         ChaosBanner[96]{};
+        uint64_t                            ChaosBannerUntil;
 
         // Vision
         bool                                BetterVision;
