@@ -212,7 +212,7 @@ namespace Cheat
             {
                 return G->VkToggleFlight == vk || G->VkToggleEyeLasers == vk ||
                     G->VkTeleportPlayerToCamera == vk || G->VkSpawnItem == vk ||
-                    G->VkDeleteObject == vk || G->VkLockGodTarget == vk;
+                    G->VkDeleteObject == vk || G->VkLockGodTarget == vk || G->VkReviveSelf == vk;
             };
 
             if (!isGameplayHotkey('W') && GizmoKeyJustPressed('W')) G->GodGizmoModeCurrent = GodGizmoMode::Move;
@@ -239,6 +239,14 @@ namespace Cheat
     {
         if (IsKeyJustDown(HAX_LINE, G->VkOpenClose))
             ToggleMenuVisibility();
+
+        constexpr size_t reviveSelfHotkeyId = Hax::Hash(L"ReviveSelfHotkeyAction");
+        if (G->VkReviveSelf != 0 && G->ReviveSelfSessionReady && !G->MenuVisible &&
+            ::GetForegroundWindow() == G->GameWndHandle &&
+            IsKeyJustDown(reviveSelfHotkeyId, (Hax::uint8)G->VkReviveSelf))
+        {
+            G->ReviveSelfRequested = true;
+        }
 
         constexpr size_t toggleFlightHotkeyId = Hax::Hash(L"ToggleFlightHotkeyAction");
         if (!G->IsInGame)

@@ -164,6 +164,17 @@ namespace Cheat
             BeginPanel(LINE_ID);
             PanelHeader(G->Loc[LocKey_PLAYERS]);
             {
+                PlayerAvatar localPlayer = PlayerAvatar::instance();
+                const bool canReviveSelf = G->ReviveSelfSessionReady && !G->IsClient && localPlayer &&
+                    localPlayer.deadSet() && localPlayer.playerDeathHead();
+                if (Button(LINE_ID, G->Loc[LocKey_ReviveSelf], G->Loc[LocKey_HostOnly],
+                    {.Enabled = canReviveSelf, .MinW = Hax::Gui::GetContentRegionAvail().X}))
+                    G->ReviveSelfRequested = true;
+                if (HotkeyEx(Hax::Hash(L"ReviveSelfHotkeyEditor"), G->VkReviveSelf,
+                    G->Loc[LocKey_ReviveSelfHotkey], G->Loc[LocKey_ReviveSelfDesc]))
+                    Hax::IniSave(G->Config);
+                HorizontalLine(1_px);
+
                 ToggleEx(LINE_ID, G->PlayersEsp, G->Loc[LocKey_DisplayThroughWalls]);
                 HorizontalLine(1_px);
                 ToggleEx(LINE_ID, G->PlayersChams, G->Loc[LocKey_XrayHighlight]);

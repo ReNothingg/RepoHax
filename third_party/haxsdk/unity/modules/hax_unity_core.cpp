@@ -206,8 +206,10 @@ namespace Unity
 
     Object Object::Instantiate(Object original, const Vector3& position, const Quaternion& rotation)
     {
-        static auto s_Method = typeof().GetMethod("Internal_InstantiateSingle_Injected", nullptr, true).Wrap();
-        return s_Method.InternalCall<Object>(original, &position, &rotation);
+        // The injected method now returns a native pointer. Let Unity's managed
+        // overload marshal both the arguments and the returned Object wrapper.
+        static auto s_Method = typeof().GetMethod("Instantiate", "UnityEngine.Object(UnityEngine.Object,UnityEngine.Vector3,UnityEngine.Quaternion)", true).Wrap();
+        return s_Method.Call<Object>(original, System::BoxOnNeed(position), System::BoxOnNeed(rotation));
     }
 
     System::Array<Object> Object::FindObjectsOfType(System::Type type)
@@ -321,7 +323,7 @@ namespace Unity
         THROW_IF_NULL();
         static auto s_Method = typeof().GetMethod("get_position_Injected", nullptr, true).Wrap();
         Vector3 ret;
-        s_Method.InternalCall<void>(*this, &ret);
+        s_Method.InternalCall<void>(GetCachedPtr(), &ret);
         return ret;
     }
 
@@ -329,7 +331,7 @@ namespace Unity
     {
         THROW_IF_NULL();
         static auto s_Method = typeof().GetMethod("set_position_Injected", nullptr, true).Wrap();
-        s_Method.InternalCall<void>(*this, &value);
+        s_Method.InternalCall<void>(GetCachedPtr(), &value);
     }
 
     Vector3 Transform::GetLocalPosition()
@@ -337,7 +339,7 @@ namespace Unity
         THROW_IF_NULL();
         static auto s_Method = typeof().GetMethod("get_localPosition_Injected", nullptr, true).Wrap();
         Vector3 ret;
-        s_Method.InternalCall<void>(*this, &ret);
+        s_Method.InternalCall<void>(GetCachedPtr(), &ret);
         return ret;
     }
 
@@ -345,7 +347,7 @@ namespace Unity
     {
         THROW_IF_NULL();
         static auto s_Method = typeof().GetMethod("set_localPosition_Injected", nullptr, true).Wrap();
-        s_Method.InternalCall<void>(*this, &value);
+        s_Method.InternalCall<void>(GetCachedPtr(), &value);
     }
 
     Quaternion Transform::GetRotation()
@@ -353,7 +355,7 @@ namespace Unity
         THROW_IF_NULL();
         static auto s_Method = typeof().GetMethod("get_rotation_Injected", nullptr, true).Wrap();
         Quaternion ret;
-        s_Method.InternalCall<void>(*this, &ret);
+        s_Method.InternalCall<void>(GetCachedPtr(), &ret);
         return ret;
     }
 
@@ -361,7 +363,7 @@ namespace Unity
     {
         THROW_IF_NULL();
         static auto s_Method = typeof().GetMethod("set_rotation_Injected", nullptr, true).Wrap();
-        s_Method.InternalCall<void>(*this, &value);
+        s_Method.InternalCall<void>(GetCachedPtr(), &value);
     }
 
     Transform Transform::GetParent()
@@ -395,7 +397,7 @@ namespace Unity
         THROW_IF_NULL();
         static auto s_Method = typeof().GetMethod("get_localScale_Injected", nullptr, true).Wrap();
         Vector3 ret;
-        s_Method.InternalCall<void>(*this, &ret);
+        s_Method.InternalCall<void>(GetCachedPtr(), &ret);
         return ret;
     }
 
@@ -403,7 +405,7 @@ namespace Unity
     {
         THROW_IF_NULL();
         static auto s_Method = typeof().GetMethod("set_localScale_Injected", nullptr, true).Wrap();
-        s_Method.InternalCall<void>(*this, &value);
+        s_Method.InternalCall<void>(GetCachedPtr(), &value);
     }
 
     Transform Transform::Find(System::String n)
@@ -643,7 +645,7 @@ namespace Unity
         static auto s_Method = typeof().GetMethod("WorldToScreenPoint_Injected", nullptr, true).Wrap();
 
         Vector3 ret;
-        s_Method.InternalCall<void>(*this, &worldPos, (int)eye, &ret);
+        s_Method.InternalCall<void>(GetCachedPtr(), &worldPos, (int)eye, &ret);
 
         return ret;
     }
@@ -695,7 +697,7 @@ namespace Unity
         THROW_IF_NULL();
         static auto s_Method = typeof().GetMethod("get_pixelRect_Injected", nullptr, true).Wrap();
         Rect ret;
-        s_Method.InternalCall<void>(*this, &ret);
+        s_Method.InternalCall<void>(GetCachedPtr(), &ret);
         return ret;
     }
 
@@ -704,7 +706,7 @@ namespace Unity
         THROW_IF_NULL();
         static auto s_Method = typeof().GetMethod("get_projectionMatrix_Injected", nullptr, true).Wrap();
         Matrix4x4 ret;
-        s_Method.InternalCall<void>(*this, &ret);
+        s_Method.InternalCall<void>(GetCachedPtr(), &ret);
 
         return ret;
     }
@@ -714,7 +716,7 @@ namespace Unity
         THROW_IF_NULL();
         static auto s_Method = typeof().GetMethod("get_worldToCameraMatrix_Injected", nullptr, true).Wrap();
         Matrix4x4 ret;
-        s_Method.InternalCall<void>(*this, &ret);
+        s_Method.InternalCall<void>(GetCachedPtr(), &ret);
         return ret;
     }
 
@@ -912,7 +914,7 @@ namespace Unity
         THROW_IF_NULL();
         static auto s_Method = typeof().GetMethod("get_bounds_Injected", nullptr, true).Wrap();
         Bounds ret;
-        s_Method.InternalCall<void>(*this, &ret);
+        s_Method.InternalCall<void>(GetCachedPtr(), &ret);
         return ret;
     }
 
@@ -976,7 +978,7 @@ namespace Unity
         THROW_IF_NULL();
         static auto s_Method = typeof().GetMethod("get_color_Injected", nullptr, true).Wrap();
         Color ret;
-        s_Method.InternalCall<void>(*this, &ret);
+        s_Method.InternalCall<void>(GetCachedPtr(), &ret);
         return ret;
     }
 
@@ -984,7 +986,7 @@ namespace Unity
     {
         THROW_IF_NULL();
         static auto s_Method = typeof().GetMethod("set_color_Injected", nullptr, true).Wrap();
-        return s_Method.InternalCall<void>(*this, &color);
+        return s_Method.InternalCall<void>(GetCachedPtr(), &color);
     }
 
     System::Type MeshRenderer::typeof()
@@ -1024,7 +1026,7 @@ namespace Unity
     {
         THROW_IF_NULL();
         static auto s_Method = typeof().GetMethod("SetPosition_Injected", nullptr, true).Wrap();
-        return s_Method.InternalCall<void>(*this, index, &position);
+        return s_Method.InternalCall<void>(GetCachedPtr(), index, &position);
     }
 
     System::Type SkinnedMeshRenderer::typeof()
@@ -1106,7 +1108,7 @@ namespace Unity
         THROW_IF_NULL();
         static auto s_Method = typeof().GetMethod("GetInnerUVs_Injected", nullptr, true).Wrap();
         Vector4 ret;
-        s_Method.InternalCall<void>(*this, &ret);
+        s_Method.InternalCall<void>(GetCachedPtr(), &ret);
         return ret;
     }
 
@@ -1115,7 +1117,7 @@ namespace Unity
         THROW_IF_NULL();
         static auto s_Method = typeof().GetMethod("get_rect_Injected", nullptr, true).Wrap();
         Rect ret;
-        s_Method.InternalCall<void>(*this, &ret);
+        s_Method.InternalCall<void>(GetCachedPtr(), &ret);
         return ret;
     }
 
@@ -1124,7 +1126,7 @@ namespace Unity
         THROW_IF_NULL();
         static auto s_Method = typeof().GetMethod("GetTextureRect_Injected", nullptr, true).Wrap();
         Rect ret;
-        s_Method.InternalCall<void>(*this, &ret);
+        s_Method.InternalCall<void>(GetCachedPtr(), &ret);
         return ret;
     }
 

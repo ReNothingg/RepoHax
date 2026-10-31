@@ -226,6 +226,7 @@
   <ItemGroup>
     <ClInclude Include="src\cheat.h" />
     <ClInclude Include="src\game_classes.h" />
+    <ClInclude Include="src\hooks\eye_laser_protocol.h" />
     <ClInclude Include="src\overlay\menu\menu.h" />
     <ClInclude Include="src\overlay\menu\tabs\tabs.h" />
     <ClInclude Include="src\overlay\overlay.h" />

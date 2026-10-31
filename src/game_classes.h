@@ -2,6 +2,62 @@
 
 #include <third_party/haxsdk/unity/hax_unity.h>
 
+// Host relay bindings. The game's RPC authority checks remain in charge of damage.
+struct EyeLaserPhotonEvent : System::Object
+{
+    using System::Object::Object;
+    META("Photon3Unity3D", "ExitGames.Client.Photon", "EventData");
+    FIELD(Code, uint8_t);
+    int Sender() { return s_get_Sender.Call<int>(*this); }
+    System::Object CustomData() { return s_get_CustomData.Call<System::Object>(*this); }
+    METHOD_WRAPPER(get_Sender);
+    METHOD_WRAPPER(get_CustomData);
+};
+
+struct EyeLaserRaiseEventOptions : System::Object
+{
+    using System::Object::Object;
+    META("PhotonRealtime", "Photon.Realtime", "RaiseEventOptions");
+    FIELD(Receivers, uint8_t);
+    FIELD(TargetActors, System::Array<System::Int32>);
+};
+
+struct EyeLaserSendOptions
+{
+    META("Photon3Unity3D", "ExitGames.Client.Photon", "SendOptions");
+    int DeliveryMode = 1;
+    bool Encrypt = false;
+    uint8_t Channel = 0;
+};
+static_assert(sizeof(EyeLaserSendOptions) == 8);
+
+struct EyeLaserPhotonNetwork
+{
+    META("PhotonUnityNetworking", "Photon.Pun", "PhotonNetwork");
+    static bool RaiseEvent(uint8_t code, System::Object payload, EyeLaserRaiseEventOptions options)
+    {
+        return s_RaiseEvent.Call<bool>(code, payload, options, System::Box(EyeLaserSendOptions{}));
+    }
+    METHOD_WRAPPER_EX(RaiseEvent, "System.Boolean(System.Byte,System.Object,Photon.Realtime.RaiseEventOptions,ExitGames.Client.Photon.SendOptions)");
+    METHOD_WRAPPER_EX(OnEvent, "System.Void(ExitGames.Client.Photon.EventData)");
+};
+
+struct EyeLaserPhotonPlayer : System::Object
+{
+    using System::Object::Object;
+    META("PhotonRealtime", "Photon.Realtime", "Player");
+    int ActorNumber() { return s_get_ActorNumber.Call<int>(*this); }
+    METHOD_WRAPPER(get_ActorNumber);
+};
+
+struct EyeLaserPhotonView : Unity::Photon::PhotonView
+{
+    using Unity::Photon::PhotonView::PhotonView;
+    META("PhotonUnityNetworking", "Photon.Pun", "PhotonView");
+    int ViewId() { return s_get_ViewID.Call<int>(*this); }
+    METHOD_WRAPPER(get_ViewID);
+};
+
 struct PrefabRef : System::Object
 {
     using System::Object::Object;
@@ -10,11 +66,14 @@ struct PrefabRef : System::Object
 
     Unity::GameObject Prefab() { THROW_IF_NULL(); return s_get_Prefab.Call<Unity::GameObject>(*this); }
 
-    FIELD(prefabName, System::String);
-    FIELD(resourcePath, System::String);
+    // The getters include AssetBundle paths introduced in R.E.P.O. 0.5.0.
+    System::String prefabName() const { THROW_IF_NULL(); return s_get_PrefabName.Call<System::String>(*this); }
+    System::String resourcePath() const { THROW_IF_NULL(); return s_get_ResourcePath.Call<System::String>(*this); }
 
 private:
     METHOD_WRAPPER(get_Prefab);
+    METHOD_WRAPPER(get_PrefabName);
+    METHOD_WRAPPER(get_ResourcePath);
 };
 
 struct MenuCursor : Unity::MonoBehaviour
@@ -44,7 +103,7 @@ struct PlayerHealth : Unity::MonoBehaviour
     FIELD(health, int);
     FIELD(renderers, System::List<Unity::MeshRenderer>);
 
-    METHOD_WRAPPER(Hurt);
+    METHOD_WRAPPER_EX(Hurt, "System.Void(System.Int32,System.Boolean,System.Int32,System.Boolean)");
     METHOD_WRAPPER(Update);
 private:
     METHOD_WRAPPER(HealOther);
@@ -163,10 +222,10 @@ struct PlayerTumble : Unity::MonoBehaviour
         s_TumbleForce.Call<void>(*this, System::Box(force));
     }
 
-    void TumbleSet(bool isTumbling, bool playerInput)
+    void TumbleSet(bool isTumbling, bool playerInput, bool reset = false)
     {
         THROW_IF_NULL();
-        s_TumbleSet.Call<void>(*this, isTumbling, playerInput);
+        s_TumbleSet.Call<void>(*this, isTumbling, playerInput, reset);
     }
 
     FIELD(tumbleLaunch, int);
@@ -174,7 +233,7 @@ struct PlayerTumble : Unity::MonoBehaviour
 
     METHOD_WRAPPER(TumbleRequest);
     METHOD_WRAPPER(TumbleForce);
-    METHOD_WRAPPER(TumbleSet);
+    METHOD_WRAPPER_EX(TumbleSet, "System.Void(System.Boolean,System.Boolean,System.Boolean)");
 };
 
 struct FlashlightController : Unity::MonoBehaviour
@@ -456,6 +515,7 @@ struct GameDirector_gameState
     META("Assembly-CSharp", "", "GameDirector/gameState");
 
     ENUM_VALUE(Main);
+    ENUM_VALUE(Death);
 };
 
 struct SpectateCamera : Unity::MonoBehaviour
@@ -689,7 +749,7 @@ struct PhysGrabObjectImpactDetector : Unity::MonoBehaviour
 
     METHOD_WRAPPER(FixedUpdate);
     METHOD_WRAPPER(Break);
-    METHOD_WRAPPER(DestroyObject);
+    METHOD_WRAPPER_EX(DestroyObject, "System.Void(System.Boolean,System.Boolean)");
 private:
     METHOD_WRAPPER(HealLogic);
 };
@@ -721,10 +781,12 @@ struct SemiLaser : Unity::MonoBehaviour
 
     META("Assembly-CSharp", "", "SemiLaser");
 
-    void LaserActive(const Unity::Vector3& startPosition, const Unity::Vector3& endPosition, bool isHitting)
+    void LaserActive(const Unity::Vector3& startPosition, const Unity::Vector3& endPosition, bool isHitting,
+        float hitShake = 8.f, float hitImpact = 12.f, float hitSustain = -1.f)
     {
         THROW_IF_NULL();
-        s_LaserActive.Call<void>(*this, System::Box(startPosition), System::Box(endPosition), isHitting);
+        s_LaserActive.Call<void>(*this, System::Box(startPosition), System::Box(endPosition), isHitting,
+            hitShake, hitImpact, hitSustain);
     }
 
     FIELD(hurtColliderBeamThickness, float);
@@ -734,7 +796,7 @@ struct SemiLaser : Unity::MonoBehaviour
     FIELD(hurtCollider, HurtCollider);
 
 private:
-    METHOD_WRAPPER(LaserActive);
+    METHOD_WRAPPER_EX(LaserActive, "System.Void(UnityEngine.Vector3,UnityEngine.Vector3,System.Boolean,System.Single,System.Single,System.Single)");
 };
 
 struct ItemGunLaser : Unity::MonoBehaviour
@@ -759,10 +821,10 @@ struct ItemBattery : Unity::MonoBehaviour
         s_SetBatteryLife.Call<void, ItemBattery, int>(*this, batteryLife);
     }
 
-    void BatteryFullPercentChange(int batteryLifeInt, bool charge = false)
+    void BatteryFullPercentChange(int batteryLifeInt, bool charge = false, bool playSound = true)
     {
         THROW_IF_NULL();
-        s_BatteryFullPercentChange.Call<void, ItemBattery, int, bool>(*this, batteryLifeInt, charge);
+        s_BatteryFullPercentChange.Call<void, ItemBattery, int, bool, bool>(*this, batteryLifeInt, charge, playSound);
     }
 
     FIELD(batteryLife, float);
@@ -772,7 +834,7 @@ struct ItemBattery : Unity::MonoBehaviour
 
     METHOD_WRAPPER(Update);
     METHOD_WRAPPER(SetBatteryLife);
-    METHOD_WRAPPER(BatteryFullPercentChange);
+    METHOD_WRAPPER_EX(BatteryFullPercentChange, "System.Void(System.Int32,System.Boolean,System.Boolean)");
 };
 
 struct ValuableObject : Unity::MonoBehaviour

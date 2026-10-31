@@ -68,7 +68,7 @@ namespace Cheat
 
     void ToggleMenuVisibility()
     {
-        ::PostMessageW(G->GameWndHandle, WM_USER, 0, 0);
+        ::PostMessageW(G->GameWndHandle, MenuToggleMessage(), 0, 0);
     }
 
     void PrepareMenu()

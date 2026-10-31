@@ -4,6 +4,8 @@
 
 RepoHax is an internal C++ mod and developer toolbox for **R.E.P.O.** It uses a custom immediate-mode UI, a native Unity SDK, and DLL proxy loading without requiring an external injector.
 
+Targets **R.E.P.O. 0.5.0 — The Sunstone Update** (Steam build 26294889). Game bindings account for the current damage, tumble, laser, battery, and object-destruction methods. Prefab paths are resolved through the game's AssetBundle-aware getters; item, enemy, and level lists are discovered at runtime.
+
 > [!IMPORTANT]
 > This project was created for educational and mod-development research. Use it only in environments where every affected player has agreed to the changes. Host-only controls are marked in the menu and automatically disabled for clients.
 
@@ -46,6 +48,7 @@ English and Russian localization is available from the Settings page.
 #### Deadly eye lasers
 
 - Visible dual eye-laser effects based on the game's laser system
+- Host relay for connected RepoHax players: the host creates the beams and applies damage
 - Configurable range and damage
 - Optional instant enemy kill
 - Optional GameObject destruction for the host
@@ -142,6 +145,7 @@ Increase or decrease every local upgrade independently using the original in-gam
 - Player ESP and through-wall chams
 - Select an individual player
 - Tumble, kill, revive, or fully heal the selected player
+- Revive yourself immediately with a dedicated button or configurable hotkey, without selecting a player (host only)
 - Protect selected friends from damage
 - Protect selected friends from tumbling
 - Switch the local voice-chat state between alive and dead channels
@@ -244,17 +248,22 @@ Saved-position slots are intentionally cleared when the game is restarted.
 |---|---:|---|
 | Open / close menu | `` ` `` / `~` | Settings |
 | Spawn selected item | `F6` | Items & Spawn |
-| Toggle noclip flight | `F7` | Stats |
+| Revive yourself | `F7` | Entities & Team |
+| Toggle noclip flight | `V` | Stats |
 | Toggle eye lasers | `F8` | Stats |
 | Move player to camera | `F9` | Stats |
 | Delete aimed GameObject | `F10` | Items & Spawn |
 | Lock aimed object | `F11` | Object Editor |
+
+Quick revive works while dead with the mod menu closed and the game focused. It uses the game's normal revival at your death head, requires host or single-player authority, and is unavailable once game over or a level restart begins. Rebind it under **Entities & Team → Players**; press `Esc` while assigning a key to clear it. The binding is saved in `haxsdk.ini`.
 
 ## Multiplayer and authority
 
 - Controls labelled **Host only** require the master client or single-player mode.
 - Unsafe host-only actions are rejected on clients when session safety is enabled.
 - Host eye lasers use room-owned Photon Blasters, and host gravity uses the game's player impulse RPC. Unmodified clients can therefore see the beams and receive the gravity correction without installing RepoHax. Because the laser carrier is a real game item, stock clients may also see its weapon model and standard effects.
+- To use eye lasers while joining another player's lobby, **both the shooter and host need this updated RepoHax build**. The host's **Allow client eye lasers** setting must be enabled (default). Other players can use the unmodified game. A stock host cannot process RepoHax requests; in that case the shooter sees local visual beams only, with no network damage.
+- The laser relay validates the sender against the firing avatar, derives the beam origin from that avatar on the host, and expires requests after 1.5 seconds without updates. Turning lasers off, opening the shooter's menu, death, leaving the room, or disabling the host relay removes the network carriers. The host's own menu does not interrupt other players' lasers.
 - Item and object position / rotation changes use the game's existing Photon synchronization where a compatible network component exists.
 - Unity does not replicate arbitrary Transform scale or edits to non-networked room geometry through the game's standard Photon stream. Those changes remain local on unmodified clients.
 - Local visual options such as FOV, fog, occlusion, flashlight changes, ESP, and chams affect only the local client.
@@ -305,6 +314,21 @@ build\Release\bin\dwmapi.dll
 ```
 
 Build logs are stored in `build\logs` unless `-NoLog` is supplied.
+
+To check bindings against your installed game's managed assemblies without launching it:
+
+```powershell
+.\tools\Test-GameBindings.ps1 -ManagedDirectory 'C:\Program Files (x86)\Steam\steamapps\common\REPO\REPO_Data\Managed'
+```
+
+The check uses Windows PowerShell 5.1 reflection-only loading to verify types, fields, method signatures, argument counts for native calls and hooks, and Unity 6 native-pointer requirements for engine calls. It does not replace a C++ build or in-game testing.
+
+The relay packet validation, sequence ordering, acknowledgement matching, and timeout boundaries have standalone C++ tests. From a Visual Studio Developer PowerShell:
+
+```powershell
+msbuild .\tools\EyeLaserProtocolTests.vcxproj /p:Configuration=Release /p:Platform=x64
+.\build\Tests\bin\EyeLaserProtocolTests.exe
+```
 
 ## Troubleshooting
 

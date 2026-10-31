@@ -4,6 +4,7 @@
 #include <src/game_classes.h>
 #include <src/resource.h>
 #include <src/overlay/esp/esp.h>
+#include "eye_laser_protocol.h"
 
 #include <float.h>
 
@@ -17,7 +18,7 @@ namespace Cheat
 
     static void* Hooked_MonoRuntimeInvoke(void* a1, void* a2, void* a3, void* a4);
     static void Hooked__EventSystem_Update(Unity::EventSystem __this);
-    static void Hooked__PlayerHealth_Hurt(PlayerHealth __this, int damage, bool savingGrace, int enemyIndex);
+    static void Hooked__PlayerHealth_Hurt(PlayerHealth __this, int damage, bool savingGrace, int enemyIndex, bool hurtByHeal);
     static void Hooked__PlayerAvatar_PlayerDeath(PlayerAvatar __this, int enemyIndex);
     static void Hooked__PlayerController_FixedUpdate(PlayerController __this);
     static void Hooked__PlayerController_Update(PlayerController __this);
@@ -33,7 +34,7 @@ namespace Cheat
     static void Hooked__PhysGrabber_RayCheck(PhysGrabber __this, bool grab);
     static bool Hooked__Physics_Raycast(void* v1, void* v2, void* v3, float maxDistance, int v5, int v6);
     static void Hooked__PhysGrabObjectImpactDetector_Break(PhysGrabObjectImpactDetector __this, float a1, void* a2, int a3, bool a4);
-    static void Hooked__PhysGrabObjectImpactDetector_DestroyObject(PhysGrabObjectImpactDetector __this, bool a1);
+    static void Hooked__PhysGrabObjectImpactDetector_DestroyObject(PhysGrabObjectImpactDetector __this, bool effects, bool forced);
     static bool Hooked__PhotonNetwork_IsMasterClient();
     static void Hooked__ItemBattery_Update(ItemBattery __this);
     static void Hooked__Camera_FireOnPreRender(Unity::Camera __this);
@@ -67,6 +68,7 @@ namespace Cheat
     static void ProcessGodTools(PlayerAvatar avatar);
     static void DeleteGodObject(Unity::GameObject object, bool networked);
     static void UpdateEyeLasers();
+    static void Hooked__EyeLaserPhotonNetwork_OnEvent(EyeLaserPhotonEvent photonEvent);
     static void DrawPlayerChams(PlayerAvatar player, Unity::CommandBuffer cb, Unity::Material aliveMat, Unity::Material deadMat);
 
     static bool s_ForcedPlayerDeath;
@@ -113,6 +115,7 @@ namespace Cheat
         HOOK(SpectateCamera::s_HeadEnergyLogic.Address, SpectateCamera_HeadEnergyLogic);
         HOOK(EnemyRigidbody::s_FixedUpdate.Address, EnemyRigidbody_FixedUpdate);
         HOOK(DataDirector::s_SaveDeleteCheck.Address, DataDirector_SaveDeleteCheck);
+        HOOK(EyeLaserPhotonNetwork::s_OnEvent.Address, EyeLaserPhotonNetwork_OnEvent);
         #undef HOOK
 
         ::FlushInstructionCache(::GetCurrentProcess(), nullptr, 0);
@@ -432,6 +435,7 @@ namespace Cheat
         G->PlayerToTumble = null;
         G->PlayerToKill = null;
         G->PlayerToRevive = null;
+        G->ReviveSelfRequested = false;
         G->PlayerToHeal = null;
         G->SetToZero = false;
         G->SetToMax = false;
@@ -911,6 +915,50 @@ namespace Cheat
         }
     }
 
+    static bool IsReviveSelfSessionReady()
+    {
+        RunManager manager = RunManager::instance();
+        GameDirector director = GameDirector::instance();
+        return manager && director && manager.runStarted() && !manager.gameOver() &&
+            !manager.restarting() && manager.levelCurrent() != manager.levelLobbyMenu() &&
+            manager.levelCurrent() != manager.levelMainMenu() &&
+            (director.currentState() == GameDirector_gameState::Main() ||
+             director.currentState() == GameDirector_gameState::Death());
+    }
+
+    static void ProcessReviveSelfCommand(PlayerAvatar avatar)
+    {
+        if (!G->ReviveSelfRequested)
+            return;
+
+        // Consume once, even if the player or session is no longer ready.
+        G->ReviveSelfRequested = false;
+        if (!G->ReviveSelfSessionReady || !avatar)
+        {
+            SetSessionAction(G->Loc[LocKey_ActionReviveSelfNotReady]);
+            return;
+        }
+        if (G->IsClient)
+        {
+            SetSessionAction(G->Loc[LocKey_ActionReviveSelfHostOnly]);
+            return;
+        }
+        if (!avatar.deadSet())
+        {
+            SetSessionAction(G->Loc[LocKey_ActionReviveSelfAlive]);
+            return;
+        }
+
+        if (!avatar.playerDeathHead())
+        {
+            SetSessionAction(G->Loc[LocKey_ActionReviveSelfNotReady]);
+            return;
+        }
+
+        avatar.Revive(false);
+        SetSessionAction(G->Loc[LocKey_ActionReviveSelfDone]);
+    }
+
     static void Hooked__EventSystem_Update(Unity::EventSystem __this)
     {
         try
@@ -923,8 +971,11 @@ namespace Cheat
 
             G->IsClient = !SemiFunc::IsMasterClientOrSingleplayer();
             G->IsInGame = IsInGame();
+            // Death is a brief camera-animation state before spectating returns to Main.
+            G->ReviveSelfSessionReady = IsReviveSelfSessionReady();
 
             UpdateSessionSafety(avatar);
+            ProcessReviveSelfCommand(avatar);
             ProcessWorldSessionCommands(avatar);
             ProcessCurrencyCommands();
             ProcessQuotaCommands();
@@ -1285,13 +1336,13 @@ namespace Cheat
         }
     }
 
-    static void Hooked__PlayerHealth_Hurt(PlayerHealth __this, int damage, bool savingGrace, int enemyIndex)
+    static void Hooked__PlayerHealth_Hurt(PlayerHealth __this, int damage, bool savingGrace, int enemyIndex, bool hurtByHeal)
     {
         PlayerAvatar localPlayer = PlayerAvatar::instance();
         if (G->GodAllPlayers || (G->Godmode && localPlayer && localPlayer.playerHealth() == __this) || IsProtectedHealth(__this))
             return;
 
-        G->PlayerHealth_Hurt_Hook.unsafe_call<void, PlayerHealth, int, bool, int>(__this, damage, savingGrace, enemyIndex);
+        G->PlayerHealth_Hurt_Hook.unsafe_call<void, PlayerHealth, int, bool, int, bool>(__this, damage, savingGrace, enemyIndex, hurtByHeal);
     }
 
     static void Hooked__PlayerAvatar_PlayerDeath(PlayerAvatar __this, int enemyIndex)
@@ -3139,7 +3190,12 @@ namespace Cheat
         return laser;
     }
 
-    static void ConfigureEyeLaserDamage(SemiLaser laser, PlayerAvatar avatar)
+    static EyeLaserProtocol::Settings LocalEyeLaserSettings()
+    {
+        return {G->EyeLaserRange, G->EyeLaserDamage, G->EyeLaserInstantKill, G->EyeLaserDestroyObjects};
+    }
+
+    static void ConfigureEyeLaserDamage(SemiLaser laser, PlayerAvatar avatar, const EyeLaserProtocol::Settings& settings)
     {
         if (!laser)
             return;
@@ -3151,15 +3207,15 @@ namespace Cheat
             return;
 
         hurt.playerLogic() = false;
-        hurt.physLogic() = true;
-        hurt.physDestroy() = G->EyeLaserDestroyObjects;
-        hurt.physHingeDestroy() = G->EyeLaserDestroyObjects;
+        hurt.physLogic() = !G->IsClient;
+        hurt.physDestroy() = settings.DestroyObjects;
+        hurt.physHingeDestroy() = settings.DestroyObjects;
         hurt.physReleaseGrab() = true;
         hurt.physImpact() = 3; // HurtCollider.BreakImpact.Heavy
         hurt.physDamageCooldown() = 0.05f;
-        hurt.enemyLogic() = true;
-        hurt.enemyKill() = G->EyeLaserInstantKill;
-        hurt.enemyDamage() = G->EyeLaserDamage;
+        hurt.enemyLogic() = !G->IsClient;
+        hurt.enemyKill() = settings.InstantKill;
+        hurt.enemyDamage() = settings.Damage;
         hurt.enemyDamageCooldown() = 0.05f;
         hurt.enemyHitTriggers() = true;
         hurt.playerCausingHurtOverride() = avatar;
@@ -3180,6 +3236,25 @@ namespace Cheat
     static NetworkEyeLaserCarrier s_LeftNetworkEyeLaser;
     static NetworkEyeLaserCarrier s_RightNetworkEyeLaser;
 
+    struct RemoteEyeLaserSession
+    {
+        int Actor = 0;
+        EyeLaserProtocol::Request Request{};
+        uint64_t LastReceivedAt = 0;
+        uint32_t LastAcknowledgedSequence = 0;
+        bool HasAcknowledged = false;
+        NetworkEyeLaserCarrier Left;
+        NetworkEyeLaserCarrier Right;
+    };
+
+    static std::array<RemoteEyeLaserSession, 16> s_RemoteEyeLasers;
+    static EyeLaserProtocol::Request s_ClientEyeLaserRequest;
+    static uint64_t s_NextEyeLaserRequestAt;
+    static uint64_t s_LastEyeLaserAckAt;
+    static uint32_t s_LastEyeLaserAckSequence;
+    static int s_EyeLaserMasterActor;
+    static bool s_ClientEyeLasersActive;
+
     static void DestroyLocalEyeLasers()
     {
         if (s_EyeLaserPrefab.Left)
@@ -3192,7 +3267,7 @@ namespace Cheat
 
     static void DestroyNetworkEyeLaser(NetworkEyeLaserCarrier& carrier)
     {
-        if (carrier.Object && G->IsInGame && !G->IsClient && SemiFunc::IsMultiplayer())
+        if (carrier.Object && G->IsInGame && SemiFunc::IsMultiplayer() && SemiFunc::IsMasterClient())
             Unity::Photon::PhotonNetwork::Destroy(carrier.Object);
         carrier = {};
     }
@@ -3261,7 +3336,7 @@ namespace Cheat
     }
 
     static void UpdateNetworkEyeLaser(NetworkEyeLaserCarrier& carrier, const Unity::Vector3& eye,
-        const Unity::Quaternion& muzzleRotation, PlayerAvatar avatar)
+        const Unity::Quaternion& muzzleRotation, PlayerAvatar avatar, const EyeLaserProtocol::Settings& settings)
     {
         if (!carrier.Object || !carrier.Phys || !carrier.Gun || !carrier.GunLaser)
             return;
@@ -3272,11 +3347,11 @@ namespace Cheat
         const Unity::Vector3 rootPosition = eye - rootRotation * carrier.MuzzleOffset;
         carrier.Phys.Teleport(rootPosition, rootRotation);
 
-        carrier.Gun.gunRange() = (float)G->EyeLaserRange;
-        ConfigureEyeLaserDamage(carrier.GunLaser.semiLaser(), avatar);
+        carrier.Gun.gunRange() = (float)settings.Range;
+        ConfigureEyeLaserDamage(carrier.GunLaser.semiLaser(), avatar, settings);
 
         if (carrier.Battery && carrier.Battery.batteryLifeInt() <= 1)
-            carrier.Battery.BatteryFullPercentChange(carrier.Battery.batteryBars(), true);
+            carrier.Battery.BatteryFullPercentChange(carrier.Battery.batteryBars(), true, false);
 
         if (carrier.Gun.stateCurrent() != 3 && carrier.Gun.photonView())
         {
@@ -3285,11 +3360,258 @@ namespace Cheat
         }
     }
 
+    static int EyeLaserActorNumber(Unity::Photon::Player player)
+    {
+        return player != null ? std::bit_cast<EyeLaserPhotonPlayer>(player).ActorNumber() : 0;
+    }
+
+    static int EyeLaserViewId(Unity::Photon::PhotonView view)
+    {
+        return view ? std::bit_cast<EyeLaserPhotonView>(view).ViewId() : 0;
+    }
+
+    static PlayerAvatar FindRemoteEyeLaserPlayer(int viewId, int actor)
+    {
+        GameDirector director = GameDirector::instance();
+        if (!director)
+            return null;
+        for (PlayerAvatar player : director.PlayerList())
+        {
+            if (!player || player.isLocal())
+                continue;
+            Unity::Photon::PhotonView view = player.photonView();
+            if (EyeLaserViewId(view) == viewId && EyeLaserActorNumber(view.GetOwner()) == actor)
+                return player;
+        }
+        return null;
+    }
+
+    static bool SendEyeLaserPacket(std::span<const int32_t> packet, int targetActor = 0)
+    {
+        System::Array<System::Int32> payload = System::Array<System::Int32>::CreateInstance(packet.size());
+        for (size_t index = 0; index < packet.size(); ++index)
+            payload[index] = System::Int32(packet[index]);
+        EyeLaserRaiseEventOptions options = System::Activator::CreateInstanceDefaultCtor<EyeLaserRaiseEventOptions>();
+        if (targetActor > 0)
+        {
+            const System::Array<System::Int32> targets{System::Int32(targetActor)};
+            Hax::Unity::Internal::GCSetField(options, &options.TargetActors(), targets);
+        }
+        else
+            options.Receivers() = 2; // ReceiverGroup.MasterClient; never broadcast client requests.
+        return EyeLaserPhotonNetwork::RaiseEvent(EyeLaserProtocol::EventCode, payload, options);
+    }
+
+    static void Hooked__EyeLaserPhotonNetwork_OnEvent(EyeLaserPhotonEvent photonEvent)
+    {
+        try
+        {
+            if (photonEvent != null && photonEvent.Code() == EyeLaserProtocol::EventCode && G->IsInGame)
+            {
+                System::Object data = photonEvent.CustomData();
+                if (data != null && System::Array<System::Int32>::typeof().IsInstanceOfType(data))
+                {
+                    auto payload = std::bit_cast<System::Array<System::Int32>>(data);
+                    if (payload.Length() >= (int)EyeLaserProtocol::AckSize && payload.Length() <= (int)EyeLaserProtocol::RequestSize)
+                    {
+                        std::array<int32_t, EyeLaserProtocol::RequestSize> values{};
+                        for (int index = 0; index < payload.Length(); ++index)
+                            values[index] = payload[index].Value;
+                        const std::span<const int32_t> packet(values.data(), payload.Length());
+                        const int sender = photonEvent.Sender();
+                        const uint64_t now = ::GetTickCount64();
+                        if (SemiFunc::IsMultiplayer() && SemiFunc::IsMasterClient())
+                        {
+                            EyeLaserProtocol::Request request;
+                            if (G->EyeLaserHostRelayEnabled && sender > 0 && EyeLaserProtocol::Decode(packet, request) &&
+                                FindRemoteEyeLaserPlayer(request.ViewId, sender))
+                            {
+                                RemoteEyeLaserSession* slot = nullptr;
+                                for (auto& session : s_RemoteEyeLasers)
+                                {
+                                    if (session.Actor == sender) { slot = &session; break; }
+                                    if (!slot && session.Actor == 0) slot = &session;
+                                }
+                                if (slot && (slot->Actor == 0 || slot->Request.ViewId != request.ViewId ||
+                                    EyeLaserProtocol::IsNewer(request.Sequence, slot->Request.Sequence)))
+                                {
+                                    slot->Actor = sender;
+                                    slot->Request = request;
+                                    slot->LastReceivedAt = now;
+                                }
+                            }
+                        }
+                        else if (sender > 0 && sender == s_EyeLaserMasterActor &&
+                            sender == EyeLaserActorNumber(Unity::Photon::PhotonNetwork::GetMasterClient()) &&
+                            EyeLaserProtocol::IsAcknowledgement(packet, s_ClientEyeLaserRequest.ViewId))
+                        {
+                            const uint32_t sequence = std::bit_cast<uint32_t>(packet[3]);
+                            if (!EyeLaserProtocol::IsNewer(sequence, s_ClientEyeLaserRequest.Sequence) &&
+                                (s_LastEyeLaserAckAt == 0 || EyeLaserProtocol::IsNewer(sequence, s_LastEyeLaserAckSequence)))
+                            {
+                                s_LastEyeLaserAckAt = now;
+                                s_LastEyeLaserAckSequence = sequence;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        catch (System::Exception&)
+        {
+            // A malformed custom event must not interrupt Photon's normal dispatch.
+        }
+        G->EyeLaserPhotonNetwork_OnEvent_Hook.unsafe_call<void, EyeLaserPhotonEvent>(photonEvent);
+    }
+
+    static void DestroyRemoteEyeLaserSession(RemoteEyeLaserSession& session)
+    {
+        DestroyNetworkEyeLaser(session.Left);
+        DestroyNetworkEyeLaser(session.Right);
+        session = {};
+    }
+
+    static void UpdateEyeLaserRelay()
+    {
+        const uint64_t now = ::GetTickCount64();
+        const bool multiplayer = G->IsInGame && SemiFunc::IsMultiplayer();
+        const bool host = multiplayer && SemiFunc::IsMasterClient();
+        if (!host)
+        {
+            for (auto& session : s_RemoteEyeLasers)
+                DestroyRemoteEyeLaserSession(session);
+        }
+
+        if (!multiplayer || host)
+        {
+            s_ClientEyeLasersActive = false;
+            s_LastEyeLaserAckAt = 0;
+            s_EyeLaserMasterActor = 0;
+            G->EyeLaserHostConnected = false;
+        }
+        else
+        {
+            const int master = EyeLaserActorNumber(Unity::Photon::PhotonNetwork::GetMasterClient());
+            PlayerAvatar avatar = PlayerAvatar::instance();
+            const int viewId = avatar ? EyeLaserViewId(avatar.photonView()) : 0;
+            if (master != s_EyeLaserMasterActor || viewId != s_ClientEyeLaserRequest.ViewId)
+            {
+                s_LastEyeLaserAckAt = 0;
+                s_NextEyeLaserRequestAt = 0;
+                s_ClientEyeLasersActive = false;
+                s_EyeLaserMasterActor = master;
+                s_ClientEyeLaserRequest.ViewId = viewId;
+            }
+            Unity::Camera camera = SemiFunc::MainCamera();
+            const bool active = G->EyeLasersEnabled && !G->MenuVisible && IsPlayerUsable(avatar) && camera && viewId > 0;
+            if (master > 0 && viewId > 0 && (active || s_ClientEyeLasersActive) &&
+                (active != s_ClientEyeLasersActive || now >= s_NextEyeLaserRequestAt))
+            {
+                s_ClientEyeLaserRequest.Active = active;
+                ++s_ClientEyeLaserRequest.Sequence;
+                s_ClientEyeLaserRequest.Options = LocalEyeLaserSettings();
+                if (camera)
+                {
+                    const Unity::Vector3 direction = camera.GetTransform().GetForward().GetNormalized();
+                    s_ClientEyeLaserRequest.Direction = {direction.X, direction.Y, direction.Z};
+                }
+                if (SendEyeLaserPacket(EyeLaserProtocol::Encode(s_ClientEyeLaserRequest)))
+                {
+                    s_ClientEyeLasersActive = active;
+                    s_NextEyeLaserRequestAt = now + EyeLaserProtocol::SendIntervalMs;
+                }
+            }
+            G->EyeLaserHostConnected = s_LastEyeLaserAckAt != 0 && !EyeLaserProtocol::HasExpired(now, s_LastEyeLaserAckAt);
+        }
+
+        if (!host)
+            return;
+
+        for (auto& session : s_RemoteEyeLasers)
+        {
+            if (session.Actor == 0)
+                continue;
+            try
+            {
+                PlayerAvatar avatar = FindRemoteEyeLaserPlayer(session.Request.ViewId, session.Actor);
+                if (!G->EyeLaserHostRelayEnabled || EyeLaserProtocol::HasExpired(now, session.LastReceivedAt) || !IsPlayerUsable(avatar))
+                {
+                    DestroyRemoteEyeLaserSession(session);
+                    continue;
+                }
+                if (session.Request.Active)
+                {
+                    if (!s_EyeLaserPrefab.Template && !G->ItemsPool.Empty())
+                        s_EyeLaserPrefab.Template = FindEyeLaserTemplate();
+                    if (!s_EyeLaserPrefab.Template || !avatar.spectatePoint())
+                        continue;
+
+                    const auto& direction = session.Request.Direction;
+                    constexpr float degrees = 57.2957795131f;
+                    const Unity::Quaternion rotation = Unity::Quaternion::Euler(
+                        -std::asin(std::clamp(direction[1], -1.f, 1.f)) * degrees,
+                        std::atan2(direction[0], direction[2]) * degrees, 0.f);
+                    const Unity::Vector3 forward = rotation * Unity::Vector3::forward();
+                    const Unity::Vector3 right = rotation * Unity::Vector3::right();
+                    const Unity::Vector3 up = rotation * Unity::Vector3::up();
+                    const Unity::Vector3 center = avatar.spectatePoint().GetPosition() + forward * 0.16f - up * 0.025f;
+                    const Unity::Vector3 leftEye = center - right * 0.055f;
+                    const Unity::Vector3 rightEye = center + right * 0.055f;
+                    if (!session.Left.Object && !CreateNetworkEyeLaser(session.Left, leftEye))
+                        continue;
+                    if (!session.Right.Object && !CreateNetworkEyeLaser(session.Right, rightEye))
+                    {
+                        DestroyNetworkEyeLaser(session.Left);
+                        continue;
+                    }
+                    UpdateNetworkEyeLaser(session.Left, leftEye, rotation, avatar, session.Request.Options);
+                    UpdateNetworkEyeLaser(session.Right, rightEye, rotation, avatar, session.Request.Options);
+                    if (now < session.Left.ReadyAt || now < session.Right.ReadyAt)
+                        continue;
+                }
+                else
+                {
+                    DestroyNetworkEyeLaser(session.Left);
+                    DestroyNetworkEyeLaser(session.Right);
+                }
+
+                // Acknowledge only after the host has actually processed the request.
+                if (!session.HasAcknowledged || session.LastAcknowledgedSequence != session.Request.Sequence)
+                {
+                    if (SendEyeLaserPacket(EyeLaserProtocol::Acknowledge(session.Request), session.Actor))
+                    {
+                        session.HasAcknowledged = true;
+                        session.LastAcknowledgedSequence = session.Request.Sequence;
+                    }
+                }
+            }
+            catch (System::Exception& ex)
+            {
+                System::String message = ex.Message();
+                Hax::LogError(G->Logger, L"Eye laser relay for actor %d: %ls", session.Actor,
+                    message != null ? message.GetRawStringData() : L"Exception without message");
+                DestroyRemoteEyeLaserSession(session);
+            }
+        }
+    }
+
     static void UpdateEyeLasers()
     {
         const wchar_t* stage = L"startup";
         try
         {
+            stage = L"host relay";
+            UpdateEyeLaserRelay();
+
+            PlayerAvatar avatar = PlayerAvatar::instance();
+            if (!G->EyeLasersEnabled || !G->IsInGame || G->MenuVisible)
+            {
+                stage = L"laser cleanup";
+                DestroyNetworkEyeLasers();
+                DestroyLocalEyeLasers();
+                return;
+            }
+
             stage = L"prefab lookup";
             if (!s_EyeLaserPrefab.Template && !G->ItemsPool.Empty())
                 s_EyeLaserPrefab.Template = FindEyeLaserTemplate();
@@ -3304,18 +3626,14 @@ namespace Cheat
                 return;
             }
 
-            PlayerAvatar avatar = PlayerAvatar::instance();
-            if (!G->EyeLasersEnabled || !G->IsInGame || G->MenuVisible)
-            {
-                stage = L"network cleanup";
-                DestroyNetworkEyeLasers();
-                return;
-            }
-
             stage = L"camera pose";
             Unity::Camera camera = SemiFunc::MainCamera();
             if (!IsPlayerUsable(avatar) || !camera)
+            {
+                DestroyNetworkEyeLasers();
+                DestroyLocalEyeLasers();
                 return;
+            }
 
             Unity::Transform cameraTransform = camera.GetTransform();
             Unity::Quaternion rotation = cameraTransform.GetRotation();
@@ -3341,13 +3659,19 @@ namespace Cheat
                     return;
 
                 stage = L"left network update";
-                UpdateNetworkEyeLaser(s_LeftNetworkEyeLaser, leftEye, rotation, avatar);
+                UpdateNetworkEyeLaser(s_LeftNetworkEyeLaser, leftEye, rotation, avatar, LocalEyeLaserSettings());
                 stage = L"right network update";
-                UpdateNetworkEyeLaser(s_RightNetworkEyeLaser, rightEye, rotation, avatar);
+                UpdateNetworkEyeLaser(s_RightNetworkEyeLaser, rightEye, rotation, avatar, LocalEyeLaserSettings());
                 return;
             }
 
             DestroyNetworkEyeLasers();
+
+            if (G->IsClient && G->EyeLaserHostConnected)
+            {
+                DestroyLocalEyeLasers();
+                return;
+            }
 
             if (!s_EyeLaserPrefab.Left)
                 s_EyeLaserPrefab.Left = CreateEyeLaserFromPrefab(s_EyeLaserPrefab.Template, leftEye);
@@ -3390,8 +3714,8 @@ namespace Cheat
                 }
             }
 
-            ConfigureEyeLaserDamage(s_EyeLaserPrefab.Left, avatar);
-            ConfigureEyeLaserDamage(s_EyeLaserPrefab.Right, avatar);
+            ConfigureEyeLaserDamage(s_EyeLaserPrefab.Left, avatar, LocalEyeLaserSettings());
+            ConfigureEyeLaserDamage(s_EyeLaserPrefab.Right, avatar, LocalEyeLaserSettings());
             s_EyeLaserPrefab.Left.LaserActive(leftEye, endPoint, hitSomething);
             s_EyeLaserPrefab.Right.LaserActive(rightEye, endPoint, hitSomething);
         }
@@ -3461,8 +3785,10 @@ namespace Cheat
                         {
                             for (EnemyParent parent : dir.enemiesSpawned())
                             {
+                                if (!parent || !parent.Spawned())
+                                    continue;
                                 Enemy enemy = parent.enemy();
-                                if (enemy && parent.Spawned())
+                                if (enemy)
                                 {
                                     Hax::Optional<EnemyEspData> data = ParseEnemyEspData(enemy);
                                     if (data.HasValue())
@@ -3743,12 +4069,13 @@ namespace Cheat
         G->PhysGrabObjectImpactDetector_Break_Hook.unsafe_call<void, PhysGrabObjectImpactDetector, float, void*, int, bool>(__this, a1, a2, a3, a4);
     }
 
-    static void Hooked__PhysGrabObjectImpactDetector_DestroyObject(PhysGrabObjectImpactDetector __this, bool a1)
+    static void Hooked__PhysGrabObjectImpactDetector_DestroyObject(PhysGrabObjectImpactDetector __this, bool effects, bool forced)
     {
-        if (G->Unbreakable && __this.isValuable())
+        // Forced cleanup must still remove extracted valuables and spent objects.
+        if (G->Unbreakable && __this.isValuable() && !forced)
             return;
 
-        G->PhysGrabObjectImpactDetector_DestroyObject_Hook.unsafe_call<void, PhysGrabObjectImpactDetector, bool>(__this, a1);
+        G->PhysGrabObjectImpactDetector_DestroyObject_Hook.unsafe_call<void, PhysGrabObjectImpactDetector, bool, bool>(__this, effects, forced);
     }
 
     static bool g_PretendMaster;
@@ -3769,7 +4096,7 @@ namespace Cheat
             if (G->InfBattery && __this.batteryLifeInt() < __this.batteryBars() && __this.physGrabObject().grabbedLocal())
             {
                 //g_PretendMaster = true;
-                __this.BatteryFullPercentChange(__this.batteryBars(), false);
+                __this.BatteryFullPercentChange(__this.batteryBars(), false, false);
                 //g_PretendMaster = false;
             }
         }

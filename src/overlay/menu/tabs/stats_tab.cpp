@@ -127,13 +127,22 @@ namespace Cheat
             PanelHeader(G->Loc[LocKey_MOVEMENT]);
             {
                 ToggleEx(LINE_ID, G->FlightEnabled, G->Loc[LocKey_Flight], G->Loc[LocKey_FlightControls], {.Disabled = !G->IsInGame});
+
+                HorizontalLine(1_px);
+
+                HotkeyEx(Hax::Hash(L"ToggleFlightHotkeyEditor"), G->VkToggleFlight, G->Loc[LocKey_Hotkey], G->Loc[LocKey_ToggleFlight]);
             }
             EndPanel();
 
             BeginPanel(LINE_ID);
             PanelHeader(G->Loc[LocKey_EYELASERS]);
             {
-                ToggleEx(LINE_ID, G->EyeLasersEnabled, G->Loc[LocKey_EyeLasers], G->Loc[LocKey_EyeLasersDesc], {.Disabled = !G->IsInGame || !avatar});
+                const auto laserDescription = G->IsClient
+                    ? G->Loc[G->EyeLaserHostConnected ? LocKey_EyeLaserHostConnected : LocKey_EyeLaserHostRequired]
+                    : G->Loc[LocKey_EyeLasersDesc];
+                ToggleEx(LINE_ID, G->EyeLasersEnabled, G->Loc[LocKey_EyeLasers], laserDescription, {.Disabled = !G->IsInGame || !avatar});
+
+                ToggleEx(LINE_ID, G->EyeLaserHostRelayEnabled, G->Loc[LocKey_EyeLaserHostRelay], G->Loc[LocKey_EyeLaserHostRelayDesc], {.Disabled = G->IsClient});
 
                 HorizontalLine(1_px);
 
@@ -155,7 +164,7 @@ namespace Cheat
 
                 HorizontalLine(1_px);
 
-                ToggleEx(LINE_ID, G->EyeLaserDestroyObjects, G->Loc[LocKey_EyeLaserDestroyObjects], G->Loc[LocKey_AvailableIfHost], {.Disabled = G->IsClient});
+                ToggleEx(LINE_ID, G->EyeLaserDestroyObjects, G->Loc[LocKey_EyeLaserDestroyObjects], G->Loc[LocKey_EyeLasersDesc], {.Disabled = G->IsClient && !G->EyeLaserHostConnected});
 
                 HotkeyEx(Hax::Hash(L"ToggleEyeLasersHotkeyEditor"), G->VkToggleEyeLasers, G->Loc[LocKey_Hotkey], G->Loc[LocKey_ToggleEyeLasers]);
             }

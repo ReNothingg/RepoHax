@@ -71,11 +71,12 @@ namespace Cheat
         Hax::IniAddEntry(ini, "Stats",      "CrouchingSpeed",      &G->Accel.Crouching,     Hax::IniFileWrite_Int,  IniFileRead_IntClamped<1, 1, 5>);
         Hax::IniAddEntry(ini, "Stats",      "InfiniteJumps",       &G->InfJumps,            Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Stats",      "NoTumble",            &G->NoTumble,            Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
-        Hax::IniAddEntry(ini, "Stats",      "VkToggleFlight",      &G->VkToggleFlight,      Hax::IniFileWrite_Int,  IniFileRead_IntClamped<VK_F7, 0, 255>);
+        Hax::IniAddEntry(ini, "Stats",      "VkToggleFlight",      &G->VkToggleFlight,      Hax::IniFileWrite_Int,  IniFileRead_IntClamped<'V', 0, 255>);
         Hax::IniAddEntry(ini, "Stats",      "FlightSpeed",         &G->FlightSpeed,         Hax::IniFileWrite_Int,  IniFileRead_IntClamped<10, 1, 30>);
         Hax::IniAddEntry(ini, "Stats",      "FlightSprintBoost",    &G->FlightSprintBoost,   Hax::IniFileWrite_Int,  IniFileRead_IntClamped<3, 1, 6>);
         Hax::IniAddEntry(ini, "Stats",      "VkTeleportPlayerToCamera", &G->VkTeleportPlayerToCamera, Hax::IniFileWrite_Int, IniFileRead_IntClamped<VK_F9, 0, 255>);
         Hax::IniAddEntry(ini, "Stats",      "EyeLasersEnabled",    &G->EyeLasersEnabled,    Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Stats",      "EyeLaserHostRelayEnabled", &G->EyeLaserHostRelayEnabled, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Stats",      "VkToggleEyeLasers",   &G->VkToggleEyeLasers,   Hax::IniFileWrite_Int,  IniFileRead_IntClamped<VK_F8, 0, 255>);
         Hax::IniAddEntry(ini, "Stats",      "EyeLaserRange",       &G->EyeLaserRange,       Hax::IniFileWrite_Int,  IniFileRead_IntClamped<80, 10, 200>);
         Hax::IniAddEntry(ini, "Stats",      "EyeLaserDamage",      &G->EyeLaserDamage,      Hax::IniFileWrite_Int,  IniFileRead_IntClamped<250, 10, 2000>);
@@ -99,6 +100,7 @@ namespace Cheat
         Hax::IniAddEntry(ini, "Entities",   "EnemiesEsp",          &G->EnemiesEsp,          Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Entities",   "PlayersEsp",          &G->PlayersEsp,          Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Entities",   "PlayersChams",        &G->PlayersChams,        Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Entities",   "VkReviveSelf",        &G->VkReviveSelf,        Hax::IniFileWrite_Int,  IniFileRead_IntClamped<VK_F7, 0, 255>);
 
         Hax::IniAddEntry(ini, "Vision",     "BetterVision",        &G->BetterVision,        Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Vision",     "NoFog",               &G->NoFog,               Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);

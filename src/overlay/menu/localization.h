@@ -131,7 +131,11 @@ X(LocKey_DontTumble, L"Dont tumble", L"Не падать") \
 X(LocKey_DisableTumbling, L"Disable tumbling from external sources", L"Отключает падение от внешних источников") \
 X(LocKey_EYELASERS, L"EYE LASERS", L"ЛАЗЕРЫ ИЗ ГЛАЗ") \
 X(LocKey_EyeLasers, L"Deadly eye lasers", L"Смертельные лазеры") \
-X(LocKey_EyeLasersDesc, L"As host, uses networked Photon Blasters visible to stock clients", L"У хоста видны обычным клиентам через сетевые Photon Blaster") \
+X(LocKey_EyeLasersDesc, L"Networked beams and damage are processed by the host", L"Сетевые лучи и урон обрабатывает хост") \
+X(LocKey_EyeLaserHostRelay, L"Allow client eye lasers", L"Разрешить лазеры клиентам") \
+X(LocKey_EyeLaserHostRelayDesc, L"Process laser requests from players with RepoHax", L"Обрабатывать запросы лазеров от игроков с RepoHax") \
+X(LocKey_EyeLaserHostConnected, L"Host confirmed network lasers", L"Хост подтвердил сетевые лазеры") \
+X(LocKey_EyeLaserHostRequired, L"Waiting for a host with RepoHax; until confirmed, beams are local visuals", L"Ожидание хоста с RepoHax; до подтверждения лучи видны только вам") \
 X(LocKey_EyeLaserRange, L"Laser range", L"Дальность лазеров") \
 X(LocKey_EyeLaserDamage, L"Damage without instant kill", L"Урон без мгновенного убийства") \
 X(LocKey_EyeLaserInstantKill, L"Instantly kill enemies", L"Мгновенно убивать врагов") \
@@ -190,6 +194,13 @@ X(LocKey_Tumble, L"Tumble", L"Уронить") \
 X(LocKey_Kill, L"Kill", L"Убить") \
 X(LocKey_HostOnly, L"Host only", L"Только хост") \
 X(LocKey_Revive, L"Revive", L"Воскресить") \
+X(LocKey_ReviveSelf, L"Revive myself", L"Возродиться") \
+X(LocKey_ReviveSelfHotkey, L"Quick revive hotkey", L"Бинд возрождения") \
+X(LocKey_ReviveSelfDesc, L"Revives you without opening the menu or selecting a player; host only. Esc clears the binding", L"Возрождает вас без открытия меню и выбора игрока; только хост. Esc сбрасывает бинд") \
+X(LocKey_ActionReviveSelfDone, L"Quick revive requested", L"Запрошено быстрое возрождение") \
+X(LocKey_ActionReviveSelfAlive, L"Quick revive skipped: you are alive", L"Возрождение пропущено: вы живы") \
+X(LocKey_ActionReviveSelfHostOnly, L"Quick revive skipped: host only", L"Возрождение пропущено: только хост") \
+X(LocKey_ActionReviveSelfNotReady, L"Quick revive unavailable: death head or session is not ready", L"Возрождение недоступно: голова или сессия не готова") \
 X(LocKey_FriendTools, L"FRIEND TOOLS", L"ИНСТРУМЕНТЫ ДЛЯ ДРУЗЕЙ") \
 X(LocKey_FriendToolsDesc, L"Host-side effects for the selected player", L"Эффекты хоста для выбранного игрока") \
 X(LocKey_ProtectPlayer, L"Godmode", L"Бессмертие") \

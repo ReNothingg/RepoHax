@@ -10,6 +10,12 @@ namespace Cheat
 {
     void Initialize(HMODULE hCheatDll);
 
+    inline UINT MenuToggleMessage()
+    {
+        static const UINT message = ::RegisterWindowMessageW(L"RepoHax.ToggleMenuVisibility");
+        return message;
+    }
+
     inline constexpr int MaxSafeRunCurrency = 2147483; // 32-bit int.
 
     enum class UpgradeType : int { Rest, Jump, Range, Speed, Stamina, Strength, Tumble, Wings, Health, Map, Climb, Battery, N };
@@ -99,11 +105,13 @@ namespace Cheat
         bool                                InfJumps;
         bool                                NoTumble;
         bool                                FlightEnabled;
-        int                                 VkToggleFlight = VK_F7;
+        int                                 VkToggleFlight = 'V';
         int                                 FlightSpeed = 10;
         int                                 FlightSprintBoost = 3;
         int                                 VkTeleportPlayerToCamera = VK_F9;
         bool                                EyeLasersEnabled;
+        bool                                EyeLaserHostRelayEnabled = true;
+        bool                                EyeLaserHostConnected;
         int                                 VkToggleEyeLasers = VK_F8;
         int                                 EyeLaserRange = 80;
         int                                 EyeLaserDamage = 250;
@@ -158,6 +166,9 @@ namespace Cheat
         bool                                EnemiesEsp;
         bool                                PlayersEsp;
         bool                                PlayersChams;
+        int                                 VkReviveSelf = VK_F7;
+        bool                                ReviveSelfRequested;
+        bool                                ReviveSelfSessionReady;
         EnemySetup                          EnemyToSpawn = null;
         PlayerAvatar                        PlayerToTumble = null;
         PlayerAvatar                        PlayerToRevive = null;
@@ -432,6 +443,7 @@ namespace Cheat
         SafetyHookInline                    SpectateCamera_HeadEnergyLogic_Hook;
         SafetyHookInline                    EnemyRigidbody_FixedUpdate_Hook;
         SafetyHookInline                    DataDirector_SaveDeleteCheck_Hook;
+        SafetyHookInline                    EyeLaserPhotonNetwork_OnEvent_Hook;
 
         SafetyHookInline                    UpdateHook;
         SafetyHookInline                    PostLateUpdateHook;

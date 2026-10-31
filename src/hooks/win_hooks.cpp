@@ -140,8 +140,11 @@ namespace Cheat
 
     static void HandleMessage(MSG* msg)
     {
-        if (msg->message == WM_USER)
+        if (msg->message == MenuToggleMessage() && msg->hwnd == G->GameWndHandle && Hax::Gui::Initialized())
+        {
             G->MenuVisible ? CloseMenu() : OpenMenu();
+            msg->message = WM_NULL;
+        }
 
         // Scene gizmo editing deliberately keeps the cursor detached from the game while
         // the menu is hidden. Restore the normal game input state as soon as editing ends.

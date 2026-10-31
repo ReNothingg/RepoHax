@@ -110,15 +110,26 @@ namespace Cheat
 
     Hax::Optional<EnemyEspData> ParseEnemyEspData(Enemy enemy)
     {
-        Unity::Camera mainCam = GameDirector::instance().MainCamera();
+        GameDirector director = GameDirector::instance();
+        if (!director)
+            return {};
+        Unity::Camera mainCam = director.MainCamera();
         if (!mainCam || !enemy)
             return {};
 
-        float dist = mainCam.GetTransform().GetPosition().Distance(enemy.GetTransform().GetPosition());
+        Unity::Transform cameraTransform = mainCam.GetTransform();
+        Unity::Transform enemyTransform = enemy.GetTransform();
+        if (!cameraTransform || !enemyTransform)
+            return {};
+
+        float dist = cameraTransform.GetPosition().Distance(enemyTransform.GetPosition());
         if (dist < 2.f)
             return {};
 
         EnemyParent parent = enemy.enemyParent();
+        EnemyHealth health = enemy.Health();
+        if (!parent || !health)
+            return {};
         if (parent.enemyName() == L"Spewer")
         {
             EnemySlowMouth comp = enemy.GetComponent<EnemySlowMouth>();
@@ -126,16 +137,33 @@ namespace Cheat
                 return {};
         }
 
-        Unity::Bounds enemyBounds{enemy.CenterTransform().GetPosition(), Unity::Vector3()};
+        Unity::Bounds enemyBounds{};
+        bool hasBounds = false;
         if (EnemyRigidbody rb = enemy.Rigidbody())
         {
             PhysGrabObject grabObj = rb.physGrabObject();
-            enemyBounds = Unity::Bounds(grabObj.centerPoint(), grabObj.boundingBox());
+            if (grabObj)
+            {
+                enemyBounds = Unity::Bounds(grabObj.centerPoint(), grabObj.boundingBox());
+                hasBounds = true;
+            }
         }
-        else
+        if (!hasBounds)
         {
-            enemyBounds = enemy.GetTransform().GetChild(1).GetChild(0).GetComponent<Unity::Collider>().GetBounds();
+            // Enemy prefab hierarchies can change between updates.
+            for (Unity::Collider collider : enemy.GetComponentsInChildren<Unity::Collider>())
+            {
+                if (!collider || !collider.GetEnabled())
+                    continue;
+                if (!hasBounds)
+                    enemyBounds = collider.GetBounds();
+                else
+                    enemyBounds.Encapsulate(collider.GetBounds());
+                hasBounds = true;
+            }
         }
+        if (!hasBounds)
+            return {};
 
         Unity::Rect bounds = CalcBoundsInScreenSpace(enemyBounds, mainCam);
         Unity::Rect screenRect{0.f, 0.f, G->ScreenWidth, G->ScreenHeight};
@@ -143,12 +171,10 @@ namespace Cheat
         if (!bounds.Overlaps(screenRect))
             return {};
 
-        EnemyHealth health = enemy.Health();
-
         return EnemyEspData
         {
             .Box = bounds,
-            .Name = enemy.enemyParent().enemyName().ToHaxView(),
+            .Name = parent.enemyName().ToHaxView(),
             .Distance = dist,
             .CurHp = health.healthCurrent(),
             .MaxHp = health.health(),

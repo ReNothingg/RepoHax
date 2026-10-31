@@ -279,9 +279,11 @@ namespace Unity
 
         int                             GetInstanceID();
 
-    private:
-        void*                           GetCachedPtr() { return ((Fields*)m_Ptr)->CachedPtr; }
+    protected:
+        // Unity 6 injected bindings take the native object, not its Mono wrapper.
+        void*                           GetCachedPtr() const { THROW_IF_NULL(); return ((Fields*)m_Ptr)->CachedPtr; }
 
+    private:
         static bool                     IsNativeObjectAlive(Object o) { return o == null; }
         static bool                     CompareBaseObjects(Object lhs, Object rhs)
         {
