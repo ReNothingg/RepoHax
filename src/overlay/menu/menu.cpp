@@ -470,7 +470,7 @@ namespace Cheat
             Hax::Gui::Space(14_px);
             Hax::Gui::BeginVertical();
             VCentered(headerH, 32_px);
-            if (IconButton(Hax::Hash(L"CloseMenu"), L'', G->Loc[LocKey_CloseMenu]))
+            if (IconButton(Hax::Hash(L"CloseMenu"), Icon::Close, G->Loc[LocKey_CloseMenu]))
                 ToggleMenuVisibility();
             Hax::Gui::EndVertical();
         }
@@ -537,8 +537,19 @@ namespace Cheat
                 {
                     if (resetScroll)
                         Hax::Gui::ScrollYTo(0.f);
+
+                    // Page body: 20px padding, then the tab stacks its rows of
+                    // tiles, columns and full-width cards with 16px gaps.
                     Hax::Gui::BeginHorizontal();
+                    Hax::Gui::Space(20_px);
+                    Hax::Gui::BeginContainer(Hax::Hash("PageBody") + g_ActiveTab,
+                        {.W = Hax::Max(1.f, Hax::Gui::GetContentRegionAvail().X - 12_px), .FitY = true});
+                    Hax::Gui::BeginVertical(16_px);
+                    Hax::Gui::Dummy({0.f, 4_px});
                     g_Tabs[g_ActiveTab].DrawFunc();
+                    Hax::Gui::Dummy({0.f, 4_px});
+                    Hax::Gui::EndVertical();
+                    Hax::Gui::EndContainer();
                     Hax::Gui::EndHorizontal();
                 }
                 Hax::Gui::EndContainer();

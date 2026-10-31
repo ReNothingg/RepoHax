@@ -21,4 +21,5 @@ namespace Cheat
     void DrawEnemyDirectorControls();
     void DrawLootControlPanel();
     void DrawTeamControlPanel();
+    void DrawDroneStrikePanel();
 }

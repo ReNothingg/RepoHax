@@ -455,6 +455,8 @@ namespace Cheat
         G->EnemyGodAction = EnemyGodCommand::None;
         G->LootGodAction = LootGodCommand::None;
         G->PlayerGodAction = PlayerGodCommand::None;
+        G->DroneLaunchRequested = false;
+        G->DroneDetonateRequested = false;
     }
 
     static void ResetSessionState()
@@ -3728,6 +3730,786 @@ namespace Cheat
         }
     }
 
+    // ---------------------------------------------------------------- Drone strike
+    // A stock drone item (model + buzzing loop) carries stock explosive grenades.
+    // Everything is a room object, so stock clients see and hear it natively:
+    // the host steers it through rigidbody velocity (synced by the game's own
+    // physics stream, no per-frame RPCs) and detonates the grenades through the
+    // game's TickEnd RPC, so every client plays the blast and takes the damage.
+
+    constexpr int   DroneMaxSlots = 8;
+    constexpr int   DroneMaxWarheads = 3;
+    constexpr float DroneLaunchTime = 0.45f;
+    constexpr float DroneArmTime = 0.3f;        // short hover so clients' interpolated copies catch up
+    constexpr float DroneMaxFlightTime = 30.f;
+    constexpr float DroneLostTargetGrace = 1.5f;
+    constexpr float DroneTargetFuse = 1.25f;
+    constexpr float DroneBystanderFuse = 1.0f;
+    constexpr float DroneCleanupDelay = 3.f;
+
+    enum class DronePhase { Idle, Launch, Cruise, Arming, Done };
+
+    struct DroneWarhead
+    {
+        Unity::GameObject Object = null;
+        Unity::Rigidbody Body = null;
+        ItemGrenade Grenade = null;
+        Unity::Vector3 Offset{};
+    };
+
+    struct DroneSlot
+    {
+        DronePhase Phase = DronePhase::Idle;
+        Unity::GameObject Object = null;
+        Unity::Rigidbody Body = null;
+        DroneWarhead Warheads[DroneMaxWarheads]{};
+        int WarheadCount = 0;
+        bool Activated = false;
+        bool Manual = false;
+        bool Lethal = false;
+        bool ThroughWalls = true;
+        float Speed = 14.f;
+        float Age = 0.f;
+        float PhaseTime = 0.f;
+        float LostTime = 0.f;
+        float Bob = 0.f;
+        Unity::Vector3 Position{};
+        Unity::Vector3 Velocity{};
+        Unity::Vector3 LaunchDir{};
+        Unity::Vector3 LastGoal{};
+        bool HasLastGoal = false;
+        PlayerAvatar TargetPlayer = null;
+        EnemyParent TargetEnemy = null;
+        PlayerAvatar HitPlayer = null;
+        EnemyParent HitEnemy = null;
+    };
+
+    struct DronePrefabs
+    {
+        Item Drone = null;
+        Item Grenade = null;
+        bool FailureLogged = false;
+    };
+
+    static std::array<DroneSlot, DroneMaxSlots> s_Drones;
+    static DronePrefabs s_DronePrefabs;
+
+    static bool DroneNameContains(Hax::WStringView name, const wchar_t* needle)
+    {
+        const size_t n = wcslen(needle);
+        if (!name.Data() || name.Size() < n)
+            return false;
+        for (size_t i = 0; i + n <= name.Size(); ++i)
+            if (_wcsnicmp(name.Data() + i, needle, n) == 0)
+                return true;
+        return false;
+    }
+
+    template <typename T>
+    static T DroneFindComponent(Unity::GameObject object)
+    {
+        if (!object)
+            return null;
+        T component = object.GetComponent<T>();
+        if (!component)
+            component = object.GetTransform().GetComponentInChildren<T>();
+        return component;
+    }
+
+    static bool FindDronePrefabs()
+    {
+        if (s_DronePrefabs.Drone && s_DronePrefabs.Grenade)
+            return true;
+        if (G->ItemsPool.Empty())
+            return false;
+
+        Item grenadeFallback = null;
+        // First pass only loads prefabs whose names look right; the second one is a
+        // full scan in case the item names ever change.
+        for (int pass = 0; pass < 2 && !(s_DronePrefabs.Drone && s_DronePrefabs.Grenade); ++pass)
+        {
+            for (const auto& entry : G->ItemsPool)
+            {
+                const bool wantDrone = !s_DronePrefabs.Drone && (pass == 1 || DroneNameContains(entry.key, L"drone"));
+                const bool wantGrenade = !s_DronePrefabs.Grenade && (pass == 1 || DroneNameContains(entry.key, L"grenade"));
+                if (!wantDrone && !wantGrenade)
+                    continue;
+
+                Item item = entry.value;
+                if (!item || item.prefab() == null)
+                    continue;
+                Unity::GameObject prefab = item.prefab().Prefab();
+                if (!prefab)
+                    continue;
+
+                if (wantDrone && DroneFindComponent<ItemDrone>(prefab))
+                    s_DronePrefabs.Drone = item;
+
+                if (wantGrenade && DroneFindComponent<ItemGrenadeExplosive>(prefab) && DroneFindComponent<ItemGrenade>(prefab))
+                {
+                    // Prefer the plain explosive grenade over taped or cluster variants.
+                    if (DroneNameContains(entry.key, L"explosive") || entry.key == Hax::WStringView(L"Grenade"))
+                        s_DronePrefabs.Grenade = item;
+                    else if (!grenadeFallback)
+                        grenadeFallback = item;
+                }
+            }
+            if (!s_DronePrefabs.Grenade && grenadeFallback)
+                s_DronePrefabs.Grenade = grenadeFallback;
+        }
+
+        if (s_DronePrefabs.Drone && s_DronePrefabs.Grenade)
+        {
+            Hax::Log(G->Logger, L"Drone strike: drone = %ls, warhead = %ls",
+                s_DronePrefabs.Drone.itemName().GetRawStringData(), s_DronePrefabs.Grenade.itemName().GetRawStringData());
+            return true;
+        }
+
+        if (!s_DronePrefabs.FailureLogged)
+        {
+            Hax::LogError(G->Logger, L"Drone strike: prefab not found (drone %d, grenade %d)",
+                (int)(bool)s_DronePrefabs.Drone, (int)(bool)s_DronePrefabs.Grenade);
+            s_DronePrefabs.FailureLogged = true;
+        }
+        return false;
+    }
+
+    static Unity::GameObject SpawnDroneObject(Item item, const Unity::Vector3& position, const Unity::Quaternion& rotation)
+    {
+        if (SemiFunc::IsMultiplayer())
+        {
+            if (!SemiFunc::IsMasterClient())
+                return null;
+            return Unity::Photon::PhotonNetwork::InstantiateRoomObject(item.prefab().resourcePath(), position, rotation);
+        }
+        return Unity::Object::Instantiate<Unity::GameObject>(item.prefab().Prefab(), position, rotation);
+    }
+
+    static void DestroyDroneObject(Unity::GameObject& object)
+    {
+        if (object)
+        {
+            if (!SemiFunc::IsMultiplayer())
+                Unity::Object::Destroy(object);
+            else if (G->IsInGame && SemiFunc::IsMasterClient())
+                Unity::Photon::PhotonNetwork::Destroy(object);
+        }
+        object = null;
+    }
+
+    // The host owns the physics. With colliders off the item glides along our path
+    // without snagging on doorframes or shoving players before it goes off.
+    static Unity::Rigidbody PrepareDroneBody(Unity::GameObject object)
+    {
+        System::Array<Unity::Collider> colliders = object.GetTransform().GetComponentsInChildren<Unity::Collider>(true);
+        if (colliders != null)
+        {
+            for (Unity::Collider collider : colliders)
+                if (collider)
+                    collider.SetEnabled(false);
+        }
+
+        Unity::Rigidbody body = DroneFindComponent<Unity::Rigidbody>(object);
+        if (body)
+            body.SetUseGravity(false);
+        return body;
+    }
+
+    static void DriveDroneBody(Unity::GameObject object, Unity::Rigidbody body, const Unity::Vector3& goal,
+        const Unity::Vector3& velocity, const Unity::Quaternion& rotation)
+    {
+        if (!object)
+            return;
+
+        Unity::Transform transform = object.GetTransform();
+        Unity::Vector3 error = goal - transform.GetPosition();
+        if (error.GetMagnitude() > 6.f)
+        {
+            // Way off (spawn hiccup, physics pop): snap instead of rubber-banding.
+            transform.SetPosition(goal);
+            error = Unity::Vector3::zero();
+        }
+        transform.SetRotation(rotation);
+        if (body)
+            body.SetVelocity(velocity + error * 10.f);
+    }
+
+    static bool IsDronePlayerListed(PlayerAvatar player)
+    {
+        if (!player)
+            return false;
+        GameDirector director = GameDirector::instance();
+        if (!director)
+            return false;
+        for (PlayerAvatar entry : director.PlayerList())
+            if (entry == player)
+                return true;
+        return false;
+    }
+
+    static Unity::Vector3 DronePlayerPoint(PlayerAvatar player)
+    {
+        Unity::Transform root = GetPlayerTransformSafe(player);
+        Unity::Vector3 feet = root ? root.GetPosition() : player.GetTransform().GetPosition();
+        if (Unity::Transform head = player.spectatePoint())
+            return (feet + head.GetPosition()) * 0.5f;
+        return feet + Unity::Vector3::up() * 0.85f;
+    }
+
+    static bool DroneEnemyPoint(EnemyParent parent, Unity::Vector3& out)
+    {
+        if (!parent || !parent.Spawned())
+            return false;
+        Enemy enemy = parent.enemy();
+        if (!enemy)
+            return false;
+        if (EnemyHealth health = enemy.Health(); health && health.dead())
+            return false;
+        Unity::Transform center = enemy.CenterTransform();
+        out = center ? center.GetPosition() : enemy.GetTransform().GetPosition();
+        return true;
+    }
+
+    static bool DroneTargetPoint(const DroneSlot& slot, Unity::Vector3& out)
+    {
+        if (slot.TargetPlayer)
+        {
+            if (!IsDronePlayerListed(slot.TargetPlayer) || !IsPlayerUsable(slot.TargetPlayer))
+                return false;
+            out = DronePlayerPoint(slot.TargetPlayer);
+            return true;
+        }
+        return DroneEnemyPoint(slot.TargetEnemy, out);
+    }
+
+    static Unity::Quaternion DroneRotation(const Unity::Vector3& velocity)
+    {
+        constexpr float degrees = 57.2957795131f;
+        const float yaw = velocity.GetMagnitude() > 0.1f ? std::atan2(velocity.X, velocity.Z) * degrees : 0.f;
+        return Unity::Quaternion::Euler(12.f, yaw, 0.f); // nose slightly down, like a real quad in forward flight
+    }
+
+    // Where the crosshair points. Manual drones chase this point.
+    static Unity::Vector3 DroneCrosshairPoint(Unity::Camera camera, PlayerAvatar local)
+    {
+        Unity::Transform camTransform = camera.GetTransform();
+        const Unity::Vector3 origin = camTransform.GetPosition();
+        const Unity::Vector3 forward = camTransform.GetForward().GetNormalized();
+        constexpr float maxRange = 250.f;
+        Unity::Vector3 point = origin + forward * maxRange;
+        float closest = maxRange;
+
+        System::Array<Unity::RaycastHit> hits = Unity::Physics::SphereCastAll(origin, 0.05f, forward, maxRange,
+            SemiFunc::LayerMaskGetVisionObstruct());
+        if (hits == null)
+            return point;
+
+        Unity::Transform avatarRoot = local ? local.GetTransform() : null;
+        Unity::Transform playerRoot = local ? local.playerTransform() : null;
+        Unity::Transform controllerRoot = PlayerController::instance() ? PlayerController::instance().GetTransform() : null;
+        for (Unity::RaycastHit& hit : hits)
+        {
+            if (hit.m_Distance < 0.3f || hit.m_Distance >= closest)
+                continue;
+            Unity::Transform hitTransform = hit.GetTransform();
+            if (!hitTransform || (avatarRoot && IsTransformBelow(hitTransform, avatarRoot)) ||
+                (playerRoot && IsTransformBelow(hitTransform, playerRoot)) ||
+                (controllerRoot && IsTransformBelow(hitTransform, controllerRoot)))
+                continue;
+            if (IsTriggerCollider(hitTransform.GetComponent<Unity::Collider>()))
+                continue;
+            closest = hit.m_Distance;
+            point = hit.m_Point;
+        }
+        return point;
+    }
+
+    // Proximity fuse. Auto drones only care about their target; manual drones go
+    // off on anybody they touch except the pilot.
+    static bool DroneCheckFuse(DroneSlot& slot, PlayerAvatar local)
+    {
+        Unity::Vector3 point;
+        if (!slot.Manual && DroneTargetPoint(slot, point) &&
+            Unity::Vector3::Distance(slot.Position, point) < DroneTargetFuse)
+        {
+            slot.HitPlayer = slot.TargetPlayer;
+            slot.HitEnemy = slot.TargetEnemy;
+            return true;
+        }
+
+        if (!slot.Manual)
+            return false;
+
+        if (GameDirector director = GameDirector::instance())
+        {
+            for (PlayerAvatar player : director.PlayerList())
+            {
+                if (!IsPlayerUsable(player) || player == local)
+                    continue;
+                if (Unity::Vector3::Distance(slot.Position, DronePlayerPoint(player)) < DroneBystanderFuse)
+                {
+                    slot.HitPlayer = player;
+                    return true;
+                }
+            }
+        }
+
+        if (EnemyDirector enemies = EnemyDirector::instance())
+        {
+            for (EnemyParent parent : enemies.enemiesSpawned())
+            {
+                if (DroneEnemyPoint(parent, point) && Unity::Vector3::Distance(slot.Position, point) < DroneTargetFuse)
+                {
+                    slot.HitEnemy = parent;
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // Wall handling when the drone is not allowed to ghost through geometry:
+    // slide along surfaces that are close ahead, crash into the ones it cannot avoid.
+    static bool DroneAvoidWalls(DroneSlot& slot, PlayerAvatar local, float step, float dt)
+    {
+        const float speed = slot.Velocity.GetMagnitude();
+        if (speed < 0.1f)
+            return false;
+
+        const Unity::Vector3 direction = slot.Velocity * (1.f / speed);
+        const float lookAhead = step + 1.8f;
+        System::Array<Unity::RaycastHit> hits = Unity::Physics::SphereCastAll(slot.Position, 0.22f, direction, lookAhead,
+            SemiFunc::LayerMaskGetVisionObstruct());
+        if (hits == null)
+            return false;
+
+        Unity::Transform avatarRoot = local ? local.GetTransform() : null;
+        Unity::Transform playerRoot = local ? local.playerTransform() : null;
+        float closest = lookAhead;
+        Unity::Vector3 normal{};
+        bool found = false;
+        for (Unity::RaycastHit& hit : hits)
+        {
+            if (hit.m_Distance >= closest)
+                continue;
+            Unity::Transform hitTransform = hit.GetTransform();
+            if (!hitTransform || (avatarRoot && IsTransformBelow(hitTransform, avatarRoot)) ||
+                (playerRoot && IsTransformBelow(hitTransform, playerRoot)))
+                continue;
+            if (IsTriggerCollider(hitTransform.GetComponent<Unity::Collider>()))
+                continue;
+            closest = hit.m_Distance;
+            normal = hit.m_Normal;
+            found = true;
+        }
+        if (!found)
+            return false;
+
+        if (closest <= step + 0.05f)
+            return true; // crashed into it
+
+        // Remove the velocity going into the surface and push away from it.
+        const float into = slot.Velocity.Dot(normal);
+        if (into < 0.f)
+            slot.Velocity = slot.Velocity - normal * into;
+        slot.Velocity = slot.Velocity + (normal + Unity::Vector3::up() * 0.35f) * (speed * 4.f * dt);
+        return false;
+    }
+
+    static void DroneSteer(DroneSlot& slot, const Unity::Vector3& goal, float dt)
+    {
+        Unity::Vector3 aim = goal;
+        // Lead moving targets a little so the drone does not just trail behind them.
+        if (slot.HasLastGoal && dt > 0.f)
+        {
+            Unity::Vector3 goalVelocity = (goal - slot.LastGoal) * (1.f / dt);
+            if (goalVelocity.GetMagnitude() < 15.f)
+            {
+                const float lead = std::clamp(Unity::Vector3::Distance(slot.Position, goal) / std::max(slot.Speed, 1.f), 0.f, 0.8f);
+                aim = goal + goalVelocity * lead;
+            }
+        }
+        slot.LastGoal = goal;
+        slot.HasLastGoal = true;
+
+        const Unity::Vector3 toAim = aim - slot.Position;
+        const float distance = toAim.GetMagnitude();
+        const Unity::Vector3 desired = distance > 0.001f ? toAim * (slot.Speed / distance) : Unity::Vector3::zero();
+        // Turn harder on the final approach so it dives in instead of orbiting.
+        const float agility = distance < 5.f ? 14.f : (slot.Manual ? 6.f : 3.5f);
+        const float blend = 1.f - std::exp(-agility * dt);
+        slot.Velocity = slot.Velocity + (desired - slot.Velocity) * blend;
+    }
+
+    static void DroneArm(DroneSlot& slot)
+    {
+        if (slot.Phase == DronePhase::Launch || slot.Phase == DronePhase::Cruise)
+        {
+            slot.Phase = DronePhase::Arming;
+            slot.PhaseTime = 0.f;
+        }
+    }
+
+    static void DroneExplode(DroneSlot& slot)
+    {
+        int fired = 0;
+        for (int i = 0; i < slot.WarheadCount; ++i)
+        {
+            DroneWarhead& warhead = slot.Warheads[i];
+            if (!warhead.Object || !warhead.Grenade)
+                continue;
+            try
+            {
+                warhead.Grenade.isSpawnedGrenade() = true; // destroy after the blast, no inventory bookkeeping
+                warhead.Grenade.TickEnd();
+                ++fired;
+            }
+            catch (System::Exception& ex)
+            {
+                System::String message = ex.Message();
+                Hax::LogError(G->Logger, L"Drone strike warhead: %ls", message != null ? message.GetRawStringData() : L"?");
+            }
+        }
+
+        DestroyDroneObject(slot.Object);
+        slot.Body = null;
+
+        if (slot.Lethal)
+        {
+            if (slot.HitPlayer && IsDronePlayerListed(slot.HitPlayer) && !slot.HitPlayer.deadSet())
+            {
+                s_ForcedPlayerDeath = true;
+                slot.HitPlayer.PlayerDeath(-1);
+                s_ForcedPlayerDeath = false;
+            }
+            else if (slot.HitEnemy && slot.HitEnemy.enemy())
+            {
+                if (EnemyHealth health = slot.HitEnemy.enemy().Health(); health && !health.dead())
+                    health.Hurt(999999, slot.Velocity.GetNormalized());
+            }
+        }
+
+        if (fired == 0)
+            Hax::LogError(G->Logger, L"Drone strike: no warhead went off");
+
+        slot.Phase = DronePhase::Done;
+        slot.PhaseTime = 0.f;
+    }
+
+    static void ResetDroneSlot(DroneSlot& slot, bool destroyObjects)
+    {
+        if (destroyObjects)
+        {
+            DestroyDroneObject(slot.Object);
+            for (DroneWarhead& warhead : slot.Warheads)
+                DestroyDroneObject(warhead.Object);
+        }
+        slot = {};
+    }
+
+    static void LaunchDrones(PlayerAvatar local)
+    {
+        if (G->IsClient || !G->IsInGame)
+            return;
+
+        if (!FindDronePrefabs())
+        {
+            G->DronePrefabsMissing = true;
+            SetSessionAction(G->Loc[LocKey_ActionDronePrefabMissing]);
+            return;
+        }
+        G->DronePrefabsMissing = false;
+
+        Unity::Camera camera = SemiFunc::MainCamera();
+        if (!camera)
+            return;
+
+        PlayerAvatar targetPlayer = null;
+        EnemyParent targetEnemy = null;
+        if (!G->DroneManualMode)
+        {
+            if (G->DroneTargetPlayer && IsDronePlayerListed(G->DroneTargetPlayer) && IsPlayerUsable(G->DroneTargetPlayer))
+                targetPlayer = G->DroneTargetPlayer;
+            else if (Unity::Vector3 unused; DroneEnemyPoint(G->DroneTargetEnemy, unused))
+                targetEnemy = G->DroneTargetEnemy;
+            else
+            {
+                SetSessionAction(G->Loc[LocKey_ActionDroneNoTarget]);
+                return;
+            }
+        }
+
+        Unity::Transform camTransform = camera.GetTransform();
+        const Unity::Quaternion camRotation = camTransform.GetRotation();
+        const Unity::Vector3 forward = camTransform.GetForward().GetNormalized();
+        const Unity::Vector3 right = (camRotation * Unity::Vector3::right()).GetNormalized();
+        const Unity::Vector3 origin = camTransform.GetPosition();
+
+        const int count = std::clamp(G->DroneSwarmSize, 1, 5);
+        const int warheads = std::clamp(G->DroneWarheads, 1, DroneMaxWarheads);
+        int launched = 0;
+        for (int i = 0; i < count; ++i)
+        {
+            DroneSlot* slot = nullptr;
+            for (DroneSlot& candidate : s_Drones)
+            {
+                if (candidate.Phase == DronePhase::Idle)
+                {
+                    slot = &candidate;
+                    break;
+                }
+            }
+            if (!slot)
+                break;
+
+            const float spread = ((float)i - (float)(count - 1) * 0.5f) * 0.9f;
+            const Unity::Vector3 spawn = origin + forward * 1.6f + right * spread + Unity::Vector3::up() * 0.35f;
+            const Unity::Quaternion rotation = DroneRotation(forward);
+
+            Unity::GameObject object = SpawnDroneObject(s_DronePrefabs.Drone, spawn, rotation);
+            if (!object)
+                break;
+
+            *slot = {};
+            slot->Object = object;
+            slot->Body = PrepareDroneBody(object);
+            slot->Position = spawn;
+            slot->LaunchDir = (forward + Unity::Vector3::up() * 0.45f + right * (spread * 0.25f)).GetNormalized();
+            slot->Speed = (float)std::clamp(G->DroneSpeed, 4, 40);
+            slot->Velocity = slot->LaunchDir * (slot->Speed * 0.5f);
+            slot->Manual = G->DroneManualMode;
+            slot->Lethal = G->DroneLethal;
+            slot->ThroughWalls = G->DroneThroughWalls;
+            slot->TargetPlayer = targetPlayer;
+            slot->TargetEnemy = targetEnemy;
+            slot->Bob = (float)i * 1.7f;
+
+            for (int w = 0; w < warheads; ++w)
+            {
+                DroneWarhead& warhead = slot->Warheads[slot->WarheadCount];
+                warhead.Offset = Unity::Vector3(((float)w - (float)(warheads - 1) * 0.5f) * 0.2f, -0.32f, 0.f);
+                warhead.Object = SpawnDroneObject(s_DronePrefabs.Grenade, spawn + warhead.Offset, Unity::Quaternion::identity());
+                if (!warhead.Object)
+                    break;
+                warhead.Body = PrepareDroneBody(warhead.Object);
+                warhead.Grenade = DroneFindComponent<ItemGrenade>(warhead.Object);
+                ++slot->WarheadCount;
+            }
+
+            slot->Phase = DronePhase::Launch;
+            ++launched;
+        }
+
+        if (launched > 0)
+            SetSessionActionF(G->Loc[LocKey_ActionDroneLaunchedFmt].Data(), launched);
+        (void)local;
+    }
+
+    static void UpdateDroneSlot(DroneSlot& slot, PlayerAvatar local, const Unity::Vector3& crosshair, bool hasCrosshair, float dt)
+    {
+        slot.Age += dt;
+        slot.PhaseTime += dt;
+
+        if (slot.Phase == DronePhase::Done)
+        {
+            // The warheads remove themselves after the blast; this only catches duds.
+            if (slot.PhaseTime >= DroneCleanupDelay)
+                ResetDroneSlot(slot, true);
+            return;
+        }
+
+        if (!slot.Object)
+        {
+            // Somebody deleted or broke the drone mid-flight: blow what is left.
+            DroneArm(slot);
+            slot.PhaseTime = DroneArmTime;
+        }
+
+        // Turn the drone on once it has run Start(): unfolds the rotors and starts
+        // the buzzing loop on every client. Its own target search stays disabled.
+        if (!slot.Activated && slot.Object && slot.Age >= 0.2f)
+        {
+            slot.Activated = true;
+            if (ItemDrone drone = DroneFindComponent<ItemDrone>(slot.Object))
+            {
+                drone.targetValuables() = false;
+                drone.targetPlayers() = false;
+                drone.targetEnemies() = false;
+                drone.targetNonValuables() = false;
+            }
+            if (ItemToggle toggle = DroneFindComponent<ItemToggle>(slot.Object))
+                toggle.ToggleItem(true, SemiFunc::PhotonViewIDPlayerAvatarLocal());
+        }
+
+        switch (slot.Phase)
+        {
+        case DronePhase::Launch:
+        {
+            const Unity::Vector3 desired = slot.LaunchDir * (slot.Speed * 0.6f);
+            slot.Velocity = slot.Velocity + (desired - slot.Velocity) * (1.f - std::exp(-6.f * dt));
+            if (slot.PhaseTime >= DroneLaunchTime)
+            {
+                slot.Phase = DronePhase::Cruise;
+                slot.PhaseTime = 0.f;
+            }
+            break;
+        }
+        case DronePhase::Cruise:
+        {
+            Unity::Vector3 goal;
+            bool haveGoal = false;
+            if (slot.Manual)
+            {
+                goal = crosshair;
+                haveGoal = hasCrosshair;
+            }
+            else
+                haveGoal = DroneTargetPoint(slot, goal);
+
+            if (haveGoal)
+            {
+                slot.LostTime = 0.f;
+                DroneSteer(slot, goal, dt);
+                // A manual drone that reaches the crosshair hits whatever is there.
+                if (slot.Manual && Unity::Vector3::Distance(slot.Position, goal) < 0.7f)
+                    DroneArm(slot);
+            }
+            else
+            {
+                // Target died or left: hover, then self-destruct.
+                slot.LostTime += dt;
+                slot.Velocity = slot.Velocity * std::exp(-4.f * dt);
+                if (slot.LostTime >= DroneLostTargetGrace)
+                    DroneArm(slot);
+            }
+
+            if (slot.Age >= DroneMaxFlightTime)
+                DroneArm(slot);
+            break;
+        }
+        case DronePhase::Arming:
+            slot.Velocity = slot.Velocity * std::exp(-14.f * dt);
+            break;
+        default:
+            break;
+        }
+
+        const float step = slot.Velocity.GetMagnitude() * dt;
+        if ((slot.Phase == DronePhase::Cruise || slot.Phase == DronePhase::Launch) && !slot.ThroughWalls &&
+            DroneAvoidWalls(slot, local, step, dt))
+        {
+            slot.HitPlayer = null;
+            slot.HitEnemy = null;
+            DroneArm(slot);
+        }
+
+        slot.Position = slot.Position + slot.Velocity * dt;
+
+        if (slot.Phase == DronePhase::Cruise && DroneCheckFuse(slot, local))
+            DroneArm(slot);
+
+        // Small hover bob so it reads as a drone, not a thrown brick.
+        slot.Bob += dt;
+        const Unity::Vector3 shown = slot.Position + Unity::Vector3::up() * (std::sin(slot.Bob * 7.f) * 0.06f);
+        const Unity::Quaternion rotation = DroneRotation(slot.Velocity);
+        DriveDroneBody(slot.Object, slot.Body, shown, slot.Velocity, rotation);
+        for (int i = 0; i < slot.WarheadCount; ++i)
+        {
+            DroneWarhead& warhead = slot.Warheads[i];
+            DriveDroneBody(warhead.Object, warhead.Body, shown + rotation * warhead.Offset, slot.Velocity, rotation);
+        }
+
+        if (slot.Phase == DronePhase::Arming && slot.PhaseTime >= DroneArmTime)
+            DroneExplode(slot);
+    }
+
+    static void UpdateDroneStrikes()
+    {
+        try
+        {
+            const bool canRun = G->IsInGame && !G->IsClient;
+            if (!canRun)
+            {
+                // Scene change or lost host: the objects are gone or no longer ours.
+                for (DroneSlot& slot : s_Drones)
+                    slot = {};
+                G->DronesInFlight = 0;
+                G->DroneLaunchRequested = false;
+                G->DroneDetonateRequested = false;
+                return;
+            }
+
+            PlayerAvatar local = PlayerAvatar::instance();
+            if (G->DroneLaunchRequested)
+            {
+                G->DroneLaunchRequested = false;
+                LaunchDrones(local);
+            }
+
+            if (G->DroneDetonateRequested)
+            {
+                G->DroneDetonateRequested = false;
+                for (DroneSlot& slot : s_Drones)
+                {
+                    slot.HitPlayer = null;
+                    slot.HitEnemy = null;
+                    DroneArm(slot);
+                }
+            }
+
+            int inFlight = 0;
+            bool needCrosshair = false;
+            for (const DroneSlot& slot : s_Drones)
+            {
+                if (slot.Phase != DronePhase::Idle && slot.Phase != DronePhase::Done)
+                    ++inFlight;
+                needCrosshair |= slot.Manual && slot.Phase == DronePhase::Cruise;
+            }
+            G->DronesInFlight = inFlight;
+            if (inFlight == 0 && !needCrosshair)
+            {
+                bool anyDone = false;
+                for (const DroneSlot& slot : s_Drones)
+                    anyDone |= slot.Phase == DronePhase::Done;
+                if (!anyDone)
+                    return;
+            }
+
+            Unity::Vector3 crosshair{};
+            bool hasCrosshair = false;
+            if (needCrosshair)
+            {
+                if (Unity::Camera camera = SemiFunc::MainCamera())
+                {
+                    crosshair = DroneCrosshairPoint(camera, local);
+                    hasCrosshair = true;
+                }
+            }
+
+            const float dt = std::clamp(Unity::Time::GetDeltaTime(), 0.f, 0.1f);
+            for (DroneSlot& slot : s_Drones)
+            {
+                if (slot.Phase == DronePhase::Idle)
+                    continue;
+                try
+                {
+                    UpdateDroneSlot(slot, local, crosshair, hasCrosshair, dt);
+                }
+                catch (System::Exception& ex)
+                {
+                    System::String message = ex.Message();
+                    Hax::LogError(G->Logger, L"Drone strike slot: %ls", message != null ? message.GetRawStringData() : L"?");
+                    ResetDroneSlot(slot, true);
+                }
+            }
+        }
+        catch (System::Exception& ex)
+        {
+            System::String message = ex.Message();
+            Hax::LogError(G->Logger, L"Drone strike: %ls", message != null ? message.GetRawStringData() : L"?");
+        }
+    }
+
     static float prevPlane;
     static float prevFov;
     static bool prevOcclusionCulling;
@@ -3886,6 +4668,7 @@ namespace Cheat
 
         G->PostLateUpdateHook.unsafe_call<void>();
         UpdateEyeLasers();
+        UpdateDroneStrikes();
 
         static bool s_FogOverridden = false;
         static bool s_PreviousFog = true;

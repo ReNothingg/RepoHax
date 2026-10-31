@@ -213,7 +213,8 @@ namespace Cheat
             {
                 return G->VkToggleFlight == vk || G->VkToggleEyeLasers == vk ||
                     G->VkTeleportPlayerToCamera == vk || G->VkSpawnItem == vk ||
-                    G->VkDeleteObject == vk || G->VkLockGodTarget == vk || G->VkReviveSelf == vk;
+                    G->VkDeleteObject == vk || G->VkLockGodTarget == vk || G->VkReviveSelf == vk ||
+                    G->VkDroneLaunch == vk || G->VkDroneDetonate == vk;
             };
 
             if (!isGameplayHotkey('W') && GizmoKeyJustPressed('W')) G->GodGizmoModeCurrent = GodGizmoMode::Move;
@@ -286,6 +287,26 @@ namespace Cheat
             G->SelectedItem)
         {
             G->ItemToSpawn = G->SelectedItem;
+        }
+
+        constexpr size_t droneLaunchHotkeyId = Hax::Hash(L"DroneLaunchHotkeyAction");
+        if (G->VkDroneLaunch != 0 &&
+            G->IsInGame &&
+            !G->IsClient &&
+            !G->MenuVisible &&
+            IsKeyJustDown(droneLaunchHotkeyId, (Hax::uint8)G->VkDroneLaunch))
+        {
+            G->DroneLaunchRequested = true;
+        }
+
+        constexpr size_t droneDetonateHotkeyId = Hax::Hash(L"DroneDetonateHotkeyAction");
+        if (G->VkDroneDetonate != 0 &&
+            G->IsInGame &&
+            G->DronesInFlight > 0 &&
+            !G->MenuVisible &&
+            IsKeyJustDown(droneDetonateHotkeyId, (Hax::uint8)G->VkDroneDetonate))
+        {
+            G->DroneDetonateRequested = true;
         }
 
         constexpr size_t deleteObjectHotkeyId = Hax::Hash(L"DeleteObjectHotkeyAction");

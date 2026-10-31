@@ -620,6 +620,8 @@ struct EnemyState
 struct EnemyParent;
 struct Enemy : Unity::Behaviour
 {
+    using Unity::Behaviour::Behaviour;
+
     META("Assembly-CSharp", "", "Enemy");
 
     FIELD(Rigidbody, EnemyRigidbody);
@@ -633,6 +635,8 @@ struct Enemy : Unity::Behaviour
 
 struct EnemyParent : Unity::Behaviour
 {
+    using Unity::Behaviour::Behaviour;
+
     META("Assembly-CSharp", "", "EnemyParent");
 
     FIELD_EX(enemy, "Enemy", Enemy);
@@ -835,6 +839,48 @@ struct ItemBattery : Unity::MonoBehaviour
     METHOD_WRAPPER(Update);
     METHOD_WRAPPER(SetBatteryLife);
     METHOD_WRAPPER_EX(BatteryFullPercentChange, "System.Void(System.Int32,System.Boolean,System.Boolean)");
+};
+
+// Drone strike: the stock drone item supplies the model and buzzing loop,
+// the stock explosive grenade supplies a networked blast.
+struct ItemDrone : Unity::MonoBehaviour
+{
+    using Unity::MonoBehaviour::MonoBehaviour;
+
+    META("Assembly-CSharp", "", "ItemDrone");
+
+    FIELD(targetValuables, bool);
+    FIELD(targetPlayers, bool);
+    FIELD(targetEnemies, bool);
+    FIELD(targetNonValuables, bool);
+    FIELD(itemToggle, ItemToggle);
+    FIELD(itemBattery, ItemBattery);
+};
+
+struct ItemGrenade : Unity::MonoBehaviour
+{
+    using Unity::MonoBehaviour::MonoBehaviour;
+
+    META("Assembly-CSharp", "", "ItemGrenade");
+
+    // Host: RPCs TickEndRPC to everyone. Singleplayer: runs it locally.
+    void TickEnd()
+    {
+        THROW_IF_NULL();
+        s_TickEnd.Call<void, ItemGrenade>(*this);
+    }
+
+    FIELD(isSpawnedGrenade, bool);
+
+private:
+    METHOD_WRAPPER(TickEnd);
+};
+
+struct ItemGrenadeExplosive : Unity::MonoBehaviour
+{
+    using Unity::MonoBehaviour::MonoBehaviour;
+
+    META("Assembly-CSharp", "", "ItemGrenadeExplosive");
 };
 
 struct ValuableObject : Unity::MonoBehaviour

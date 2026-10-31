@@ -17,6 +17,7 @@ OUT = ROOT / "src" / "overlay" / "menu" / "search_index.h"
 FILE_TAB = {
     "stats_tab.cpp": 0,
     "entities_tab.cpp": 1,
+    "drone_panel.cpp": 1,
     "vision_tab.cpp": 2,
     "valuables_tab.cpp": 3,
     "items_tab.cpp": 4,
@@ -38,7 +39,7 @@ SHARED_PANEL_TAB = {
 }
 
 # Keys that are values, hints or messages rather than feature names.
-SKIP_SUFFIX = ("Desc", "Fmt", "Hint", "Short")
+SKIP_SUFFIX = ("Desc", "Fmt", "Hint", "Short", "Status", "Tag", "Label", "Short2")
 SKIP_PREFIX = ("LocKey_Action",)
 SKIP_KEYS = {
     "LocKey_Hotkey", "LocKey_Default", "LocKey_Meters", "LocKey_Yes", "LocKey_No",
@@ -49,7 +50,9 @@ SKIP_KEYS = {
     "LocKey_EyeLaserHostRequired", "LocKey_Degrees", "LocKey_Alive", "LocKey_Dead",
     "LocKey_NotAllHighlighted", "LocKey_TargetReady", "LocKey_NoTarget",
     "LocKey_NetworkObject", "LocKey_LocalObject", "LocKey_GizmoControls",
-    "LocKey_ApplyAidKit", "LocKey_WithinSelectedDistance",
+    "LocKey_ApplyAidKit", "LocKey_WithinSelectedDistance", "LocKey_NoPlayers",
+    "LocKey_NoneAvailable", "LocKey_UpgradesLocal", "LocKey_LightNormal", "LocKey_LightDark",
+    "LocKey_LightBright", "LocKey_YOU", "LocKey_Yes", "LocKey_No",
 }
 
 KEY_RE = re.compile(r"\bLocKey_\w+")

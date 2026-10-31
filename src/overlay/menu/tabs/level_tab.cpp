@@ -11,180 +11,163 @@
 
 namespace Cheat
 {
-    static void StatusLine(Hax::WStringView name, Hax::WStringView value, Hax::Gui::Color valueColor = Theme::Text)
-    {
-        Hax::Gui::BeginHorizontal();
-        {
-            MainLabel(name, Theme::Faint);
-            const Hax::Vector2 valueSize = CalcMainLabelSize(value);
-            Hax::Gui::Space(Hax::Max(0.f, Hax::Gui::GetContentRegionAvail().X - valueSize.X));
-            MainLabel(value, valueColor);
-        }
-        Hax::Gui::EndHorizontal();
-    }
-
     static Hax::WStringView LastActionText()
     {
         Hax::WStringView action = Hax::WStringView(G->SessionLastAction);
         return action == Hax::WStringView(L"Idle") ? G->Loc[LocKey_Idle] : action;
     }
 
+    static void DrawStatusTiles()
+    {
+        RunManager manager = RunManager::instance();
+        System::String levelName = (manager && manager.levelCurrent()) ? manager.levelCurrent().NarrativeName() : null;
+        const int completed = manager ? manager.levelsCompleted() : 0;
+
+        LevelGenerator gen = LevelGenerator::Instance();
+        const int spawned = gen ? gen.ModulesSpawned() : 0;
+        const int amount = gen ? gen.ModuleAmount() : 0;
+
+        int enemies = 0;
+        if (EnemyDirector dir = EnemyDirector::instance(); dir && dir.enemiesSpawned() != null)
+            enemies = dir.enemiesSpawned().Count();
+
+        int valuables = 0;
+        if (ValuableDirector dir = ValuableDirector::instance(); dir && dir.valuableList() != null)
+            valuables = dir.valuableList().Count();
+
+        int points = 0;
+        if (RoundDirector dir = RoundDirector::instance(); dir && dir.extractionPointList() != null)
+            points = dir.extractionPointList().Count();
+
+        Hax::char16 done[64]{}, modules[32]{}, enemyCount[16]{}, loot[32]{};
+        swprintf_s(done, G->Loc[LocKey_LevelsDoneFmt].Data(), completed);
+        swprintf_s(modules, L"%d / %d", spawned, amount);
+        swprintf_s(enemyCount, L"%d", enemies);
+        swprintf_s(loot, L"%d · %d", valuables, points);
+
+        BeginColumns(Hax::Hash("LevelTiles"), 4);
+        StatTile(G->Loc[LocKey_LevelName], levelName != null ? levelName.ToHaxView() : Hax::WStringView(L"—"), done);
+        NextColumn();
+        StatTile(G->Loc[LocKey_Modules], modules, {}, amount > 0 ? (float)spawned / (float)amount : 0.f);
+        NextColumn();
+        StatTile(G->Loc[LocKey_ActiveEnemies], enemyCount, G->Loc[LocKey_OnMapHint]);
+        NextColumn();
+        StatTile(G->Loc[LocKey_ValuablesPointsTile], loot, G->Loc[LocKey_PointsOpenHint]);
+        EndColumns();
+    }
+
+    static void DrawProgressCard()
+    {
+        RunManager manager = RunManager::instance();
+        const bool host = G->IsInGame && !G->IsClient;
+
+        BeginPanel(LINE_ID);
+        PanelHeader(G->Loc[LocKey_PROGRESS], {}, {.Icon = Icon::Bars});
+        {
+            const int completed = manager ? manager.levelsCompleted() : 0;
+            const int delta = StepperRow(LINE_ID, G->Loc[LocKey_LevelsCompletedShort2], {}, completed, manager && host, true);
+            if (delta != 0 && manager)
+                manager.levelsCompleted() = Hax::Clamp(completed + delta, 0, 100);
+            HorizontalLine(1_px);
+
+            if (ActionRow(LINE_ID, G->Loc[LocKey_NextLevel], {}, G->Loc[LocKey_GoShort], {.Enabled = host, .HostOnly = true}))
+                G->ForceNextLevel = true;
+            HorizontalLine(1_px);
+
+            StatsManager stats = StatsManager::instance();
+            System::String saveName = stats ? stats.saveFileCurrent() : null;
+            if (ActionRow(LINE_ID, G->Loc[LocKey_SaveFile], saveName != null ? saveName.ToHaxView() : Hax::WStringView(L"—"),
+                G->Loc[LocKey_SaveShort], {.Enabled = G->IsInGame && stats}))
+                G->SaveWorldNow = true;
+        }
+        EndPanel();
+    }
+
+    static void DrawMapFilterCard()
+    {
+        BeginPanel(LINE_ID);
+        PanelHeader(G->Loc[LocKey_MAPFILTER], {}, {.Icon = Icon::Map, .HostOnly = true});
+        {
+            Hax::Gui::BeginVertical(6_px);
+            Hax::Gui::BeginHorizontal(6_px);
+            {
+                const bool lastMap = G->TotalBans + 1 == G->LevelBans.Size();
+                for (size_t i = 0; i < G->LevelBans.Size(); ++i)
+                {
+                    LevelBan& ban = G->LevelBans[i];
+                    const bool disabled = G->IsClient || (lastMap && ban.Allowed);
+                    if (Selectable(LINE_ID + i * 10000, ban.Name, !G->IsClient && !ban.Allowed, {.AutoLayout = true, .Disabled = disabled}))
+                    {
+                        ban.Allowed = !ban.Allowed;
+                        G->TotalBans += ban.Allowed ? -1 : 1;
+                    }
+                }
+            }
+            Hax::Gui::EndHorizontal();
+            Hax::Gui::EndVertical();
+        }
+        EndPanel();
+    }
+
+    static void DrawSafetyCard()
+    {
+        BeginPanel(LINE_ID);
+        PanelHeader(G->Loc[LocKey_SAFETY], G->Loc[LocKey_WorldSessionToolsDesc], {.Icon = Icon::Shield});
+        {
+            ToggleEx(LINE_ID, G->SessionSafetyEnabled, G->Loc[LocKey_SessionSafety], G->Loc[LocKey_SessionSafetyDesc]);
+            HorizontalLine(1_px);
+            ToggleEx(LINE_ID, G->AutoCancelClientUnsafe, G->Loc[LocKey_CancelHostOnlyClient], G->Loc[LocKey_CancelHostOnlyClientDesc]);
+            HorizontalLine(1_px);
+            ToggleEx(LINE_ID, G->PreserveSaveOnDeath, G->Loc[LocKey_PreserveSaveOnDeath], G->Loc[LocKey_PreserveSaveOnDeathDesc]);
+            HorizontalLine(1_px);
+            ToggleEx(LINE_ID, G->DisableAllPlayersDeadCheck, G->Loc[LocKey_BlockAllDeadGameover], G->Loc[LocKey_BlockAllDeadGameoverDesc]);
+        }
+        EndPanel();
+    }
+
+    static void DrawLevelActionsCard()
+    {
+        const bool host = G->IsInGame && !G->IsClient;
+
+        BeginPanel(LINE_ID);
+        PanelHeader(G->Loc[LocKey_LEVEL], {}, {.Icon = Icon::Play, .HostOnly = true});
+        {
+            bool reload = false, unlock = false;
+            const GridButton buttons[] =
+            {
+                {.Label = G->Loc[LocKey_ReloadLevel], .Clicked = &reload, .Enabled = host && RunManager::instance()},
+                {.Label = G->Loc[LocKey_UnlockExtractionPoints], .Clicked = &unlock, .Enabled = host && RoundDirector::instance()},
+            };
+            ButtonGrid(LINE_ID, buttons, _countof(buttons), 1);
+            if (reload)
+                G->ReloadCurrentLevel = true;
+            if (unlock)
+                G->UnlockExtractionPoints = true;
+
+            HorizontalLine(1_px);
+            InfoRow(G->Loc[LocKey_LastAction], LastActionText(), Theme::Muted);
+        }
+        EndPanel();
+    }
+
     void DrawLevelTab()
     {
-        const Hax::Vector2 mainAreaSize = Hax::Gui::GetContentRegionAvail();
-        const float spacing = 20_px;
-        const Hax::Vector2 columnSize = {(mainAreaSize.X - 3 * spacing) / 2, mainAreaSize.Y};
+        DrawStatusTiles();
 
-        // Column 1
-        Hax::Gui::Space(spacing);
-        Hax::Gui::BeginContainer(Hax::Hash("LevelColumnLeft"), {.W = columnSize.X, .FitY = true});
-        Hax::Gui::BeginVertical(spacing);
-        Hax::Gui::Dummy({0.f, 0.f});
+        BeginColumns(Hax::Hash("LevelColumns"), 3);
         {
-            BeginPanel(LINE_ID);
-            PanelHeader(G->Loc[LocKey_WorldSessionStatus]);
-            {
-                RunManager manager = RunManager::instance();
-                System::String levelName = (manager && manager.levelCurrent()) ? manager.levelCurrent().NarrativeName() : null;
-                StatusLine(G->Loc[LocKey_LevelName], levelName != null ? levelName.ToHaxView() : Hax::WStringView(L"-"));
-                StatusLine(G->Loc[LocKey_InGame], G->IsInGame ? G->Loc[LocKey_Yes] : G->Loc[LocKey_No], G->IsInGame ? Theme::Ok : Theme::Danger);
-                StatusLine(G->Loc[LocKey_Authority], G->IsClient ? G->Loc[LocKey_Client] : G->Loc[LocKey_HostSingleplayer], G->IsClient ? Theme::Accent : Theme::Ok);
-
-                Hax::char16 buf[64]{};
-                swprintf_s(buf, _countof(buf), L"%d", manager ? manager.levelsCompleted() : 0);
-                StatusLine(G->Loc[LocKey_LevelsCompletedShort], buf);
-
-                LevelGenerator gen = LevelGenerator::Instance();
-                swprintf_s(buf, _countof(buf), L"%d / %d", gen ? gen.ModulesSpawned() : 0, gen ? gen.ModuleAmount() : 0);
-                StatusLine(G->Loc[LocKey_Modules], buf);
-
-                int enemies = 0;
-                if (EnemyDirector dir = EnemyDirector::instance(); dir && dir.enemiesSpawned() != null)
-                    enemies = dir.enemiesSpawned().Count();
-                swprintf_s(buf, _countof(buf), L"%d", enemies);
-                StatusLine(G->Loc[LocKey_ActiveEnemies], buf);
-
-                int valuables = 0;
-                if (ValuableDirector dir = ValuableDirector::instance(); dir && dir.valuableList() != null)
-                    valuables = dir.valuableList().Count();
-                swprintf_s(buf, _countof(buf), L"%d", valuables);
-                StatusLine(G->Loc[LocKey_ValuablesCount], buf);
-
-                int points = 0;
-                if (RoundDirector dir = RoundDirector::instance(); dir && dir.extractionPointList() != null)
-                    points = dir.extractionPointList().Count();
-                swprintf_s(buf, _countof(buf), L"%d", points);
-                StatusLine(G->Loc[LocKey_ExtractionPointsCount], buf);
-
-                StatsManager stats = StatsManager::instance();
-                System::String saveName = stats ? stats.saveFileCurrent() : null;
-                StatusLine(G->Loc[LocKey_SaveFile], saveName != null ? saveName.ToHaxView() : Hax::WStringView(L"-"));
-                StatusLine(G->Loc[LocKey_LastAction], LastActionText(), Theme::Muted);
-            }
-            EndPanel();
-
-            BeginPanel(LINE_ID);
-            PanelHeader(G->Loc[LocKey_WorldSessionTools], G->Loc[LocKey_WorldSessionToolsDesc]);
-            {
-                const float gap = 5_px;
-                const float w = Hax::Gui::GetContentRegionAvail().X;
-                const float halfW = (w - gap) / 2.f;
-
-                Hax::Gui::BeginHorizontal(gap);
-                {
-                    if (Button(LINE_ID, G->Loc[LocKey_SaveNow], {}, {.Enabled = G->IsInGame && StatsManager::instance(), .MinW = halfW}))
-                        G->SaveWorldNow = true;
-
-                    if (Button(LINE_ID, G->Loc[LocKey_ReloadLevel], G->Loc[LocKey_HostOnly], {.Enabled = G->IsInGame && !G->IsClient && RunManager::instance(), .MinW = halfW}))
-                        G->ReloadCurrentLevel = true;
-                }
-                Hax::Gui::EndHorizontal();
-
-                if (Button(LINE_ID, G->Loc[LocKey_UnlockExtractionPoints], G->Loc[LocKey_HostOnly], {.Enabled = G->IsInGame && !G->IsClient && RoundDirector::instance(), .MinW = w}))
-                    G->UnlockExtractionPoints = true;
-
-                HorizontalLine(1_px);
-
-                ToggleEx(LINE_ID, G->PreserveSaveOnDeath, G->Loc[LocKey_PreserveSaveOnDeath], G->Loc[LocKey_PreserveSaveOnDeathDesc]);
-                HorizontalLine(1_px);
-                ToggleEx(LINE_ID, G->SessionSafetyEnabled, G->Loc[LocKey_SessionSafety], G->Loc[LocKey_SessionSafetyDesc]);
-                HorizontalLine(1_px);
-                ToggleEx(LINE_ID, G->AutoCancelClientUnsafe, G->Loc[LocKey_CancelHostOnlyClient], G->Loc[LocKey_CancelHostOnlyClientDesc]);
-                HorizontalLine(1_px);
-                ToggleEx(LINE_ID, G->DisableAllPlayersDeadCheck, G->Loc[LocKey_BlockAllDeadGameover], G->Loc[LocKey_BlockAllDeadGameoverDesc]);
-                HorizontalLine(1_px);
-                if (Button(LINE_ID, G->Loc[LocKey_ResetRiskyToggles], G->Loc[LocKey_ResetRiskyTogglesDesc], {.MinW = w}))
-                    G->ResetSessionSafety = true;
-            }
-            EndPanel();
-
-            BeginPanel(LINE_ID);
-            PanelHeader(G->Loc[LocKey_GENERAL]);
-            {
-                {
-                    RunManager manager = RunManager::instance();
-                    int levelsCompl = manager ? manager.levelsCompleted() : 0;
-
-                    const float fieldWidth = 64_px;
-                    const float fieldHeight = CalcButtonHeight();
-                    Hax::Gui::BeginHorizontal(5_px);
-                    {
-                        MainLabelAlignedByH(G->Loc[LocKey_LevelsCompleted], fieldHeight);
-                        Hax::Gui::Space(Hax::Max(0.f, Hax::Gui::GetContentRegionAvail().X - fieldWidth));
-                        int target = levelsCompl;
-                        if (IntInput(LINE_ID, target, 0, 100, fieldWidth, manager && !G->IsClient && G->IsInGame))
-                            manager.levelsCompleted() = target;
-                    }
-                    Hax::Gui::EndHorizontal();
-                }
-
-                HorizontalLine(1_px);
-
-                bool disabled = G->IsClient || !G->IsInGame;
-                if (Button(LINE_ID, G->Loc[LocKey_NextLevel], {}, {.Enabled = !disabled, .MinW = Hax::Gui::GetContentRegionAvail().X}))
-                    G->ForceNextLevel = true;
-            }
-            EndPanel();
+            DrawProgressCard();
+            DrawMapFilterCard();
         }
-        Hax::Gui::Dummy({0.f, 0.f});
-        Hax::Gui::EndVertical();
-        Hax::Gui::EndContainer();
-
-        // Column 2
-        Hax::Gui::Space(spacing);
-        Hax::Gui::BeginContainer(Hax::Hash("LevelColumnRight"), {.W = columnSize.X, .FitY = true});
-        Hax::Gui::BeginVertical(spacing);
-        Hax::Gui::Dummy({0.f, 0.f});
+        NextColumn();
+        {
+            DrawSafetyCard();
+            DrawLevelActionsCard();
+        }
+        NextColumn();
         {
             DrawWorldControlPanel();
-
-            BeginPanel(LINE_ID);
-            PanelHeader(G->Loc[LocKey_MAPFILTER], G->Loc[LocKey_AvailableIfHost]);
-            {
-                Hax::Gui::BeginVertical(5_px);
-                {
-                    Hax::Gui::BeginHorizontal(5_px);
-                    {
-                        bool lastMap = G->TotalBans + 1 == G->LevelBans.Size();
-                        for (size_t i = 0; i < G->LevelBans.Size(); ++i)
-                        {
-                            LevelBan& ban = G->LevelBans[i];
-                            bool disabled = G->IsClient || lastMap && ban.Allowed;
-                            if (Selectable(LINE_ID + i * 10000, ban.Name, !G->IsClient && !ban.Allowed, { .AutoLayout = true, .Disabled = disabled, .R = 5_px }))
-                            {
-                                ban.Allowed = !ban.Allowed;
-                                G->TotalBans += ban.Allowed ? -1 : 1;
-                            }
-                        }
-                    }
-                    Hax::Gui::EndHorizontal();
-                }
-                Hax::Gui::EndVertical();
-            }
-            EndPanel();
         }
-        Hax::Gui::Dummy({0.f, 0.f});
-        Hax::Gui::EndVertical();
-        Hax::Gui::EndContainer();
+        EndColumns();
     }
 }

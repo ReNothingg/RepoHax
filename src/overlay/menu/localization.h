@@ -38,6 +38,56 @@ X(LocKey_PlayersLabel, L"Players", L"Игроки") \
 X(LocKey_HostBadge, L"HOST", L"ХОСТ") \
 X(LocKey_ClientBadge, L"CLIENT", L"КЛИЕНТ") \
 X(LocKey_ResetRiskyShort, L"Reset risky", L"Сбросить рискованное") \
+X(LocKey_NOCLIP, L"NOCLIP", L"НОКЛИП") \
+X(LocKey_GodmodeHint, L"Incoming damage is ignored", L"Урон по вам не проходит") \
+X(LocKey_HealShort, L"Heal", L"Исцелить") \
+X(LocKey_MoveShort, L"Move", L"Переместить") \
+X(LocKey_ApplyShort, L"Apply", L"Применить") \
+X(LocKey_GoShort, L"Go", L"Перейти") \
+X(LocKey_SaveShort, L"Save", L"Сохранить") \
+X(LocKey_ActivateShort, L"Activate", L"Активировать") \
+X(LocKey_FixShort, L"Fix", L"Исправить") \
+X(LocKey_DontTumbleHint, L"Stay upright while flying", L"Не опрокидываться в полёте") \
+X(LocKey_AidKitsHint, L"Health packs on the map", L"Аптечки на карте") \
+X(LocKey_NoneAvailable, L"None available", L"Нет доступных") \
+X(LocKey_UpgradesLocal, L"local", L"локально") \
+X(LocKey_AvailableNowFmt, L"%d available", L"Доступно: %d") \
+X(LocKey_PROGRESS, L"PROGRESS", L"ПРОГРЕСС") \
+X(LocKey_SAFETY, L"SAFETY", L"БЕЗОПАСНОСТЬ") \
+X(LocKey_LEVEL, L"LEVEL", L"УРОВЕНЬ") \
+X(LocKey_LevelsDoneFmt, L"Levels completed: %d", L"Пройдено уровней: %d") \
+X(LocKey_OnMapHint, L"active on the map", L"активны на карте") \
+X(LocKey_ValuablesPointsTile, L"Valuables · extraction", L"Ценности · извлечение") \
+X(LocKey_PointsOpenHint, L"extraction points", L"точек извлечения") \
+X(LocKey_LevelsCompletedShort2, L"Levels completed", L"Пройдено уровней") \
+X(LocKey_LIGHTING, L"Lighting", L"Освещение") \
+X(LocKey_YOU, L"YOU", L"ВЫ") \
+X(LocKey_SelectedTag, L"selected", L"выбран") \
+X(LocKey_YouTag, L"you", L"вы") \
+X(LocKey_AliveStatus, L"ALIVE", L"ЖИВ") \
+X(LocKey_DeadStatus, L"DEAD", L"МЁРТВ") \
+X(LocKey_NoPlayers, L"No players yet", L"Игроков пока нет") \
+X(LocKey_SelectPlayerHint, L"Pick a player in the list above", L"Выберите игрока в списке выше") \
+X(LocKey_TeleportToShort, L"Teleport to", L"Телепорт к нему") \
+X(LocKey_BringShort, L"Bring to me", L"Ко мне") \
+X(LocKey_OnMapFmt, L"%d on the map", L"%d на карте") \
+X(LocKey_RunBalance, L"Run balance", L"Баланс забега") \
+X(LocKey_QuotaTile, L"Quota", L"Квота") \
+X(LocKey_ValuablesOnMap, L"Valuables on the map", L"Ценности на карте") \
+X(LocKey_BalanceSyncHint, L"Synced and saved immediately", L"Синхронизируется и сохраняется сразу") \
+X(LocKey_QuotaTileHint, L"Target for extraction points", L"Цель для точек извлечения") \
+X(LocKey_PricesAll, L"All valuable prices", L"Цены всех ценностей") \
+X(LocKey_HOTKEYS, L"HOTKEYS", L"ГОРЯЧИЕ КЛАВИШИ") \
+X(LocKey_INTERFACE, L"INTERFACE", L"ИНТЕРФЕЙС") \
+X(LocKey_QUICK_TELEPORT, L"QUICK TELEPORT", L"БЫСТРЫЙ ТЕЛЕПОРТ") \
+X(LocKey_PLAYER_TELEPORT, L"PLAYER", L"ИГРОК") \
+X(LocKey_Gizmo, L"Gizmo", L"Гизмо") \
+X(LocKey_LightNormal, L"Normal", L"Обычное") \
+X(LocKey_LightDark, L"Dark", L"Темнота") \
+X(LocKey_LightBright, L"Bright", L"Яркое") \
+X(LocKey_TargetLockShort, L"Lock", L"Зафиксировать") \
+X(LocKey_GizmoModeLabel, L"Mode", L"Режим") \
+X(LocKey_GizmoSpaceLabel, L"Axes", L"Оси") \
 X(LocKey_QUOTA, L"QUOTA", L"КВОТА") \
 X(LocKey_CurrentQuota, L"Current quota", L"Текущая квота") \
 X(LocKey_QuotaTarget, L"New quota", L"Новая квота") \
@@ -239,6 +289,9 @@ X(LocKey_NoTarget, L"No GameObject target", L"Нет цели GameObject") \
 X(LocKey_ActionObjectDeleted, L"Aimed object deleted", L"Объект под прицелом удалён") \
 X(LocKey_ActionObjectNoTarget, L"Delete skipped: no removable target", L"Удаление пропущено: подходящая цель не найдена") \
 X(LocKey_ActionObjectHostOnly, L"Delete skipped: host only", L"Удаление пропущено: только для хоста") \
+X(LocKey_ActionDronePrefabMissing, L"Drone launch skipped: drone or grenade prefab not found", L"Запуск дрона отменён: префаб дрона или гранаты не найден") \
+X(LocKey_ActionDroneNoTarget, L"Drone launch skipped: select a living target", L"Запуск дрона отменён: выберите живую цель") \
+X(LocKey_ActionDroneLaunchedFmt, L"Drones launched: %d", L"Запущено дронов: %d") \
 X(LocKey_SPAWN, L"SPAWN", L"СПАВН") \
 X(LocKey_TRUCK, L"TRUCK", L"ФУРГОН") \
 X(LocKey_TeleportTruck, L"Teleport to truck", L"Телепортироваться в фургон") \
@@ -367,6 +420,28 @@ X(LocKey_Small, L"Small", L"Маленькая") \
 X(LocKey_Medium, L"Medium", L"Средняя") \
 X(LocKey_Large, L"Large", L"Большая") \
 X(LocKey_Unknown, L"Unknown", L"Неизвестное") \
+X(LocKey_DRONESTRIKE, L"DRONE STRIKE", L"УДАР БПЛА") \
+X(LocKey_DroneStrikeDesc, L"Kamikaze drone with grenades: flies at the target and blows up", L"Дрон-камикадзе с гранатами: летит в цель и взрывается") \
+X(LocKey_DroneGuidance, L"Guidance", L"Наведение") \
+X(LocKey_DroneModeAuto, L"Auto", L"Авто") \
+X(LocKey_DroneModeManual, L"Crosshair", L"По прицелу") \
+X(LocKey_DroneManualHint, L"Flies where you aim and blows up on anyone it touches", L"Летит туда, куда вы смотрите, и взрывается о любого") \
+X(LocKey_DroneTarget, L"Target", L"Цель") \
+X(LocKey_DronePlayerTag, L"Player", L"Игрок") \
+X(LocKey_DroneEnemyTag, L"Enemy", L"Враг") \
+X(LocKey_DroneSpeed, L"Drone speed", L"Скорость дрона") \
+X(LocKey_DroneSpeedFmt, L"%d m/s", L"%d м/с") \
+X(LocKey_DroneSwarm, L"Drones per launch", L"Дронов за запуск") \
+X(LocKey_DroneWarheads, L"Grenades per drone", L"Гранат на дрон") \
+X(LocKey_DroneThroughWalls, L"Fly through walls", L"Сквозь стены") \
+X(LocKey_DroneThroughWallsDesc, L"Off: dodges walls and blows up if it crashes", L"Выкл: облетает стены и взрывается, если врежется") \
+X(LocKey_DroneLethal, L"Guaranteed kill", L"Гарантированное убийство") \
+X(LocKey_DroneLethalDesc, L"The hit target dies even if the blast was not enough", L"Цель умрёт, даже если взрыва не хватило") \
+X(LocKey_DroneLaunch, L"Launch", L"Запустить") \
+X(LocKey_DroneDetonate, L"Detonate all", L"Подорвать все") \
+X(LocKey_DroneLaunchHotkey, L"Drone launch key", L"Клавиша запуска дрона") \
+X(LocKey_DroneDetonateHotkey, L"Drone detonate key", L"Клавиша подрыва дронов") \
+X(LocKey_DronesInFlight, L"In the air", L"В воздухе") \
 X(LocKey_UnlockAll, L"Unlock all", L"Открыть все")\
 X(LocKey_ResetAll, L"Reset all", L"Сбросить все")
 

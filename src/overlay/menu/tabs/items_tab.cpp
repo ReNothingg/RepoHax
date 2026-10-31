@@ -10,119 +10,96 @@
 
 namespace Cheat
 {
+    static void DrawSpawnCard()
+    {
+        const bool host = G->IsInGame && !G->IsClient;
+
+        BeginPanel(LINE_ID);
+        PanelHeader(G->Loc[LocKey_SPAWN], {}, {.Icon = Icon::Box, .HostOnly = true});
+        {
+            const float gap = 8_px;
+            const Hax::Vector2 spawnSize = CalcButtonSize(G->Loc[LocKey_Spawn]);
+            const size_t nItems = G->ItemsPool.Size();
+            constexpr size_t dropListId = Hax::Hash(L"ItemSelect");
+            const float dropW = Hax::Gui::GetContentRegionAvail().X - gap - spawnSize.X;
+
+            Hax::Gui::BeginHorizontal(gap);
+            {
+                Hax::WStringView preview = L"—";
+                if (G->SelectedItem != null)
+                    preview = G->SelectedItem.itemName().ToHaxView();
+
+                const Hax::Vector2 pos = Hax::Gui::GetCursorPos();
+                if (DropdownBtn(LINE_ID, preview, dropW))
+                    OpenPopup(dropListId, {pos.X, pos.Y + CalcButtonHeight()});
+
+                if (Button(LINE_ID, G->Loc[LocKey_Spawn], {}, {.Enabled = host && G->SelectedItem, .Style = ButtonStyle::Primary}))
+                    G->ItemToSpawn = G->SelectedItem;
+            }
+            Hax::Gui::EndHorizontal();
+
+            const float selectableH = CalcButtonHeight();
+            const float dropListH = selectableH * Hax::Max(1ULL, Hax::Min(nItems, 8ULL)) + 8_px + 1.f;
+            if (BeginDropList(dropListId, {dropW, dropListH}))
+            {
+                const float w = Hax::Gui::GetContentRegionAvail().X;
+                for (size_t i = 0; i < nItems; ++i)
+                {
+                    const auto& p = G->ItemsPool.begin()[i];
+                    if (Selectable(LINE_ID + i * 10000, p.key, G->SelectedItem == p.value, {.MinW = w}))
+                    {
+                        G->SelectedItem = p.value;
+                        ClosePopup(dropListId);
+                    }
+                }
+                EndDropList();
+            }
+
+            HorizontalLine(1_px);
+            HotkeyEx(Hax::Hash(L"SpawnItemHotkeyEditor"), G->VkSpawnItem, G->Loc[LocKey_Hotkey], G->Loc[LocKey_Spawn]);
+        }
+        EndPanel();
+    }
+
+    static void DrawRemoverCard()
+    {
+        const bool canDelete = G->IsInGame && !G->IsClient && G->ObjectRemoverEnabled && G->ObjectRemoverTargetValid;
+
+        BeginPanel(LINE_ID);
+        PanelHeader(G->Loc[LocKey_OBJECT_REMOVER], G->Loc[LocKey_ObjectRemoverDesc],
+            {.Icon = Icon::Trash, .HostOnly = true, .Toggle = &G->ObjectRemoverEnabled, .ToggleDisabled = G->IsClient});
+        {
+            Hax::char16 range[32]{};
+            swprintf_s(range, _countof(range), G->Loc[LocKey_Meters].Data(), G->ObjectRemoverRange);
+            SliderEx(LINE_ID, G->Loc[LocKey_ObjectRemoverRange], range, &G->ObjectRemoverRange, 3, 100, SliderConvertInt);
+            HorizontalLine(1_px);
+
+            if (ActionRow(LINE_ID, G->Loc[LocKey_DeleteTarget],
+                G->ObjectRemoverTargetValid ? G->Loc[LocKey_TargetReady] : G->Loc[LocKey_NoTarget],
+                G->Loc[LocKey_DeleteTarget],
+                {.Enabled = canDelete, .Style = ButtonStyle::Danger, .Hotkey = &G->VkDeleteObject, .HotkeyId = Hax::Hash(L"DeleteObjectHotkeyEditor")}))
+                G->DeleteObjectRequested = true;
+        }
+        EndPanel();
+    }
+
     void DrawItemsTab()
     {
-        const Hax::Vector2 mainAreaSize = Hax::Gui::GetContentRegionAvail();
-        const float spacing = 20_px;
-        const Hax::Vector2 columnSize = {(mainAreaSize.X - 3 * spacing) / 2, mainAreaSize.Y};
-
-        // Column 1
-        Hax::Gui::Space(spacing);
-        Hax::Gui::BeginContainer(Hax::Hash("ItemsColumnLeft"), {.W = columnSize.X, .FitY = true});
-        Hax::Gui::BeginVertical(spacing);
-        Hax::Gui::Dummy({0.f, 0.f});
+        BeginColumns(Hax::Hash("ItemsColumns"), 3);
         {
             BeginPanel(LINE_ID);
-            PanelHeader(G->Loc[LocKey_GUNS]);
+            PanelHeader(G->Loc[LocKey_GUNS], {}, {.Icon = Icon::Gun});
             {
-                {
-                    bool enabled = !G->IsClient;
-                    ToggleEx(LINE_ID, G->InfBattery, G->Loc[LocKey_MaxBatteryGun], G->Loc[LocKey_HostOnly], {.Disabled = !enabled});
-                }
-
+                ToggleEx(LINE_ID, G->InfBattery, G->Loc[LocKey_MaxBatteryGun], {}, {.Disabled = G->IsClient, .HostOnly = true});
                 HorizontalLine(1_px);
-
-                {
-                    ToggleEx(LINE_ID, G->UseLaser, G->Loc[LocKey_LaserCrosshair]);
-                }
+                ToggleEx(LINE_ID, G->UseLaser, G->Loc[LocKey_LaserCrosshair]);
             }
             EndPanel();
         }
-        Hax::Gui::Dummy({0.f, 0.f});
-        Hax::Gui::EndVertical();
-        Hax::Gui::EndContainer();
-
-        // Column 2
-        Hax::Gui::Space(spacing);
-        Hax::Gui::BeginContainer(Hax::Hash("ItemsColumnRight"), {.W = columnSize.X, .FitY = true});
-        Hax::Gui::BeginVertical(spacing);
-        Hax::Gui::Dummy({0.f, 0.f});
-        {
-            BeginPanel(LINE_ID);
-            PanelHeader(G->Loc[LocKey_SPAWN], G->Loc[LocKey_AvailableIfHost]);
-            {
-                const float spacing2 = 5_px;
-                Hax::Vector2 sz = CalcButtonSize(G->Loc[LocKey_Spawn]);
-                Hax::Gui::BeginHorizontal(spacing2);
-                {
-                    size_t nItems = G->ItemsPool.Size();
-                    constexpr size_t dropListId = Hax::Hash(L"ItemSelect");
-                    const float dropListW = Hax::Gui::GetContentRegionAvail().X - spacing2 - sz.X;
-
-                    Hax::Gui::BeginVertical(3_px);
-                    {
-                        Hax::WStringView preview = L"-";
-                        if (G->SelectedItem != null)
-                            preview = G->SelectedItem.itemName().ToHaxView();
-
-                        if (DropdownBtn(LINE_ID, preview, dropListW))
-                            OpenPopup(dropListId, Hax::Gui::GetCursorPos());
-                    }
-                    Hax::Gui::EndVertical();
-
-                    const float selectableH = CalcButtonHeight();
-                    const float dropListH = selectableH * Hax::Max(1ULL, Hax::Min(nItems, 8ULL)) + 5_px * 2.f + 1.f;
-                    if (BeginDropList(dropListId, {dropListW, dropListH}))
-                    {
-                        for (size_t i = 0; i < nItems; ++i)
-                        {
-                            const auto& p = G->ItemsPool.begin()[i];
-                            if (Selectable(LINE_ID + i * 10000, p.key, G->SelectedItem == p.value, {.MinW = dropListW}))
-                            {
-                                G->SelectedItem = p.value;
-                                ClosePopup(dropListId);
-                            }
-                        }
-                        EndDropList();
-                    }
-
-                    bool enabled = !G->IsClient && G->SelectedItem && G->IsInGame;
-                    if (Button(LINE_ID, G->Loc[LocKey_Spawn], {}, {.Enabled = enabled}))
-                        G->ItemToSpawn = G->SelectedItem;
-                }
-                Hax::Gui::EndHorizontal();
-
-                HorizontalLine(1_px);
-                HotkeyEx(Hax::Hash(L"SpawnItemHotkeyEditor"), G->VkSpawnItem, G->Loc[LocKey_Hotkey], G->Loc[LocKey_Spawn]);
-            }
-            EndPanel();
-
-            BeginPanel(LINE_ID);
-            PanelHeader(G->Loc[LocKey_OBJECT_REMOVER], G->Loc[LocKey_ObjectRemoverDesc]);
-            {
-                ToggleEx(LINE_ID, G->ObjectRemoverEnabled, G->Loc[LocKey_ObjectRemover], G->Loc[LocKey_HostOnly], {.Disabled = G->IsClient});
-
-                HorizontalLine(1_px);
-
-                Hax::char16 range[32]{};
-                swprintf_s(range, _countof(range), G->Loc[LocKey_Meters].Data(), G->ObjectRemoverRange);
-                SliderEx(LINE_ID, G->Loc[LocKey_ObjectRemoverRange], range, &G->ObjectRemoverRange, 3, 100, SliderConvertInt);
-
-                HorizontalLine(1_px);
-
-                MainLabel(G->ObjectRemoverTargetValid ? G->Loc[LocKey_TargetReady] : G->Loc[LocKey_NoTarget],
-                    G->ObjectRemoverTargetValid ? Theme::Danger : Theme::Faint);
-
-                const bool canDelete = G->IsInGame && !G->IsClient && G->ObjectRemoverEnabled && G->ObjectRemoverTargetValid;
-                if (Button(LINE_ID, G->Loc[LocKey_DeleteTarget], G->Loc[LocKey_HostOnly], {.Enabled = canDelete, .MinW = Hax::Gui::GetContentRegionAvail().X}))
-                    G->DeleteObjectRequested = true;
-
-                HotkeyEx(Hax::Hash(L"DeleteObjectHotkeyEditor"), G->VkDeleteObject, G->Loc[LocKey_Hotkey], G->Loc[LocKey_DeleteTarget]);
-            }
-            EndPanel();
-        }
-        Hax::Gui::Dummy({0.f, 0.f});
-        Hax::Gui::EndVertical();
-        Hax::Gui::EndContainer();
+        NextColumn();
+        DrawSpawnCard();
+        NextColumn();
+        DrawRemoverCard();
+        EndColumns();
     }
 }

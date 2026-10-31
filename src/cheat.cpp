@@ -101,6 +101,14 @@ namespace Cheat
         Hax::IniAddEntry(ini, "Entities",   "PlayersEsp",          &G->PlayersEsp,          Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Entities",   "PlayersChams",        &G->PlayersChams,        Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Entities",   "VkReviveSelf",        &G->VkReviveSelf,        Hax::IniFileWrite_Int,  IniFileRead_IntClamped<VK_F7, 0, 255>);
+        Hax::IniAddEntry(ini, "Drone",      "ManualMode",          &G->DroneManualMode,     Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Drone",      "Speed",               &G->DroneSpeed,          Hax::IniFileWrite_Int,  IniFileRead_IntClamped<14, 4, 40>);
+        Hax::IniAddEntry(ini, "Drone",      "SwarmSize",           &G->DroneSwarmSize,      Hax::IniFileWrite_Int,  IniFileRead_IntClamped<1, 1, 5>);
+        Hax::IniAddEntry(ini, "Drone",      "Warheads",            &G->DroneWarheads,       Hax::IniFileWrite_Int,  IniFileRead_IntClamped<1, 1, 3>);
+        Hax::IniAddEntry(ini, "Drone",      "ThroughWalls",        &G->DroneThroughWalls,   Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Drone",      "Lethal",              &G->DroneLethal,         Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Drone",      "VkLaunch",            &G->VkDroneLaunch,       Hax::IniFileWrite_Int,  IniFileRead_IntClamped<VK_F5, 0, 255>);
+        Hax::IniAddEntry(ini, "Drone",      "VkDetonate",          &G->VkDroneDetonate,     Hax::IniFileWrite_Int,  IniFileRead_IntClamped<VK_F4, 0, 255>);
 
         Hax::IniAddEntry(ini, "Vision",     "BetterVision",        &G->BetterVision,        Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Vision",     "NoFog",               &G->NoFog,               Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);

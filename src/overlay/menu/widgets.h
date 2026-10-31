@@ -4,6 +4,17 @@
 
 namespace Cheat
 {
+    // Vector icons drawn with lines and circles. The bundled icon font only has
+    // the navigation glyphs, so everything else is drawn here.
+    enum class Icon : Hax::uint8
+    {
+        None, Search, Close, ChevronRight, ChevronDown, Check, Plus, Minus,
+        Heart, Move, ArrowUp, Hand, Zap, Sparkle, ChevronsUp, Eye, Shield, Globe,
+        Map, User, Users, Coin, Gem, Box, Target, Extract, Wallet, Play, Bars,
+        Reset, Ghost, Sliders, Sun, Save, Trash, Battery, Keyboard, Clock,
+        Crosshair, Cube, Shirt, Truck, Gun, Dot
+    };
+
     enum class ButtonStyle
     {
         Secondary,
@@ -17,12 +28,65 @@ namespace Cheat
         bool Enabled = true;
         float MinW = 0.f;
         ButtonStyle Style = ButtonStyle::Secondary;
+        Cheat::Icon Icon = Cheat::Icon::None;
     };
 
     struct ToggleExParams
     {
         bool Disabled;
         size_t SettingsId;
+        bool HostOnly;
+        int* Hotkey;
+        size_t HotkeyId;
+    };
+
+    struct CardHeaderParams
+    {
+        Cheat::Icon Icon = Cheat::Icon::None;
+        bool HostOnly = false;
+        bool* Toggle = nullptr;          // master switch on the right
+        bool ToggleDisabled = false;
+        int* Hotkey = nullptr;           // editable key cap next to the switch
+        size_t HotkeyId = 0;
+        Hax::WStringView Action = {};    // small button on the right
+        bool ActionEnabled = true;
+        ButtonStyle ActionStyle = ButtonStyle::Secondary;
+        size_t SettingsId = 0;           // settings popup button
+        Hax::WStringView Note = {};      // faint text on the right
+        bool NoDivider = false;
+        size_t Id = 0;
+    };
+
+    struct ActionRowParams
+    {
+        bool Enabled = true;
+        ButtonStyle Style = ButtonStyle::Secondary;
+        bool HostOnly = false;
+        int* Hotkey = nullptr;
+        size_t HotkeyId = 0;
+    };
+
+    struct GridButton
+    {
+        Hax::WStringView Label;
+        bool* Clicked = nullptr;
+        bool Enabled = true;
+        ButtonStyle Style = ButtonStyle::Secondary;
+        Cheat::Icon Icon = Cheat::Icon::None;
+        Hax::WStringView Tooltip = {};
+    };
+
+    struct PlayerRowData
+    {
+        Hax::WStringView Initial;
+        Hax::Gui::Color AvatarColor;
+        Hax::WStringView Name;
+        Hax::WStringView Tag;
+        Hax::WStringView Status;
+        Hax::Gui::Color StatusColor;
+        int Hp;
+        int MaxHp;
+        bool Selected;
     };
 
     struct SelectableParams
@@ -38,6 +102,10 @@ namespace Cheat
         bool Disabled;
         Hax::Gui::TextureHandle Icon;
     };
+
+    // Icons
+    void DrawIcon(Icon icon, const Hax::Rect& bounds, Hax::Gui::Color col);
+    void IconItem(Icon icon, float size, Hax::Gui::Color col, float rowH = 0.f);
 
     // Text
     void Label(Hax::Gui::FontHandle hFont, Hax::WStringView text, float fontH, Hax::Gui::Color col);
@@ -60,26 +128,44 @@ namespace Cheat
     void Badge(Hax::WStringView text, Hax::Gui::Color fg);
     Hax::Vector2 CalcBadgeSize(Hax::WStringView text);
     void KeyCap(Hax::WStringView text);
-    bool IconButton(size_t id, Hax::char16 icon16, Hax::WStringView tooltip = {});
+    bool IconButton(size_t id, Icon icon, Hax::WStringView tooltip = {});
     void StatusDot(Hax::Gui::Color col, float h);
 
     // Search: flashes the control whose label matches after jumping to it.
     void SetSearchHighlight(Hax::WStringView label);
     void TickSearchHighlight();
 
+    // Page layout: equal (or weighted) columns, each a vertical stack of cards.
+    void BeginColumns(size_t id, int count, const float* weights = nullptr);
+    void NextColumn();
+    void EndColumns();
+    void StatTile(Hax::WStringView label, Hax::WStringView value, Hax::WStringView sub = {}, float progress = -1.f, Hax::Gui::Color valueCol = 0xECEAE4FF);
+
     // Cards
     void BeginPanel(size_t id);
     void EndPanel();
-    void PanelHeader(Hax::WStringView text, Hax::WStringView desc = {});
+    // Card title row. Returns true when its switch changed or its action button was clicked.
+    bool PanelHeader(Hax::WStringView text, Hax::WStringView desc = {}, const CardHeaderParams& params = {});
     void HorizontalLine(float th, float w = 0.f);
+
+    // Rows
+    bool ToggleEx(size_t id, bool& value, Hax::WStringView text, Hax::WStringView desc = {}, ToggleExParams params = {});
+    bool ActionRow(size_t id, Hax::WStringView text, Hax::WStringView hint, Hax::WStringView btnLabel, const ActionRowParams& params = {});
+    void InfoRow(Hax::WStringView label, Hax::WStringView value, Hax::Gui::Color valueCol = 0xECEAE4FF);
+    int SegmentedRow(size_t id, Hax::WStringView text, const Hax::WStringView* items, int count, int selected, bool enabled = true, bool fullWidth = false);
+    int StepperRow(size_t id, Hax::WStringView text, Hax::WStringView hint, int value, bool enabled, bool hostOnly = false);
+    int Stepper(size_t id, int value, bool enabled);
+    int UpgradeCell(size_t id, Hax::WStringView label, int value, bool enabled, float width);
+    bool PlayerRow(size_t id, const PlayerRowData& data);
+    bool HotkeyEx(size_t id, int& key, Hax::WStringView label, Hax::WStringView desc = {});
 
     // Controls
     bool SettingsBtn(size_t id, bool disabled = false);
     bool Toggle(size_t id, bool& value, bool enabled = true);
-    bool ToggleEx(size_t id, bool& value, Hax::WStringView text, Hax::WStringView desc = {}, ToggleExParams params = {});
     Hax::Vector2 CalcButtonSize(Hax::WStringView label);
     float CalcButtonHeight();
     bool Button(size_t id, Hax::WStringView label, Hax::WStringView desc = {}, const ButtonParams& params = {});
+    bool ButtonGrid(size_t id, const GridButton* buttons, int count, int perRow);
     void Image(Hax::Gui::TextureHandle tex, Hax::Vector2 customSize = {}, float rounding = 0.f);
     int SliderConvertInt(int min, int max, float m);
     float SliderConvertFloat(float min, float max, float m);
@@ -101,7 +187,6 @@ namespace Cheat
     bool RepeatBtn(size_t id, Hax::WStringView label, bool enabled = true);
     bool IntInput(size_t id, int& value, int min, int max, float width, bool enabled = true);
     bool Hotkey(size_t id, int& key);
-    bool HotkeyEx(size_t id, int& key, Hax::WStringView label, Hax::WStringView desc = {});
     bool Checkbox(size_t id, bool& val);
     bool CheckboxEx(size_t id, bool& val, Hax::WStringView text);
 

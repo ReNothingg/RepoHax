@@ -4,6 +4,7 @@
 
 #include "../localization.h"
 #include "../widgets.h"
+#include "../theme.h"
 
 #define LINE_ID (HAX_LINE * 891)
 
@@ -11,104 +12,63 @@ namespace Cheat
 {
     void DrawVisionTab()
     {
-        const Hax::Vector2 mainAreaSize = Hax::Gui::GetContentRegionAvail();
-        const float spacing = 20_px;
-        const Hax::Vector2 columnSize = {(mainAreaSize.X - 3 * spacing) / 2, mainAreaSize.Y};
-
-        // Column 1
-        Hax::Gui::Space(spacing);
-        Hax::Gui::BeginContainer(Hax::Hash("VisionColumnLeft"), {.W = columnSize.X, .FitY = true});
-        Hax::Gui::BeginVertical(spacing);
-        Hax::Gui::Dummy({0.f, 0.f});
+        BeginColumns(Hax::Hash("VisionColumns"), 3);
         {
             BeginPanel(LINE_ID);
-            PanelHeader(G->Loc[LocKey_VIEW]);
+            PanelHeader(G->Loc[LocKey_VIEW], {}, {.Icon = Icon::Eye});
             {
-                {
-                    ToggleEx(LINE_ID, G->BetterVision, G->Loc[LocKey_BetterVision]);
-                }
-
+                ToggleEx(LINE_ID, G->BetterVision, G->Loc[LocKey_BetterVision]);
+                HorizontalLine(1_px);
+                ToggleEx(LINE_ID, G->NoFog, G->Loc[LocKey_NoFog], G->Loc[LocKey_NoFogDesc]);
+                HorizontalLine(1_px);
+                ToggleEx(LINE_ID, G->ThirdPerson, G->Loc[LocKey_ThirdPerson]);
                 HorizontalLine(1_px);
 
-                {
-                    ToggleEx(LINE_ID, G->NoFog, G->Loc[LocKey_NoFog], G->Loc[LocKey_NoFogDesc]);
-                }
+                Hax::char16 buf[32] = {};
+                swprintf_s(buf, _countof(buf), G->Fov < 61 ? G->Loc[LocKey_Default].Data() : G->Loc[LocKey_Degrees].Data(), G->Fov);
+                SliderEx(LINE_ID, G->Loc[LocKey_FieldOfView], buf, &G->Fov, 60, 140, SliderConvertInt);
+            }
+            EndPanel();
 
-                HorizontalLine(1_px);
-
-                {
-                    ToggleEx(LINE_ID, G->DisableOcclusionCulling, G->Loc[LocKey_DisableOcclusion], G->Loc[LocKey_DisableOcclusionDesc]);
-
-                    Hax::char16 buf[32] = {};
-                    swprintf_s(buf, _countof(buf), G->Loc[LocKey_Meters].Data(), G->RenderDistance);
-                    SliderEx(LINE_ID, G->Loc[LocKey_RenderDistance], buf, &G->RenderDistance, 32, 500, SliderConvertInt);
-                }
-
-                HorizontalLine(1_px);
-
-                {
-                    ToggleEx(LINE_ID, G->ThirdPerson, G->Loc[LocKey_ThirdPerson]);
-                }
-
-                HorizontalLine(1_px);
-
-                {
-                    Hax::char16 buf[32] = {};
-                    swprintf_s(buf, _countof(buf), G->Fov < 61 ? G->Loc[LocKey_Default].Data() : G->Loc[LocKey_Degrees].Data(), G->Fov);
-
-                    SliderEx(LINE_ID, G->Loc[LocKey_FieldOfView], buf, &G->Fov, 60, 140, SliderConvertInt);
-                }
+            BeginPanel(LINE_ID);
+            PanelHeader(G->Loc[LocKey_DisableOcclusion], G->Loc[LocKey_DisableOcclusionDesc],
+                {.Icon = Icon::Box, .Toggle = &G->DisableOcclusionCulling});
+            {
+                Hax::char16 buf[32] = {};
+                swprintf_s(buf, _countof(buf), G->Loc[LocKey_Meters].Data(), G->RenderDistance);
+                SliderEx(LINE_ID, G->Loc[LocKey_RenderDistance], buf, &G->RenderDistance, 32, 500, SliderConvertInt);
             }
             EndPanel();
         }
-        Hax::Gui::Dummy({0.f, 0.f});
-        Hax::Gui::EndVertical();
-        Hax::Gui::EndContainer();
-
-        // Column 2
-        Hax::Gui::Space(spacing);
-        Hax::Gui::BeginContainer(Hax::Hash("VisionColumnRight"), {.W = columnSize.X, .FitY = true});
-        Hax::Gui::BeginVertical(spacing);
-        Hax::Gui::Dummy({0.f, 0.f});
+        NextColumn();
         {
             BeginPanel(LINE_ID);
-            PanelHeader(G->Loc[LocKey_FLASHLIGHT]);
+            PanelHeader(G->Loc[LocKey_FLASHLIGHT], {}, {.Icon = Icon::Sun});
             {
-                {
-                    int& intensity = G->Flashlight.Intensity;
-                    Hax::char16 buf[16] = {};
-                    swprintf_s(buf, _countof(buf), intensity < 11 ? G->Loc[LocKey_Default].Data() : L"x%.1f", intensity / 10.f);
-
-                    SliderEx(LINE_ID, G->Loc[LocKey_LightIntensity], buf, &intensity, 10, 100, SliderConvertInt);
-                }
-
+                int& intensity = G->Flashlight.Intensity;
+                Hax::char16 buf[16] = {};
+                swprintf_s(buf, _countof(buf), intensity < 11 ? G->Loc[LocKey_Default].Data() : L"×%.1f", intensity / 10.f);
+                SliderEx(LINE_ID, G->Loc[LocKey_LightIntensity], buf, &intensity, 10, 100, SliderConvertInt);
                 HorizontalLine(1_px);
 
-                {
-                    int& angle = G->Flashlight.Angle;
-                    Hax::char16 buf[16] = {};
-                    swprintf_s(buf, _countof(buf), G->Loc[LocKey_Degrees].Data(), angle);
-
-                    SliderEx(LINE_ID, G->Loc[LocKey_IlluminationAngle], buf, &angle, 60, 120, SliderConvertInt);
-                }
-
+                int& angle = G->Flashlight.Angle;
+                swprintf_s(buf, _countof(buf), G->Loc[LocKey_Degrees].Data(), angle);
+                SliderEx(LINE_ID, G->Loc[LocKey_IlluminationAngle], buf, &angle, 60, 120, SliderConvertInt);
                 HorizontalLine(1_px);
 
-                {
-                    ToggleEx(LINE_ID, G->Flashlight.InCrouch, G->Loc[LocKey_WorksWhileCrouching]);
-                }
+                ToggleEx(LINE_ID, G->Flashlight.InCrouch, G->Loc[LocKey_WorksWhileCrouching]);
             }
             EndPanel();
-
+        }
+        NextColumn();
+        {
             BeginPanel(LINE_ID);
-            PanelHeader(G->Loc[LocKey_DEADHEAD]);
+            PanelHeader(G->Loc[LocKey_DEADHEAD], {}, {.Icon = Icon::Battery});
             {
                 ToggleEx(LINE_ID, G->MaxHeadBattery, G->Loc[LocKey_MaxBatteryHead]);
             }
             EndPanel();
         }
-        Hax::Gui::Dummy({0.f, 0.f});
-        Hax::Gui::EndVertical();
-        Hax::Gui::EndContainer();
+        EndColumns();
     }
 }

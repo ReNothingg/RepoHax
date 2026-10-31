@@ -179,6 +179,22 @@ namespace Cheat
         ChatPref                            ChatPrefered = ChatPref::None;
         size_t SelectedEnemySetup;
 
+        // Drone strike (fun). Host/singleplayer only: drones and warheads are room objects.
+        bool                                DroneManualMode;          // false: homes on target, true: flies to crosshair
+        PlayerAvatar                        DroneTargetPlayer = null;
+        EnemyParent                         DroneTargetEnemy = null;
+        int                                 DroneSpeed = 14;          // m/s
+        int                                 DroneSwarmSize = 1;       // drones per launch
+        int                                 DroneWarheads = 1;        // grenades per drone
+        bool                                DroneThroughWalls = true;
+        bool                                DroneLethal;              // guaranteed kill on target hit
+        int                                 VkDroneLaunch = VK_F5;
+        int                                 VkDroneDetonate = VK_F4;
+        bool                                DroneLaunchRequested;
+        bool                                DroneDetonateRequested;
+        int                                 DronesInFlight;
+        bool                                DronePrefabsMissing;
+
         // Vision
         bool                                BetterVision;
         bool                                NoFog;
