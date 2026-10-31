@@ -139,7 +139,7 @@ namespace Cheat
             SliderEx(LINE_ID, G->Loc[LocKey_DroneSpeed], buf, &G->DroneSpeed, 4, 40, SliderConvertInt);
             HorizontalLine(1_px);
             swprintf_s(buf, L"%d", G->DroneSwarmSize);
-            SliderEx(LINE_ID, G->Loc[LocKey_DroneSwarm], buf, &G->DroneSwarmSize, 1, 5, SliderConvertInt);
+            SliderEx(LINE_ID, G->Loc[LocKey_DroneSwarm], buf, &G->DroneSwarmSize, 1, 50, SliderConvertInt);
             HorizontalLine(1_px);
             swprintf_s(buf, L"%d", G->DroneWarheads);
             SliderEx(LINE_ID, G->Loc[LocKey_DroneWarheads], buf, &G->DroneWarheads, 1, 3, SliderConvertInt);

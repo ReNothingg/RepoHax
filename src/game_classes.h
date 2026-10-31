@@ -883,6 +883,27 @@ struct ItemGrenadeExplosive : Unity::MonoBehaviour
     META("Assembly-CSharp", "", "ItemGrenadeExplosive");
 };
 
+// NavMesh routing for drones that are not allowed to fly through walls.
+struct DroneNavMeshPath : System::Object
+{
+    using System::Object::Object;
+    META("UnityEngine.AIModule", "UnityEngine.AI", "NavMeshPath");
+
+    System::Array<Unity::Vector3> Corners() { return s_get_corners.Call<System::Array<Unity::Vector3>>(*this); }
+    METHOD_WRAPPER(get_corners);
+};
+
+struct DroneNavMesh
+{
+    META("UnityEngine.AIModule", "UnityEngine.AI", "NavMesh");
+
+    static bool CalculatePath(const Unity::Vector3& source, const Unity::Vector3& target, int areaMask, DroneNavMeshPath path)
+    {
+        return s_CalculatePath.Call<bool>(System::Box(source), System::Box(target), areaMask, path);
+    }
+    METHOD_WRAPPER_EX(CalculatePath, "System.Boolean(UnityEngine.Vector3,UnityEngine.Vector3,System.Int32,UnityEngine.AI.NavMeshPath)");
+};
+
 struct ValuableObject : Unity::MonoBehaviour
 {
     using Unity::MonoBehaviour::MonoBehaviour;

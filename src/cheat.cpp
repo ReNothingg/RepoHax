@@ -66,9 +66,9 @@ namespace Cheat
 
         Hax::IniAddEntry(ini, "Stats",      "Godmode",             &G->Godmode,             Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Stats",      "InfiniteStamina",     &G->InfStamina,          Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
-        Hax::IniAddEntry(ini, "Stats",      "WalkingSpeed",        &G->Accel.Walking,       Hax::IniFileWrite_Int,  IniFileRead_IntClamped<1, 1, 5>);
-        Hax::IniAddEntry(ini, "Stats",      "SprintingSpeed",      &G->Accel.Sprinting,     Hax::IniFileWrite_Int,  IniFileRead_IntClamped<1, 1, 5>);
-        Hax::IniAddEntry(ini, "Stats",      "CrouchingSpeed",      &G->Accel.Crouching,     Hax::IniFileWrite_Int,  IniFileRead_IntClamped<1, 1, 5>);
+        Hax::IniAddEntry(ini, "Stats",      "WalkingSpeed",        &G->Accel.Walking,       Hax::IniFileWrite_Int,  IniFileRead_IntClamped<1, 1, 50>);
+        Hax::IniAddEntry(ini, "Stats",      "SprintingSpeed",      &G->Accel.Sprinting,     Hax::IniFileWrite_Int,  IniFileRead_IntClamped<1, 1, 50>);
+        Hax::IniAddEntry(ini, "Stats",      "CrouchingSpeed",      &G->Accel.Crouching,     Hax::IniFileWrite_Int,  IniFileRead_IntClamped<1, 1, 50>);
         Hax::IniAddEntry(ini, "Stats",      "InfiniteJumps",       &G->InfJumps,            Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Stats",      "NoTumble",            &G->NoTumble,            Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Stats",      "VkToggleFlight",      &G->VkToggleFlight,      Hax::IniFileWrite_Int,  IniFileRead_IntClamped<'V', 0, 255>);
@@ -103,7 +103,7 @@ namespace Cheat
         Hax::IniAddEntry(ini, "Entities",   "VkReviveSelf",        &G->VkReviveSelf,        Hax::IniFileWrite_Int,  IniFileRead_IntClamped<VK_F7, 0, 255>);
         Hax::IniAddEntry(ini, "Drone",      "ManualMode",          &G->DroneManualMode,     Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Drone",      "Speed",               &G->DroneSpeed,          Hax::IniFileWrite_Int,  IniFileRead_IntClamped<14, 4, 40>);
-        Hax::IniAddEntry(ini, "Drone",      "SwarmSize",           &G->DroneSwarmSize,      Hax::IniFileWrite_Int,  IniFileRead_IntClamped<1, 1, 5>);
+        Hax::IniAddEntry(ini, "Drone",      "SwarmSize",           &G->DroneSwarmSize,      Hax::IniFileWrite_Int,  IniFileRead_IntClamped<1, 1, 50>);
         Hax::IniAddEntry(ini, "Drone",      "Warheads",            &G->DroneWarheads,       Hax::IniFileWrite_Int,  IniFileRead_IntClamped<1, 1, 3>);
         Hax::IniAddEntry(ini, "Drone",      "ThroughWalls",        &G->DroneThroughWalls,   Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Drone",      "Lethal",              &G->DroneLethal,         Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);

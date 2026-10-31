@@ -3737,7 +3737,11 @@ namespace Cheat
     // physics stream, no per-frame RPCs) and detonates the grenades through the
     // game's TickEnd RPC, so every client plays the blast and takes the damage.
 
-    constexpr int   DroneMaxSlots = 8;
+    // Each drone is 1 + up to 3 networked room objects; 100 keeps the worst case
+    // (400 objects) under Photon's ~1000 room view IDs.
+    constexpr int   DroneMaxSlots = 100;
+    constexpr int   DroneMaxSwarm = 50;
+    constexpr int   DroneSpawnPerFrame = 4;
     constexpr int   DroneMaxWarheads = 3;
     constexpr float DroneLaunchTime = 0.45f;
     constexpr float DroneArmTime = 0.3f;        // short hover so clients' interpolated copies catch up
@@ -3778,6 +3782,14 @@ namespace Cheat
         Unity::Vector3 LaunchDir{};
         Unity::Vector3 LastGoal{};
         bool HasLastGoal = false;
+        // NavMesh route (walls mode): corners lifted to flight height.
+        Unity::Vector3 Path[24]{};
+        int PathCount = 0;
+        int PathIndex = 0;
+        Unity::Vector3 PathGoal{};
+        float PathTimer = 0.f;
+        float LosTimer = 0.f;
+        bool LosClear = false;
         PlayerAvatar TargetPlayer = null;
         EnemyParent TargetEnemy = null;
         PlayerAvatar HitPlayer = null;
@@ -3791,7 +3803,22 @@ namespace Cheat
         bool FailureLogged = false;
     };
 
+    struct DroneLaunchOrder
+    {
+        int Total = 0;
+        int Next = 0;
+        int Launched = 0;
+        int Warheads = 1;
+        float Speed = 14.f;
+        bool Manual = false;
+        bool Lethal = false;
+        bool ThroughWalls = true;
+        PlayerAvatar TargetPlayer = null;
+        EnemyParent TargetEnemy = null;
+    };
+
     static std::array<DroneSlot, DroneMaxSlots> s_Drones;
+    static DroneLaunchOrder s_DroneLaunchOrder;
     static DronePrefabs s_DronePrefabs;
 
     static bool DroneNameContains(Hax::WStringView name, const wchar_t* needle)
@@ -4090,7 +4117,9 @@ namespace Cheat
         bool found = false;
         for (Unity::RaycastHit& hit : hits)
         {
-            if (hit.m_Distance >= closest)
+            // Distance 0 means the cast started inside a collider (just spawned
+            // in a wall, scraping a corner): that is not something ahead of us.
+            if (hit.m_Distance <= 0.f || hit.m_Distance >= closest)
                 continue;
             Unity::Transform hitTransform = hit.GetTransform();
             if (!hitTransform || (avatarRoot && IsTransformBelow(hitTransform, avatarRoot)) ||
@@ -4105,18 +4134,138 @@ namespace Cheat
         if (!found)
             return false;
 
-        if (closest <= step + 0.05f)
-            return true; // crashed into it
+        // Crash only when flying straight into it, and never right after launch;
+        // a glancing hit is handled by sliding along the surface.
+        if (closest <= step + 0.05f && slot.Age > 0.6f && direction.Dot(normal) < -0.6f)
+            return true;
 
-        // Remove the velocity going into the surface and push away from it.
+        // Remove the velocity going into the surface and push away from it,
+        // harder the closer the wall is.
         const float into = slot.Velocity.Dot(normal);
         if (into < 0.f)
             slot.Velocity = slot.Velocity - normal * into;
-        slot.Velocity = slot.Velocity + (normal + Unity::Vector3::up() * 0.35f) * (speed * 4.f * dt);
+        const float urgency = 1.f - std::clamp(closest / lookAhead, 0.f, 1.f);
+        slot.Velocity = slot.Velocity + normal * (speed * (1.f + 5.f * urgency) * dt);
         return false;
     }
 
-    static void DroneSteer(DroneSlot& slot, const Unity::Vector3& goal, float dt)
+    constexpr float DroneFlightHeight = 1.1f;
+
+    // Clear flight line between two points? `slack` skips the last stretch,
+    // which is usually the target's own collider.
+    static bool DroneLineClear(const Unity::Vector3& from, const Unity::Vector3& to, PlayerAvatar local, float slack)
+    {
+        const Unity::Vector3 delta = to - from;
+        const float distance = delta.GetMagnitude();
+        const float length = distance - slack;
+        if (length <= 0.05f)
+            return true;
+
+        System::Array<Unity::RaycastHit> hits = Unity::Physics::SphereCastAll(from, 0.2f, delta * (1.f / distance), length,
+            SemiFunc::LayerMaskGetVisionObstruct());
+        if (hits == null)
+            return true;
+
+        Unity::Transform avatarRoot = local ? local.GetTransform() : null;
+        Unity::Transform playerRoot = local ? local.playerTransform() : null;
+        for (Unity::RaycastHit& hit : hits)
+        {
+            if (hit.m_Distance <= 0.f)
+                continue;
+            Unity::Transform hitTransform = hit.GetTransform();
+            if (!hitTransform || (avatarRoot && IsTransformBelow(hitTransform, avatarRoot)) ||
+                (playerRoot && IsTransformBelow(hitTransform, playerRoot)))
+                continue;
+            if (IsTriggerCollider(hitTransform.GetComponent<Unity::Collider>()))
+                continue;
+            return false;
+        }
+        return true;
+    }
+
+    static void DroneBuildPath(DroneSlot& slot, const Unity::Vector3& aim)
+    {
+        slot.PathCount = 0;
+        slot.PathIndex = 0;
+        slot.PathGoal = aim;
+
+        Unity::NavMeshHit start{}, end{};
+        if (!Unity::NavMesh::SamplePosition(slot.Position, &start, 5.f, -1) ||
+            !Unity::NavMesh::SamplePosition(aim, &end, 5.f, -1))
+            return;
+
+        DroneNavMeshPath path = System::Activator::CreateInstanceDefaultCtor<DroneNavMeshPath>();
+        if (path == null || !DroneNavMesh::CalculatePath(start.m_Position, end.m_Position, -1, path))
+            return;
+
+        System::Array<Unity::Vector3> corners = path.Corners();
+        if (corners == null)
+            return;
+
+        // Corner 0 is where we already are. The last one is replaced with the
+        // real aim point so the final leg goes for the chest, not the floor.
+        const int count = corners.Length();
+        for (int i = 1; i < count && slot.PathCount < (int)std::size(slot.Path); ++i)
+            slot.Path[slot.PathCount++] = corners[i] + Unity::Vector3::up() * DroneFlightHeight;
+        if (slot.PathCount > 0 && count - 1 <= (int)std::size(slot.Path))
+            slot.Path[slot.PathCount - 1] = aim;
+    }
+
+    // Walls mode: fly straight when the aim is in sight, otherwise follow the
+    // level's NavMesh corridor by corridor, cutting corners it can already see past.
+    static Unity::Vector3 DroneRoute(DroneSlot& slot, const Unity::Vector3& aim, PlayerAvatar local, float dt)
+    {
+        slot.LosTimer -= dt;
+        slot.PathTimer -= dt;
+        const bool refresh = slot.LosTimer <= 0.f;
+        if (refresh)
+        {
+            slot.LosTimer = 0.12f;
+            slot.LosClear = DroneLineClear(slot.Position, aim, local, 1.f);
+        }
+        if (slot.LosClear)
+        {
+            slot.PathCount = 0;
+            return aim;
+        }
+
+        if (slot.PathTimer <= 0.f || slot.PathIndex >= slot.PathCount ||
+            Unity::Vector3::Distance(aim, slot.PathGoal) > 2.f)
+        {
+            slot.PathTimer = 0.6f;
+            DroneBuildPath(slot, aim);
+            if (slot.PathCount == 0)
+            {
+                static bool s_NoPathLogged = false;
+                if (!s_NoPathLogged)
+                {
+                    Hax::LogError(G->Logger, L"Drone strike: no NavMesh path, falling back to wall sliding");
+                    s_NoPathLogged = true;
+                }
+            }
+        }
+        if (slot.PathCount == 0)
+            return aim;
+
+        while (slot.PathIndex < slot.PathCount - 1 &&
+            Unity::Vector3::Distance(slot.Position, slot.Path[slot.PathIndex]) < 1.2f)
+            ++slot.PathIndex;
+
+        if (refresh)
+        {
+            for (int j = std::min(slot.PathIndex + 3, slot.PathCount - 1); j > slot.PathIndex; --j)
+            {
+                if (DroneLineClear(slot.Position, slot.Path[j], local, 0.3f))
+                {
+                    slot.PathIndex = j;
+                    break;
+                }
+            }
+        }
+        return slot.Path[slot.PathIndex];
+    }
+
+    static void DroneSteer(DroneSlot& slot, const Unity::Vector3& goal, PlayerAvatar local, float dt)
     {
         Unity::Vector3 aim = goal;
         // Lead moving targets a little so the drone does not just trail behind them.
@@ -4132,11 +4281,15 @@ namespace Cheat
         slot.LastGoal = goal;
         slot.HasLastGoal = true;
 
-        const Unity::Vector3 toAim = aim - slot.Position;
+        const Unity::Vector3 steerPoint = slot.ThroughWalls ? aim : DroneRoute(slot, aim, local, dt);
+        const bool routed = !slot.ThroughWalls && slot.PathCount > 0 && !slot.LosClear;
+
+        const Unity::Vector3 toAim = steerPoint - slot.Position;
         const float distance = toAim.GetMagnitude();
         const Unity::Vector3 desired = distance > 0.001f ? toAim * (slot.Speed / distance) : Unity::Vector3::zero();
-        // Turn harder on the final approach so it dives in instead of orbiting.
-        const float agility = distance < 5.f ? 14.f : (slot.Manual ? 6.f : 3.5f);
+        // Turn harder on the final approach so it dives in instead of orbiting;
+        // corridor corners need a quick turn too.
+        const float agility = distance < 5.f ? 14.f : (routed ? 9.f : (slot.Manual ? 6.f : 3.5f));
         const float blend = 1.f - std::exp(-agility * dt);
         slot.Velocity = slot.Velocity + (desired - slot.Velocity) * blend;
     }
@@ -4156,19 +4309,30 @@ namespace Cheat
         for (int i = 0; i < slot.WarheadCount; ++i)
         {
             DroneWarhead& warhead = slot.Warheads[i];
-            if (!warhead.Object || !warhead.Grenade)
-                continue;
-            try
+            bool detonated = false;
+            if (warhead.Object && warhead.Grenade)
             {
-                warhead.Grenade.isSpawnedGrenade() = true; // destroy after the blast, no inventory bookkeeping
-                warhead.Grenade.TickEnd();
-                ++fired;
+                try
+                {
+                    warhead.Grenade.isSpawnedGrenade() = true; // destroy after the blast, no inventory bookkeeping
+                    warhead.Grenade.TickEnd();
+                    detonated = true;
+                    ++fired;
+                }
+                catch (System::Exception& ex)
+                {
+                    System::String message = ex.Message();
+                    Hax::LogError(G->Logger, L"Drone strike warhead: %ls", message != null ? message.GetRawStringData() : L"?");
+                }
             }
-            catch (System::Exception& ex)
-            {
-                System::String message = ex.Message();
-                Hax::LogError(G->Logger, L"Drone strike warhead: %ls", message != null ? message.GetRawStringData() : L"?");
-            }
+
+            // A detonated grenade destroys itself through the game. Touching it again
+            // (a second PhotonNetwork.Destroy) crashes Unity, so forget it right away.
+            // Duds are removed now, while they are still known to be alive.
+            if (detonated)
+                warhead = {};
+            else
+                DestroyDroneObject(warhead.Object);
         }
 
         DestroyDroneObject(slot.Object);
@@ -4239,16 +4403,60 @@ namespace Cheat
             }
         }
 
+        // Queue the whole swarm; SpawnQueuedDrones() releases it in waves so a big
+        // launch does not freeze the game for one long frame.
+        DroneLaunchOrder& order = s_DroneLaunchOrder;
+        order.Total = std::clamp(G->DroneSwarmSize, 1, DroneMaxSwarm);
+        order.Next = 0;
+        order.Launched = 0;
+        order.Warheads = std::clamp(G->DroneWarheads, 1, DroneMaxWarheads);
+        order.Speed = (float)std::clamp(G->DroneSpeed, 4, 40);
+        order.Manual = G->DroneManualMode;
+        order.Lethal = G->DroneLethal;
+        order.ThroughWalls = G->DroneThroughWalls;
+        order.TargetPlayer = targetPlayer;
+        order.TargetEnemy = targetEnemy;
+        (void)local;
+    }
+
+    // Small swarms fan out in front of you; big ones form rings around you
+    // that grow wider and higher with every ring.
+    static void DroneSwarmLayout(int index, int total, const Unity::Vector3& origin, const Unity::Vector3& forward,
+        const Unity::Vector3& right, Unity::Vector3& spawn, Unity::Vector3& launchDir)
+    {
+        const Unity::Vector3 up = Unity::Vector3::up();
+        if (total <= 5)
+        {
+            const float spread = ((float)index - (float)(total - 1) * 0.5f) * 0.9f;
+            spawn = origin + forward * 1.6f + right * spread + up * 0.35f;
+            launchDir = (forward + up * 0.45f + right * (spread * 0.25f)).GetNormalized();
+            return;
+        }
+
+        constexpr int perRing = 8;
+        const int ring = index / perRing;
+        const float angle = ((float)(index % perRing) / (float)perRing) * 6.2831853f + (float)ring * 0.39f;
+        const Unity::Vector3 outward = forward * std::cos(angle) + right * std::sin(angle);
+        spawn = origin + outward * (1.6f + (float)ring * 0.8f) + up * (0.35f + (float)ring * 0.3f);
+        launchDir = (outward * 0.6f + forward * 0.4f + up * 0.7f).GetNormalized();
+    }
+
+    static void SpawnQueuedDrones()
+    {
+        DroneLaunchOrder& order = s_DroneLaunchOrder;
+        if (order.Next >= order.Total)
+            return;
+
+        Unity::Camera camera = SemiFunc::MainCamera();
+        if (!camera)
+            return;
+
         Unity::Transform camTransform = camera.GetTransform();
-        const Unity::Quaternion camRotation = camTransform.GetRotation();
         const Unity::Vector3 forward = camTransform.GetForward().GetNormalized();
-        const Unity::Vector3 right = (camRotation * Unity::Vector3::right()).GetNormalized();
+        const Unity::Vector3 right = (camTransform.GetRotation() * Unity::Vector3::right()).GetNormalized();
         const Unity::Vector3 origin = camTransform.GetPosition();
 
-        const int count = std::clamp(G->DroneSwarmSize, 1, 5);
-        const int warheads = std::clamp(G->DroneWarheads, 1, DroneMaxWarheads);
-        int launched = 0;
-        for (int i = 0; i < count; ++i)
+        for (int spawned = 0; spawned < DroneSpawnPerFrame && order.Next < order.Total; ++spawned)
         {
             DroneSlot* slot = nullptr;
             for (DroneSlot& candidate : s_Drones)
@@ -4260,34 +4468,46 @@ namespace Cheat
                 }
             }
             if (!slot)
+            {
+                order.Total = order.Next; // sky is full, drop the rest
                 break;
+            }
 
-            const float spread = ((float)i - (float)(count - 1) * 0.5f) * 0.9f;
-            const Unity::Vector3 spawn = origin + forward * 1.6f + right * spread + Unity::Vector3::up() * 0.35f;
-            const Unity::Quaternion rotation = DroneRotation(forward);
+            const int index = order.Next++;
+            Unity::Vector3 spawn, launchDir;
+            DroneSwarmLayout(index, order.Total, origin, forward, right, spawn, launchDir);
+            if (!order.ThroughWalls)
+            {
+                // Indoors a steep climb just hits the ceiling.
+                launchDir.Y *= 0.2f;
+                launchDir = launchDir.GetNormalized();
+            }
 
-            Unity::GameObject object = SpawnDroneObject(s_DronePrefabs.Drone, spawn, rotation);
+            Unity::GameObject object = SpawnDroneObject(s_DronePrefabs.Drone, spawn, DroneRotation(launchDir));
             if (!object)
+            {
+                order.Total = order.Next;
                 break;
+            }
 
             *slot = {};
             slot->Object = object;
             slot->Body = PrepareDroneBody(object);
             slot->Position = spawn;
-            slot->LaunchDir = (forward + Unity::Vector3::up() * 0.45f + right * (spread * 0.25f)).GetNormalized();
-            slot->Speed = (float)std::clamp(G->DroneSpeed, 4, 40);
-            slot->Velocity = slot->LaunchDir * (slot->Speed * 0.5f);
-            slot->Manual = G->DroneManualMode;
-            slot->Lethal = G->DroneLethal;
-            slot->ThroughWalls = G->DroneThroughWalls;
-            slot->TargetPlayer = targetPlayer;
-            slot->TargetEnemy = targetEnemy;
-            slot->Bob = (float)i * 1.7f;
+            slot->LaunchDir = launchDir;
+            slot->Speed = order.Speed;
+            slot->Velocity = launchDir * (order.Speed * 0.5f);
+            slot->Manual = order.Manual;
+            slot->Lethal = order.Lethal;
+            slot->ThroughWalls = order.ThroughWalls;
+            slot->TargetPlayer = order.TargetPlayer;
+            slot->TargetEnemy = order.TargetEnemy;
+            slot->Bob = (float)index * 1.7f;
 
-            for (int w = 0; w < warheads; ++w)
+            for (int w = 0; w < order.Warheads; ++w)
             {
                 DroneWarhead& warhead = slot->Warheads[slot->WarheadCount];
-                warhead.Offset = Unity::Vector3(((float)w - (float)(warheads - 1) * 0.5f) * 0.2f, -0.32f, 0.f);
+                warhead.Offset = Unity::Vector3(((float)w - (float)(order.Warheads - 1) * 0.5f) * 0.2f, -0.32f, 0.f);
                 warhead.Object = SpawnDroneObject(s_DronePrefabs.Grenade, spawn + warhead.Offset, Unity::Quaternion::identity());
                 if (!warhead.Object)
                     break;
@@ -4297,12 +4517,11 @@ namespace Cheat
             }
 
             slot->Phase = DronePhase::Launch;
-            ++launched;
+            ++order.Launched;
         }
 
-        if (launched > 0)
-            SetSessionActionF(G->Loc[LocKey_ActionDroneLaunchedFmt].Data(), launched);
-        (void)local;
+        if (order.Next >= order.Total && order.Launched > 0)
+            SetSessionActionF(G->Loc[LocKey_ActionDroneLaunchedFmt].Data(), order.Launched);
     }
 
     static void UpdateDroneSlot(DroneSlot& slot, PlayerAvatar local, const Unity::Vector3& crosshair, bool hasCrosshair, float dt)
@@ -4312,9 +4531,10 @@ namespace Cheat
 
         if (slot.Phase == DronePhase::Done)
         {
-            // The warheads remove themselves after the blast; this only catches duds.
+            // Everything was already handed back to the game in DroneExplode; the
+            // delay only keeps the slot busy while the blast plays out.
             if (slot.PhaseTime >= DroneCleanupDelay)
-                ResetDroneSlot(slot, true);
+                ResetDroneSlot(slot, false);
             return;
         }
 
@@ -4369,7 +4589,7 @@ namespace Cheat
             if (haveGoal)
             {
                 slot.LostTime = 0.f;
-                DroneSteer(slot, goal, dt);
+                DroneSteer(slot, goal, local, dt);
                 // A manual drone that reaches the crosshair hits whatever is there.
                 if (slot.Manual && Unity::Vector3::Distance(slot.Position, goal) < 0.7f)
                     DroneArm(slot);
@@ -4433,6 +4653,7 @@ namespace Cheat
                 // Scene change or lost host: the objects are gone or no longer ours.
                 for (DroneSlot& slot : s_Drones)
                     slot = {};
+                s_DroneLaunchOrder = {};
                 G->DronesInFlight = 0;
                 G->DroneLaunchRequested = false;
                 G->DroneDetonateRequested = false;
@@ -4445,10 +4666,12 @@ namespace Cheat
                 G->DroneLaunchRequested = false;
                 LaunchDrones(local);
             }
+            SpawnQueuedDrones();
 
             if (G->DroneDetonateRequested)
             {
                 G->DroneDetonateRequested = false;
+                s_DroneLaunchOrder.Total = s_DroneLaunchOrder.Next; // stop any wave still coming
                 for (DroneSlot& slot : s_Drones)
                 {
                     slot.HitPlayer = null;
@@ -5027,6 +5250,8 @@ namespace Cheat
                         if (selectedCandidate-- == 0)
                         {
                             __this.levelCurrent() = level;
+                            Hax::Log(G->Logger, L"Map filter: picked %ls (%d candidates, %zu banned)",
+                                ban.Name.Data(), candidateCount, G->TotalBans);
                             return;
                         }
                     }
@@ -5042,6 +5267,7 @@ namespace Cheat
         s_RerollingRunLevel = false;
         s_RunLevelToAvoid = null;
 
+        Hax::Log(G->Logger, L"Map filter: fell back to the game's random map (%zu levels parsed)", G->LevelBans.Size());
         G->RunManager_SetRunLevel_Hook.unsafe_call<void, RunManager>(__this);
     }
 
