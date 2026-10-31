@@ -363,6 +363,7 @@ namespace Cheat
         Hax::Gui::FontHandle                NunitoSans_ExtraBold;
         Hax::Gui::FontHandle                Icons_Solid;
         Hax::Gui::TextureHandle             Logo;
+        Hax::Gui::TextureHandle             AppIcon;
         size_t                              KeyListenerId;
 
         struct

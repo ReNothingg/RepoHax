@@ -20,7 +20,7 @@ Targets **R.E.P.O. 0.5.0 — The Sunstone Update** (Steam build 26294889). Game 
 
 ## Interface
 
-The redesigned menu is organized by purpose and uses one scrollbar for the entire active page:
+The menu uses a dark graphite theme with an amber accent. The side panel starts with the program icon and a feature search: type any part of a feature name, pick a result, and the menu opens that page and highlights the control. Pages are grouped by purpose and each page has one scrollbar:
 
 - **Player** — Stats, Vision, Cosmetic
 - **Session** — Session & Level, Entities & Team

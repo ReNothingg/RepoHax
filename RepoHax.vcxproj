@@ -234,6 +234,8 @@
     <ClInclude Include="src\resource.h" />
     <ClInclude Include="src\overlay\esp\esp.h" />
     <ClInclude Include="src\overlay\menu\localization.h" />
+    <ClInclude Include="src\overlay\menu\search_index.h" />
+    <ClInclude Include="src\overlay\menu\theme.h" />
     <ClInclude Include="src\overlay\menu\widgets.h" />
     <ClInclude Include="third_party\haxsdk\gui\hax_gui.h" />
     <ClInclude Include="third_party\haxsdk\gui\hax_gui_dx11.h" />
@@ -274,6 +276,7 @@
     <Image Include="resources\images\HealthLarge.png" />
     <Image Include="resources\images\HealthMedium.png" />
     <Image Include="resources\images\HealthSmall.png" />
+    <Image Include="resources\images\icon.png" />
     <Image Include="resources\images\logo.png" />
     <Image Include="resources\images\QMark.png" />
     <Image Include="resources\images\Range_Upgrade.png" />

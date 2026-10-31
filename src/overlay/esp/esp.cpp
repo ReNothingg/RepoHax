@@ -4,6 +4,8 @@
 
 #include <src/cheat.h>
 
+#include "../menu/theme.h"
+
 namespace Cheat
 {
     enum VerticalAlignment : int 
@@ -34,7 +36,7 @@ namespace Cheat
                      float fontSize,
                      VerticalAlignment vAlign = VerticalAlignment_Bottom,
                      HorizontalAlignment hAlign = HorizontalAlignment_Right);
-    static float EspFontSize() { return 9_px; }
+    static float EspFontSize() { return 10.5_px; }
     static float IconFontSize() { return 14_px; }
     static void VertHealthBar(float x, float y, float width, float height, float cur, float max);
     static void VertHealthBar(float x, float y, float width, float height, int cur, int max);
@@ -396,18 +398,46 @@ namespace Cheat
         };
     }
 
+    // ESP palette, matching the menu theme.
+    namespace EspColors
+    {
+        constexpr Hax::Gui::Color Enemy    = Theme::Danger;
+        constexpr Hax::Gui::Color Player   = Theme::Host;
+        constexpr Hax::Gui::Color Dead     = Theme::Faint;
+        constexpr Hax::Gui::Color Valuable = Theme::Ok;
+        constexpr Hax::Gui::Color Marker   = Theme::Accent;
+        constexpr Hax::Gui::Color TagBg    = 0x0A0B0DD6;
+        constexpr Hax::Gui::Color Outline  = 0x00000099;
+    }
+
+    // Text label on a dark rounded plate, centred on `anchor.X`.
+    static void Tag(Hax::WStringView text, Hax::Vector2 anchor, Hax::Gui::Color col, bool above)
+    {
+        const float fontH = EspFontSize();
+        const Hax::Vector2 textSize = Hax::Gui::CalcTextSize(G->NunitoSans_Bold, text, fontH);
+        const Hax::Vector2 pad = {6_px, 2_px};
+        const Hax::Vector2 size = textSize + pad * 2.f;
+        const Hax::Vector2 min = {anchor.X - size.X / 2.f, above ? anchor.Y - 4_px - size.Y : anchor.Y + 4_px};
+
+        Hax::Gui::DrawRect(min, min + size, {.FillColor = EspColors::TagBg, .Rounding = 5_px});
+        Hax::Gui::DrawString(G->NunitoSans_Bold, text, min + pad, fontH, {.Color = col});
+    }
+
+    static Hax::Gui::Color HealthColor(float cur, float max)
+    {
+        const float t = max > 0.f ? Hax::Clamp(cur / max, 0.f, 1.f) : 0.f;
+        return Hax::Lerp(Hax::Gui::LinearColor(Theme::Danger), Hax::Gui::LinearColor(Theme::Ok), t).ToColor();
+    }
+
     static void DrawEnemyEsp(EnemyEspData& data)
     {
-        float fontH = 9_px;
+        Box(data.Box, EspColors::Enemy);
+        Tag(data.Name, {data.Box.GetCenter().X, data.Box.Min.Y}, EspColors::Enemy, true);
+        VertHealthBar(data.Box.Min.X - 7_px, data.Box.Min.Y, 3_px, data.Box.GetSize().Y, data.CurHp, data.MaxHp);
 
-        Box(data.Box, 0xFF0000FF);
-        Text(G->NunitoSans_Bold, data.Name, Hax::Vector2(data.Box.GetCenter().X, data.Box.Min.Y - 2.f), 0xFFFFFFFF, fontH, VerticalAlignment_Top, HorizontalAlignment_Center);
-        VertHealthBar(data.Box.Min.X - 10.f, data.Box.Min.Y, 3.f, data.Box.GetSize().Y, data.CurHp, data.MaxHp);
-
-        Hax::Gui::Color lerped = Hax::Lerp(0xFF0000FF, Hax::Gui::Color(0x00FF00FF), (float)data.CurHp / data.MaxHp);
         Hax::WStringBuilder<16> sb;
-        sb.AppendF(L"%d", data.CurHp);
-        Text(G->NunitoSans_Bold, sb.View(), Hax::Vector2(data.Box.Min.X - 15.f, data.Box.Min.Y), lerped, fontH, VerticalAlignment_Bottom, HorizontalAlignment_Left);
+        sb.AppendF(L"%d HP", data.CurHp);
+        Tag(sb.View(), {data.Box.GetCenter().X, data.Box.Max.Y}, HealthColor((float)data.CurHp, (float)data.MaxHp), false);
     }
 
     static void DrawValuableEsp(ValuableEspData& data)
@@ -419,68 +449,67 @@ namespace Cheat
             s.RemovePrefix(9);
 
         wchar_t buf[64] = {0};
-        if (swprintf_s(buf, L"%.*ls | %.0f$", (int)s.Length(), s.begin(), data.Value) > 0)
+        if (swprintf_s(buf, L"%.*ls \u00B7 $%.0f", (int)s.Length(), s.begin(), data.Value) > 0)
         {
-            Text(G->NunitoSans_Bold, buf, data.Pos, 0xFFFF00FF, EspFontSize(), VerticalAlignment_Bottom, HorizontalAlignment_Center);
+            Tag(buf, data.Pos, EspColors::Valuable, false);
             return;
         }
 
-        Text(G->NunitoSans_Bold, s, data.Pos, 0xFF00FFFF, EspFontSize(), VerticalAlignment_Bottom, HorizontalAlignment_Center);
+        Tag(s, data.Pos, EspColors::Valuable, false);
     }
 
     static void DrawExtrPointEsp(ExtrPointEspData& data)
     {
-        Hax::Gui::Color color = data.Active ? 0x00FF00FF : data.Completed ? 0x545454FF : 0xFF0000FF;
+        Hax::Gui::Color color = data.Active ? EspColors::Marker : data.Completed ? EspColors::Dead : EspColors::Enemy;
         Text(G->Icons_Solid, L"\uF468", data.Pos, color, IconFontSize());
     }
 
     static void DrawTruckEsp(TruckEspData& data)
     {
-        Hax::Gui::Color color = 0x00FF00FF;
-        Text(G->Icons_Solid, L"\uF0D1", data.Pos, color, IconFontSize());
+        Text(G->Icons_Solid, L"\uF0D1", data.Pos, EspColors::Marker, IconFontSize());
     }
 
     static void DrawPlayerEsp(PlayerEspData& data)
     {
-        Box(data.Box, data.Dead ? 0x545454FF : 0x00FF00FF);
-        Text(G->NunitoSans_Bold, data.Name, Hax::Vector2(data.Box.GetCenter().X, data.Box.Min.Y - 2.f), 0xFFFFFFFF, EspFontSize(), VerticalAlignment_Top, HorizontalAlignment_Center);
+        const Hax::Gui::Color col = data.Dead ? EspColors::Dead : EspColors::Player;
+        Box(data.Box, col);
+        Tag(data.Name, {data.Box.GetCenter().X, data.Box.Min.Y}, col, true);
         if (!data.Dead)
         {
-            VertHealthBar(data.Box.Min.X - 10_px, data.Box.Min.Y, 3_px, data.Box.GetSize().Y, data.CurHp, data.MaxHp);
+            VertHealthBar(data.Box.Min.X - 7_px, data.Box.Min.Y, 3_px, data.Box.GetSize().Y, data.CurHp, data.MaxHp);
 
-            Hax::Gui::Color lerped = Hax::Lerp(Hax::Gui::Color(0xFF0000FF), Hax::Gui::Color(0x00FF00FF), (float)data.CurHp / data.MaxHp);
             Hax::WStringBuilder<16> sb;
-            sb.AppendF(L"%d", data.CurHp);
-            Text(G->NunitoSans_Bold, sb.View(), Hax::Vector2(data.Box.Min.X - 15_px, data.Box.Min.Y), lerped, EspFontSize(), VerticalAlignment_Bottom, HorizontalAlignment_Left);
+            sb.AppendF(L"%d HP", data.CurHp);
+            Tag(sb.View(), {data.Box.GetCenter().X, data.Box.Max.Y}, HealthColor((float)data.CurHp, (float)data.MaxHp), false);
         }
     }
 
     static void DrawCosmeticBoxEsp(CosmeticBoxEspData& data)
     {
-        static Hax::Array<Hax::Gui::Color, 4> s_RarityToColor = {0x7FFF00FF, 0x57A0D3FF, 0xF81894FF, 0xE6CC00FF};
+        static Hax::Array<Hax::Gui::Color, 4> s_RarityToColor = {Theme::Ok, Theme::Host, 0xC9A7F5FF, Theme::Accent};
 
         Text(G->Icons_Solid, L"\uF553", data.Pos, s_RarityToColor[data.Rarity], IconFontSize());
     }
 
     static void Box(const Hax::Rect& rect, const Hax::Gui::Color& col)
     {
-        float px1 = 1_px;
-        float px3 = 3_px;
+        const float outline = 3.5_px;
+        const float line = 1.5_px;
 
         Hax::Vector2 tl = rect.GetTL();
         Hax::Vector2 tr = rect.GetTR();
         Hax::Vector2 br = rect.GetBR();
         Hax::Vector2 bl = rect.GetBL();
 
-        Hax::Gui::DrawLine(tl, tr, {.FillColor = 0x000000FF, .Th = px3});
-        Hax::Gui::DrawLine(tr, br, {.FillColor = 0x000000FF, .Th = px3});
-        Hax::Gui::DrawLine(bl, br, {.FillColor = 0x000000FF, .Th = px3});
-        Hax::Gui::DrawLine(tl, bl, {.FillColor = 0x000000FF, .Th = px3});
+        Hax::Gui::DrawLine(tl, tr, {.FillColor = EspColors::Outline, .Th = outline});
+        Hax::Gui::DrawLine(tr, br, {.FillColor = EspColors::Outline, .Th = outline});
+        Hax::Gui::DrawLine(bl, br, {.FillColor = EspColors::Outline, .Th = outline});
+        Hax::Gui::DrawLine(tl, bl, {.FillColor = EspColors::Outline, .Th = outline});
 
-        Hax::Gui::DrawLine(tl, tr, {.FillColor = col, .Th = px1});
-        Hax::Gui::DrawLine(tr, br, {.FillColor = col, .Th = px1});
-        Hax::Gui::DrawLine(bl, br, {.FillColor = col, .Th = px1});
-        Hax::Gui::DrawLine(tl, bl, {.FillColor = col, .Th = px1});
+        Hax::Gui::DrawLine(tl, tr, {.FillColor = col, .Th = line});
+        Hax::Gui::DrawLine(tr, br, {.FillColor = col, .Th = line});
+        Hax::Gui::DrawLine(bl, br, {.FillColor = col, .Th = line});
+        Hax::Gui::DrawLine(tl, bl, {.FillColor = col, .Th = line});
     }
 
     static void Text(Hax::Gui::FontHandle hFont,
@@ -504,10 +533,9 @@ namespace Cheat
 
     static void VertHealthBar(float x, float y, float width, float height, float cur, float max)
     {
-        float coef = Hax::Clamp(cur / max, 0.f, 1.f);
-        Hax::Gui::Color lerped = Hax::Lerp(Hax::Gui::Color(0xFF0000FF), Hax::Gui::Color(0x00FF00FF), coef);
-        Hax::Gui::DrawLine({x, y}, {x, y + height}, {.FillColor = 0x000000FF, .Th = width + 2_px});
-        Hax::Gui::DrawLine({x, y + height - height * coef}, {x, y + height}, {.FillColor = lerped, .Th = width});
+        const float coef = max > 0.f ? Hax::Clamp(cur / max, 0.f, 1.f) : 0.f;
+        Hax::Gui::DrawLine({x, y}, {x, y + height}, {.FillColor = EspColors::Outline, .Th = width + 2_px});
+        Hax::Gui::DrawLine({x, y + height - height * coef}, {x, y + height}, {.FillColor = HealthColor(cur, max), .Th = width});
     }
 
     static void VertHealthBar(float x, float y, float width, float height, int cur, int max)

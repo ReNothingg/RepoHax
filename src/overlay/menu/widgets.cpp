@@ -4,43 +4,86 @@
 
 #include <src/cheat.h>
 
+#include "theme.h"
+
+#define DESC_FONT G->NunitoSans_SemiBold
+#define MAIN_FONT G->NunitoSans_SemiBold
+#define BOLD_FONT G->NunitoSans_Bold
+#define HEADER_FONT G->NunitoSans_ExtraBold
+#define ICONS_FONT G->Icons_Solid
+
 namespace Cheat
 {
-    namespace Theme
+
+    static Hax::Gui::Color Mix(Hax::Gui::Color a, Hax::Gui::Color b, float t)
     {
-        // R.E.P.O. extraction-console palette: soot-black metal, aged brass,
-        // amber controls and toxic-green status lights.
-        constexpr Hax::Gui::Color WindowBg = 0x090A07FF;
-        constexpr Hax::Gui::Color SidePanelBg = 0x11120CFF;
-        constexpr float WindowR = 4.f;
-        constexpr float MainFontSize = 13.f;
-        constexpr float DescFontSize = 12.f;
-        constexpr float TitleFontSize = 12.f;
-        constexpr Hax::Gui::LinearColor BtnBg = 0x17170FFF;
-        constexpr Hax::Gui::Color BtnBgActive = 0xC77A0CFF;
-        constexpr Hax::Gui::Color DescColor = 0x978D67FF;
-        constexpr Hax::Gui::Color DisabledMaskCol = 0x090A07C8;
-        constexpr Hax::Gui::Color SeparatorCol = 0x504629FF;
-        constexpr Hax::Gui::Color MainCol = 0xD8D0ACFF;
-        constexpr Hax::Gui::Color PopupBg = 0x12130DFF;
-        constexpr Hax::Gui::Color FrameColor = 0x1B1C13FF;
-        constexpr Hax::Gui::Color ActiveColor = 0xE89416FF;
-        constexpr Hax::Gui::Color HeaderColor = 0xE8B93FFF;
-        constexpr Hax::Gui::Color MetalBorder = 0x65542BFF;
-        constexpr Hax::Gui::Color MetalHighlight = 0x9A7732FF;
-        constexpr Hax::Gui::Color StatusGreen = 0x9ED52AFF;
-        constexpr Hax::Gui::Color AlertRed = 0xE34B22FF;
-
-        #define DESC_FONT G->NunitoSans_SemiBold
-        #define MAIN_FONT G->NunitoSans_Bold
-        #define HEADER_FONT G->NunitoSans_ExtraBold
-        #define ICONS_FONT G->Icons_Solid
-
-        constexpr Hax::Vector2 ToggleSize = {39.f, 20.f};
-        constexpr float SettingBtnSize = 16.f;
-        constexpr float CheckboxSize = 16.f;
-        constexpr Hax::Vector2 WindowSize = {1320.f, 740.f};
+        return Hax::Lerp(Hax::Gui::LinearColor(a), Hax::Gui::LinearColor(b), t).ToColor();
     }
+
+    static void AnimateHover(Hax::Gui::LinearAnim& anim, bool hovered, float speed = 0.1f)
+    {
+        const float dt = Hax::Gui::GetDeltaTime();
+        anim.Elapse(hovered ? dt : -dt, speed);
+    }
+
+    //=========================================================================
+    // Search highlight
+    //=========================================================================
+
+    static Hax::WStringView s_Highlight;
+    static double s_HighlightStart = 0.0;
+    static int s_ScrollDelayFrames = 0;
+    static bool s_ScrollPending = false;
+
+    void SetSearchHighlight(Hax::WStringView label)
+    {
+        s_Highlight = label;
+        s_HighlightStart = Hax::Gui::GetTime();
+        // Wait for the newly selected page to lay out before scrolling to it.
+        s_ScrollDelayFrames = 2;
+        s_ScrollPending = true;
+    }
+
+    void TickSearchHighlight()
+    {
+        if (s_ScrollDelayFrames > 0)
+            --s_ScrollDelayFrames;
+        else if (s_ScrollPending && Hax::Gui::GetTime() - s_HighlightStart > 1.0)
+            s_ScrollPending = false;
+
+        if (!s_Highlight.Empty() && Hax::Gui::GetTime() - s_HighlightStart > 3.0)
+            s_Highlight = {};
+    }
+
+    static void DrawSearchHighlight(Hax::WStringView text, const Hax::Rect& bounds)
+    {
+        if (s_Highlight.Empty() || text.Size() != s_Highlight.Size() || !(text == s_Highlight))
+            return;
+
+        if (s_ScrollPending && s_ScrollDelayFrames == 0)
+        {
+            s_ScrollPending = false;
+            Hax::Gui::ScrollYTo(bounds.Min.Y - 80_px);
+            s_HighlightStart = Hax::Gui::GetTime();
+        }
+
+        const float t = (float)(Hax::Gui::GetTime() - s_HighlightStart);
+        const float fade = Hax::Clamp(1.f - (t - 1.8f) / 1.f, 0.f, 1.f);
+        const float pulse = 0.55f + 0.45f * (Hax::Sin(t * 7.f) * 0.5f + 0.5f);
+
+        Hax::Gui::LinearColor ring(Theme::Accent);
+        ring.A = fade * pulse;
+        Hax::Gui::LinearColor fill(Theme::Accent);
+        fill.A = fade * 0.12f;
+
+        const Hax::Vector2 pad = {8_px, 5_px};
+        Hax::Gui::DrawRect(bounds.Min - pad, bounds.Max + pad,
+            {.BorderColor = ring.ToColor(), .BorderTh = 1.5_px, .FillColor = fill.ToColor(), .Rounding = 7_px});
+    }
+
+    //=========================================================================
+    // Text
+    //=========================================================================
 
     void Label(Hax::Gui::FontHandle hFont, Hax::WStringView text, float fontH, Hax::Gui::Color col)
     {
@@ -51,23 +94,31 @@ namespace Cheat
         bounds.Max = bounds.Min + textSize;
 
         Hax::Gui::PlaceItem(textSize);
-        if (Hax::Gui::IsItemVisible(bounds))
-            Hax::Gui::DrawString(hFont, text, bounds.Min, fontH, {.Color = col});
+        if (!Hax::Gui::IsItemVisible(bounds))
+            return;
+
+        DrawSearchHighlight(text, bounds);
+        Hax::Gui::DrawString(hFont, text, bounds.Min, fontH, {.Color = col});
     }
 
     void MainLabel(Hax::WStringView text)
     {
-        Label(MAIN_FONT, text, Theme::MainFontSize * Hax::Gui::G.ScaleFactor, Theme::MainCol);
+        Label(MAIN_FONT, text, Hax::Gui::Scale(Theme::MainFontSize), Theme::Text);
     }
 
     void MainLabel(Hax::WStringView text, const Hax::Gui::Color& col)
     {
-        Label(MAIN_FONT, text, Theme::MainFontSize * Hax::Gui::G.ScaleFactor, col);
+        Label(MAIN_FONT, text, Hax::Gui::Scale(Theme::MainFontSize), col);
     }
 
     Hax::Vector2 CalcMainLabelSize(Hax::WStringView text)
     {
         return Hax::Gui::CalcTextSize(MAIN_FONT, text, Hax::Gui::Scale(Theme::MainFontSize));
+    }
+
+    void HintLabel(Hax::WStringView text)
+    {
+        Label(DESC_FONT, text, Hax::Gui::Scale(11.5f), Theme::Faint);
     }
 
     static void TextTooltip(size_t id, Hax::WStringView text, const Hax::Rect& hoverBounds)
@@ -86,11 +137,11 @@ namespace Cheat
 
         if (hoverStartedAt == 0.0)
             hoverStartedAt = Hax::Gui::GetTime();
-        if (Hax::Gui::GetTime() - hoverStartedAt < 0.22)
+        if (Hax::Gui::GetTime() - hoverStartedAt < 0.25)
             return;
 
-        const float fontH = Hax::Gui::Scale(Theme::DescFontSize);
-        const Hax::Vector2 padding = {10_px, 7_px};
+        const float fontH = Hax::Gui::Scale(12.f);
+        const Hax::Vector2 padding = {11_px, 8_px};
         const Hax::Vector2 textSize = Hax::Gui::CalcTextSize(DESC_FONT, text, fontH);
         const Hax::Vector2 size = textSize + padding * 2.f;
         const Hax::Vector2 viewport = Hax::Gui::GetViewportSize();
@@ -99,13 +150,11 @@ namespace Cheat
         pos.Y = Hax::Clamp(pos.Y, 8_px, Hax::Max(8_px, viewport.Y - size.Y - 8_px));
 
         Hax::Gui::SwitchLayer(L"Popups");
-        Hax::Gui::DrawRect(pos + Hax::Vector2(3_px, 3_px), pos + size + Hax::Vector2(3_px, 3_px),
-            {.FillColor = 0x000000A8, .Rounding = 2_px});
+        Hax::Gui::DrawRect(pos + Hax::Vector2(0.f, 4_px), pos + size + Hax::Vector2(0.f, 4_px),
+            {.FillColor = 0x00000080, .Rounding = 8_px});
         Hax::Gui::DrawRect(pos, pos + size,
-            {.BorderColor = 0xA87A28FF, .BorderTh = 1_px, .FillColor = 0x11120DFA, .Rounding = 2_px});
-        Hax::Gui::DrawRect(pos, {pos.X + 3_px, pos.Y + size.Y},
-            {.FillColor = Theme::ActiveColor, .Rounding = Hax::Vector4(2_px, 0.f, 0.f, 2_px)});
-        Hax::Gui::DrawString(DESC_FONT, text, pos + padding, fontH, {.Color = 0xD7CDA7FF});
+            {.BorderColor = Theme::Line2, .BorderTh = 1_px, .FillColor = Theme::Surface2, .Rounding = 8_px});
+        Hax::Gui::DrawString(DESC_FONT, text, pos + padding, fontH, {.Color = Theme::Text});
         Hax::Gui::RestoreLayer();
     }
 
@@ -115,7 +164,6 @@ namespace Cheat
 
         Hax::Gui::BeginVertical();
         {
-            //Hax::Gui::Space((h - metrics.CapHeight) / 2.f - (metrics.Ascent - metrics.CapHeight));
             Hax::Gui::Space((h - metrics.LineHeight) / 2.f);
             Label(hFont, label, fontH, col);
         }
@@ -124,8 +172,12 @@ namespace Cheat
 
     void MainLabelAlignedByH(Hax::WStringView label, float h)
     {
-        LabelAlignedByH(MAIN_FONT, label, Hax::Gui::Scale(Theme::MainFontSize), Theme::MainCol, h);
+        LabelAlignedByH(MAIN_FONT, label, Hax::Gui::Scale(Theme::MainFontSize), Theme::Text, h);
     }
+
+    //=========================================================================
+    // Window and side panel
+    //=========================================================================
 
     void BeginWindow()
     {
@@ -152,16 +204,18 @@ namespace Cheat
         posOffset = windowPos - centeredPos;
 
         const Hax::Rect windowBounds = Hax::Rect::FromPosSize(windowPos, windowSize);
+        const float r = Hax::Gui::Scale(Theme::WindowR);
+
+        // Soft drop shadow, then the window body.
+        Hax::Gui::DrawRect(windowBounds.Min + Hax::Vector2(0.f, 10_px), windowBounds.Max + Hax::Vector2(0.f, 10_px),
+            {.FillColor = 0x00000066, .Rounding = r});
 
         Hax::Gui::SetCursorPos(windowBounds.Min);
         Hax::Gui::BeginContainer(WINDOW_ID, {.W = windowSize.X, .H = windowSize.Y, .Clip = true});
         Hax::Gui::BeginHorizontal();
 
-        const float r = Hax::Gui::Scale(Theme::WindowR);
         Hax::Gui::DrawRect(windowBounds.Min, windowBounds.Max,
-            {.BorderColor = 0x8A6A2DFF, .BorderTh = 2_px, .FillColor = Theme::WindowBg, .Rounding = r});
-        Hax::Gui::DrawRect(windowBounds.Min + Hax::Vector2(5_px, 5_px), windowBounds.Max - Hax::Vector2(5_px, 5_px),
-            {.BorderColor = 0x332D1BFF, .BorderTh = 1_px, .FillColor = Hax::Gui::Color::Transparent, .Rounding = 2_px});
+            {.BorderColor = Theme::Line2, .BorderTh = 1_px, .FillColor = Theme::Bg, .Rounding = r});
     }
 
     void EndWindow()
@@ -172,7 +226,7 @@ namespace Cheat
 
     bool BeginSidePanel()
     {
-        const Hax::Vector2 size = {236_px, Hax::Gui::GetContentRegionAvail().Y};
+        const Hax::Vector2 size = {Hax::Gui::Scale(Theme::SidePanelWidth), Hax::Gui::GetContentRegionAvail().Y};
 
         constexpr size_t id = Hax::Hash("SidePanel");
         Hax::Gui::BeginContainer(id, {.W = size.X, .H = size.Y});
@@ -188,10 +242,10 @@ namespace Cheat
         }
 
         const float r = Hax::Gui::Scale(Theme::WindowR);
-        Hax::Gui::DrawRect(bounds.Min, bounds.Max,
-            {.BorderColor = Theme::MetalBorder, .BorderTh = 1_px, .FillColor = Theme::SidePanelBg, .Rounding = Hax::Vector4(r, 0.f, 0.f, r)});
-        Hax::Gui::DrawLine({bounds.Max.X - 4_px, bounds.Min.Y + 8_px}, {bounds.Max.X - 4_px, bounds.Max.Y - 8_px},
-            {.FillColor = 0x2F2A19FF, .Th = 2_px});
+        Hax::Gui::DrawRect(bounds.Min + Hax::Vector2(1_px, 1_px), {bounds.Max.X, bounds.Max.Y - 1_px},
+            {.FillColor = Theme::Rail, .Rounding = Hax::Vector4(r, 0.f, 0.f, r)});
+        Hax::Gui::DrawLine({bounds.Max.X - 0.5_px, bounds.Min.Y + 1_px}, {bounds.Max.X - 0.5_px, bounds.Max.Y - 1_px},
+            {.FillColor = Theme::Line, .Th = 1_px});
 
         Hax::Gui::BeginVertical();
         return true;
@@ -203,19 +257,328 @@ namespace Cheat
         Hax::Gui::EndContainer();
     }
 
+    //=========================================================================
+    // Navigation
+    //=========================================================================
+
+    // Last time the search field had keyboard focus. Compared against the clock so a
+    // hidden menu (which stops rendering) never leaves hotkeys blocked.
+    static double s_TextInputTime = -1.0;
+
+    bool IsTextInputActive()
+    {
+        return s_TextInputTime >= 0.0 && Hax::Gui::GetTime() - s_TextInputTime < 0.15;
+    }
+
+    bool SearchField(size_t id, wchar_t* buf, size_t bufSize, Hax::WStringView hint, float width)
+    {
+        const Hax::Vector2 size = {width, 34_px};
+        const Hax::Rect bounds = Hax::Rect::FromPosSize(Hax::Gui::GetCursorPos(), size);
+        Hax::Gui::PlaceItem(size);
+        if (!Hax::Gui::IsItemVisible(bounds))
+            return false;
+
+        const bool focused = Hax::Gui::IsItemFocused(id);
+        Hax::Gui::DrawRect(bounds.Min, bounds.Max,
+            {.BorderColor = focused ? Theme::Accent : Theme::Line, .BorderTh = 1_px, .FillColor = Theme::Surface1, .Rounding = 8_px});
+
+        const float iconH = 12_px;
+        const Hax::Vector2 iconSize = Hax::Gui::CalcTextSize(ICONS_FONT, L"", iconH);
+        Hax::Gui::DrawString(ICONS_FONT, L"", {bounds.Min.X + 11_px, bounds.Min.Y + (size.Y - iconSize.Y) / 2.f}, iconH,
+            {.Color = focused ? Theme::Muted : Theme::Faint});
+
+        const float fontH = Hax::Gui::Scale(12.5f);
+        bool changed = false;
+        const bool hasText = buf[0] != L'\0';
+        const float clearW = hasText ? 22_px : 0.f;
+        const Hax::Rect editBounds = {{bounds.Min.X + 31_px, bounds.Min.Y + 8_px}, {bounds.Max.X - 8_px - clearW, bounds.Max.Y - 8_px}};
+
+        Hax::Gui::PushClipRect(editBounds);
+        changed = Hax::Gui::StringEdit(id, MAIN_FONT, buf, bufSize, fontH, editBounds,
+            {.CaretColor = Theme::Accent, .Hint = hint, .HintColor = Theme::Faint, .TextColor = Theme::Text});
+        Hax::Gui::PopClipRect();
+
+        if (Hax::Gui::IsItemHovered(id))
+            Hax::Gui::SetMouseIcon(Hax::Gui::MouseIcon_TextInput);
+
+        if (Hax::Gui::IsItemFocused(id))
+            s_TextInputTime = Hax::Gui::GetTime();
+
+        if (Hax::Gui::IsItemFocused(id) && Hax::Gui::IsKeyJustDown(VK_ESCAPE) && buf[0] != L'\0')
+        {
+            buf[0] = L'\0';
+            changed = true;
+        }
+
+        if (hasText)
+        {
+            const size_t clearId = id + 1;
+            const Hax::Rect clearBounds = {{bounds.Max.X - 8_px - clearW, bounds.Min.Y + 6_px}, {bounds.Max.X - 6_px, bounds.Max.Y - 6_px}};
+            Hax::Gui::Interact(clearId, clearBounds);
+            const bool hovered = Hax::Gui::IsItemHovered(clearId);
+            if (hovered)
+                Hax::Gui::SetMouseIcon(Hax::Gui::MouseIcon_Hand);
+            const float xH = 11_px;
+            const Hax::Vector2 xSize = Hax::Gui::CalcTextSize(ICONS_FONT, L"", xH);
+            Hax::Gui::DrawString(ICONS_FONT, L"", clearBounds.GetCenter() - xSize / 2.f, xH,
+                {.Color = hovered ? Theme::Text : Theme::Faint});
+            if (Hax::Gui::IsItemClicked(clearId))
+            {
+                buf[0] = L'\0';
+                changed = true;
+            }
+        }
+
+        return changed;
+    }
+
+    bool NavItem(size_t id, Hax::WStringView text, Hax::char16 icon16, bool active, bool chevron)
+    {
+        const float fontH = Hax::Gui::Scale(Theme::MainFontSize);
+        const Hax::Vector2 size = {Hax::Gui::GetContentRegionAvail().X, 36_px};
+        const Hax::Rect bounds = Hax::Rect::FromPosSize(Hax::Gui::GetCursorPos(), size);
+
+        Hax::Gui::PlaceItem(size);
+        if (!Hax::Gui::IsItemVisible(bounds))
+            return false;
+
+        const auto res = Hax::Gui::Interact(id, bounds);
+        Hax::Gui::LinearAnim& hover = Hax::Gui::GetState<Hax::Gui::LinearAnim>(id);
+        AnimateHover(hover, res.Hovered);
+        if (res.Hovered)
+            Hax::Gui::SetMouseIcon(Hax::Gui::MouseIcon_Hand);
+
+        if (active)
+            Hax::Gui::DrawRect(bounds.Min, bounds.Max, {.FillColor = Theme::Surface2, .Rounding = 8_px});
+        else if (hover.Progress > 0.f)
+        {
+            Hax::Gui::LinearColor bg = Theme::Surface1;
+            bg.A = hover.Progress;
+            Hax::Gui::DrawRect(bounds.Min, bounds.Max, {.FillColor = bg.ToColor(), .Rounding = 8_px});
+        }
+
+        const float iconH = 14_px;
+        const Hax::WStringView icon = {&icon16, 1};
+        const Hax::Vector2 iconSize = Hax::Gui::CalcTextSize(ICONS_FONT, icon, iconH);
+        Hax::Gui::DrawString(ICONS_FONT, icon, {bounds.Min.X + 10_px + (18_px - iconSize.X) / 2.f, bounds.Min.Y + (size.Y - iconSize.Y) / 2.f}, iconH,
+            {.Color = active ? Theme::Accent : Mix(Theme::Faint, Theme::Muted, hover.Progress)});
+
+        const Hax::Vector2 textSize = Hax::Gui::CalcTextSize(BOLD_FONT, text, fontH);
+        Hax::Gui::DrawString(BOLD_FONT, text, {bounds.Min.X + 38_px, bounds.Min.Y + (size.Y - textSize.Y) / 2.f}, fontH,
+            {.Color = active ? Theme::Text : Mix(Theme::Muted, Theme::Text, hover.Progress)});
+
+        if (chevron)
+        {
+            const float chevH = 9_px;
+            const Hax::Vector2 chevSize = Hax::Gui::CalcTextSize(ICONS_FONT, L"", chevH);
+            Hax::Gui::DrawString(ICONS_FONT, L"", {bounds.Max.X - 12_px - chevSize.X, bounds.Min.Y + (size.Y - chevSize.Y) / 2.f}, chevH,
+                {.Color = Theme::Faint});
+        }
+
+        return Hax::Gui::IsItemClicked(id);
+    }
+
+    bool NavSubItem(size_t id, Hax::WStringView text, bool active)
+    {
+        const float fontH = Hax::Gui::Scale(12.5f);
+        const Hax::Vector2 size = {Hax::Gui::GetContentRegionAvail().X, 30_px};
+        const Hax::Rect bounds = Hax::Rect::FromPosSize(Hax::Gui::GetCursorPos(), size);
+
+        Hax::Gui::PlaceItem(size);
+        if (!Hax::Gui::IsItemVisible(bounds))
+            return false;
+
+        const auto res = Hax::Gui::Interact(id, bounds);
+        Hax::Gui::LinearAnim& hover = Hax::Gui::GetState<Hax::Gui::LinearAnim>(id);
+        AnimateHover(hover, res.Hovered && !active);
+        if (res.Hovered)
+            Hax::Gui::SetMouseIcon(Hax::Gui::MouseIcon_Hand);
+
+        if (hover.Progress > 0.f)
+        {
+            Hax::Gui::LinearColor bg = Theme::Surface1;
+            bg.A = hover.Progress;
+            Hax::Gui::DrawRect(bounds.Min, bounds.Max, {.FillColor = bg.ToColor(), .Rounding = 8_px});
+        }
+
+        if (active)
+            Hax::Gui::DrawCircle({bounds.Min.X + 23_px, bounds.GetCenter().Y}, 2.5_px, {.FillColor = Theme::Accent});
+
+        const Hax::Vector2 textSize = Hax::Gui::CalcTextSize(MAIN_FONT, text, fontH);
+        Hax::Gui::DrawString(MAIN_FONT, text, {bounds.Min.X + 36_px, bounds.Min.Y + (size.Y - textSize.Y) / 2.f}, fontH,
+            {.Color = active ? Theme::Accent : Mix(Theme::Muted, Theme::Text, hover.Progress)});
+
+        return Hax::Gui::IsItemClicked(id);
+    }
+
+    bool SearchResultItem(size_t id, Hax::WStringView text, Hax::WStringView where)
+    {
+        const float fontH = Hax::Gui::Scale(12.5f);
+        const float subH = Hax::Gui::Scale(11.f);
+        const Hax::Vector2 size = {Hax::Gui::GetContentRegionAvail().X, 42_px};
+        const Hax::Rect bounds = Hax::Rect::FromPosSize(Hax::Gui::GetCursorPos(), size);
+
+        Hax::Gui::PlaceItem(size);
+        if (!Hax::Gui::IsItemVisible(bounds))
+            return false;
+
+        const auto res = Hax::Gui::Interact(id, bounds);
+        Hax::Gui::LinearAnim& hover = Hax::Gui::GetState<Hax::Gui::LinearAnim>(id);
+        AnimateHover(hover, res.Hovered);
+        if (res.Hovered)
+            Hax::Gui::SetMouseIcon(Hax::Gui::MouseIcon_Hand);
+
+        Hax::Gui::DrawRect(bounds.Min, bounds.Max,
+            {.FillColor = Mix(Theme::Rail, Theme::Surface2, hover.Progress), .Rounding = 8_px});
+
+        Hax::Gui::PushClipRect(bounds);
+        Hax::Gui::DrawString(MAIN_FONT, text, {bounds.Min.X + 10_px, bounds.Min.Y + 6_px}, fontH, {.Color = Theme::Text});
+        Hax::Gui::DrawString(DESC_FONT, where, {bounds.Min.X + 10_px, bounds.Min.Y + 23_px}, subH, {.Color = Theme::Faint});
+        Hax::Gui::PopClipRect();
+
+        return Hax::Gui::IsItemClicked(id);
+    }
+
+    void Badge(Hax::WStringView text, Hax::Gui::Color fg)
+    {
+        const float fontH = Hax::Gui::Scale(10.f);
+        const Hax::Vector2 textSize = Hax::Gui::CalcTextSize(HEADER_FONT, text, fontH);
+        const Hax::Vector2 size = {textSize.X + 16_px, 20_px};
+        const Hax::Rect bounds = Hax::Rect::FromPosSize(Hax::Gui::GetCursorPos(), size);
+        Hax::Gui::PlaceItem(size);
+        if (!Hax::Gui::IsItemVisible(bounds))
+            return;
+
+        Hax::Gui::LinearColor bg(fg);
+        bg.A = 0.13f;
+        Hax::Gui::DrawRect(bounds.Min, bounds.Max, {.FillColor = bg.ToColor(), .Rounding = size.Y / 2.f});
+        Hax::Gui::DrawString(HEADER_FONT, text, bounds.Min + (size - textSize) / 2.f, fontH, {.Color = fg});
+    }
+
+    Hax::Vector2 CalcBadgeSize(Hax::WStringView text)
+    {
+        const Hax::Vector2 textSize = Hax::Gui::CalcTextSize(HEADER_FONT, text, Hax::Gui::Scale(10.f));
+        return {textSize.X + 16_px, 20_px};
+    }
+
+    static void DrawKeyCap(const Hax::Rect& bounds, Hax::Gui::Color border)
+    {
+        Hax::Gui::DrawRect(bounds.Min, bounds.Max, {.FillColor = border, .Rounding = 5_px});
+        Hax::Gui::DrawRect(bounds.Min + Hax::Vector2(1_px, 1_px), bounds.Max - Hax::Vector2(1_px, 2_px),
+            {.FillColor = Theme::Surface2, .Rounding = 4_px});
+    }
+
+    void KeyCap(Hax::WStringView text)
+    {
+        const float fontH = Hax::Gui::Scale(11.f);
+        const Hax::Vector2 textSize = Hax::Gui::CalcTextSize(BOLD_FONT, text, fontH);
+        const Hax::Vector2 size = {Hax::Max(22_px, textSize.X + 12_px), 22_px};
+        const Hax::Rect bounds = Hax::Rect::FromPosSize(Hax::Gui::GetCursorPos(), size);
+        Hax::Gui::PlaceItem(size);
+        if (!Hax::Gui::IsItemVisible(bounds))
+            return;
+
+        DrawKeyCap(bounds, Theme::Line2);
+        Hax::Gui::DrawString(BOLD_FONT, text, {bounds.Min.X + (size.X - textSize.X) / 2.f, bounds.Min.Y + (size.Y - 1_px - textSize.Y) / 2.f}, fontH,
+            {.Color = Theme::Muted});
+    }
+
+    bool IconButton(size_t id, Hax::char16 icon16, Hax::WStringView tooltip)
+    {
+        const Hax::Vector2 size = {32_px, 32_px};
+        const Hax::Rect bounds = Hax::Rect::FromPosSize(Hax::Gui::GetCursorPos(), size);
+        Hax::Gui::PlaceItem(size);
+        if (!Hax::Gui::IsItemVisible(bounds))
+            return false;
+
+        const auto res = Hax::Gui::Interact(id, bounds);
+        Hax::Gui::LinearAnim& hover = Hax::Gui::GetState<Hax::Gui::LinearAnim>(id);
+        AnimateHover(hover, res.Hovered);
+        if (res.Hovered)
+            Hax::Gui::SetMouseIcon(Hax::Gui::MouseIcon_Hand);
+
+        Hax::Gui::DrawRect(bounds.Min, bounds.Max,
+            {.BorderColor = Theme::Line2, .BorderTh = 1_px, .FillColor = Mix(Theme::Surface1, Theme::Surface3, hover.Progress), .Rounding = 8_px});
+        const float iconH = 13_px;
+        const Hax::WStringView icon = {&icon16, 1};
+        const Hax::Vector2 iconSize = Hax::Gui::CalcTextSize(ICONS_FONT, icon, iconH);
+        Hax::Gui::DrawString(ICONS_FONT, icon, bounds.GetCenter() - iconSize / 2.f, iconH,
+            {.Color = Mix(Theme::Muted, Theme::Text, hover.Progress)});
+        TextTooltip(id ^ 0x49434F4E42544E00ull, tooltip, bounds);
+
+        return Hax::Gui::IsItemClicked(id);
+    }
+
+    void StatusDot(Hax::Gui::Color col, float h)
+    {
+        const Hax::Vector2 size = {7_px, h};
+        const Hax::Rect bounds = Hax::Rect::FromPosSize(Hax::Gui::GetCursorPos(), size);
+        Hax::Gui::PlaceItem(size);
+        if (Hax::Gui::IsItemVisible(bounds))
+            Hax::Gui::DrawCircle(bounds.GetCenter(), 3.5_px, {.FillColor = col});
+    }
+
+    //=========================================================================
+    // Cards
+    //=========================================================================
+
     void PanelHeader(Hax::WStringView text, Hax::WStringView desc)
     {
         const float fontH = Hax::Gui::Scale(Theme::TitleFontSize);
         const Hax::Vector2 pos = Hax::Gui::GetCursorPos();
         const Hax::Vector2 textSize = Hax::Gui::CalcTextSize(HEADER_FONT, text, fontH);
-        Label(HEADER_FONT, text, fontH, Theme::HeaderColor);
+        Label(HEADER_FONT, text, fontH, Theme::Muted);
         TextTooltip(Hax::Hash(text) ^ 0x50414E454C484452ull, desc, Hax::Rect::FromPosSize(pos, textSize));
     }
 
+    void BeginPanel(size_t id)
+    {
+        Hax::Gui::BeginContainer(id, {.FitY = true});
+        const Hax::Vector2 containerSize = Hax::Gui::GetContentRegionAvail();
+        if (containerSize.Y > 0.f)
+        {
+            const Hax::Vector2 a = Hax::Gui::GetCursorPos();
+            const Hax::Vector2 b = a + containerSize;
+            Hax::Gui::DrawRect(a, b,
+                {.BorderColor = Theme::Line, .BorderTh = 1_px, .FillColor = Theme::Surface1, .Rounding = Hax::Gui::Scale(Theme::CardR)});
+        }
+        else
+            Hax::Gui::PushSkipDrawing();
+
+        Hax::Gui::BeginHorizontal();
+        const float padding = 16_px;
+        Hax::Gui::Space(padding);
+        Hax::Gui::BeginContainer(id + 1, {.W = containerSize.X - padding * 2.f, .H = 15.f, .FitY = true});
+        Hax::Gui::BeginVertical(12_px);
+        Hax::Gui::Dummy({0.f, 2_px});
+    }
+
+    void EndPanel()
+    {
+        Hax::Gui::Dummy({0.f, 2_px});
+        Hax::Gui::EndVertical();
+        Hax::Gui::EndContainer();
+        Hax::Gui::EndHorizontal();
+
+        if (Hax::Gui::IsDrawingSkipped())
+            Hax::Gui::PopSkipDrawing();
+
+        Hax::Gui::EndContainer();
+    }
+
+    void HorizontalLine(float th, float w)
+    {
+        Hax::Gui::HorizontalLine(th, Theme::Line, w);
+    }
+
+    //=========================================================================
+    // Controls
+    //=========================================================================
+
     bool SettingsBtn(size_t id, bool disabled)
     {
-        const float h = Theme::SettingBtnSize * Hax::Gui::G.ScaleFactor;
-        const Hax::Vector2 size = Hax::Gui::CalcTextSize(ICONS_FONT, L"\uF013", h);
+        const float h = Hax::Gui::Scale(Theme::SettingBtnSize);
+        const Hax::Vector2 size = Hax::Gui::CalcTextSize(ICONS_FONT, L"", h);
         const Hax::Rect bounds = Hax::Rect::FromPosSize(Hax::Gui::GetCursorPos(), size);
 
         Hax::Gui::PlaceItem(size);
@@ -225,19 +588,12 @@ namespace Cheat
         if (!disabled)
             Hax::Gui::Interact(id, bounds);
         Hax::Gui::LinearAnim& state = Hax::Gui::GetState<Hax::Gui::LinearAnim>(id);
-
-        const float deltaTime = Hax::Gui::GetDeltaTime();
+        AnimateHover(state, Hax::Gui::IsItemHovered(id));
         if (Hax::Gui::IsItemHovered(id))
-        {
             Hax::Gui::SetMouseIcon(Hax::Gui::MouseIcon_Hand);
-            state.Elapse(deltaTime, 0.1f);
-        }
-        else
-            state.Elapse(-deltaTime, 0.1f);
 
-        const Hax::Gui::Color color = Hax::Gui::IsItemActive(id) ? Theme::ActiveColor
-            : Hax::Lerp(Hax::Gui::LinearColor(0x8E835FFF), Hax::Gui::LinearColor(0xF0C14AFF), state.Progress).ToColor();
-        Hax::Gui::DrawString(ICONS_FONT, L"\uF013", bounds.Min, h, {.Color = color});
+        const Hax::Gui::Color color = Hax::Gui::IsItemActive(id) ? Theme::Accent : Mix(Theme::Faint, Theme::Text, state.Progress);
+        Hax::Gui::DrawString(ICONS_FONT, L"", bounds.Min, h, {.Color = color});
 
         return Hax::Gui::IsItemClicked(id);
     }
@@ -262,38 +618,32 @@ namespace Cheat
 
         ToggleState& state = Hax::Gui::GetState<ToggleState>(id);
         const float deltaTime = Hax::Gui::GetDeltaTime();
-        state.ToggleAnim.Elapse(value ? deltaTime : -deltaTime, 0.1f);
+        state.ToggleAnim.Elapse(value ? deltaTime : -deltaTime, 0.12f);
 
         if (enabled)
             Hax::Gui::Interact(id, bounds);
 
+        AnimateHover(state.HoverAnim, Hax::Gui::IsItemHovered(id));
         if (Hax::Gui::IsItemHovered(id))
-        {
-            state.HoverAnim.Elapse(deltaTime, 0.1f);
             Hax::Gui::SetMouseIcon(Hax::Gui::MouseIcon_Hand);
-        }
-        else
-            state.HoverAnim.Elapse(-deltaTime, 0.1f);
 
         if (Hax::Gui::IsItemClicked(id))
             value = !value;
 
-        const Hax::Gui::Color border = Hax::Lerp(Hax::Gui::LinearColor(0x55492AFF), Hax::Gui::LinearColor(0xB98A32FF), state.HoverAnim.Progress).ToColor();
+        const float t = state.ToggleAnim.Progress;
+        const Hax::Gui::Color offTrack = Mix(Theme::Surface3, 0x343A42FF, state.HoverAnim.Progress);
         Hax::Gui::DrawRect(bounds.Min, bounds.Max,
-            {.BorderColor = border, .BorderTh = 1_px, .FillColor = 0x0D0E09FF, .Rounding = 2_px});
+            {.FillColor = Mix(offTrack, Theme::Accent, t), .Rounding = toggleSize.Y / 2.f});
 
-        const float lampW = 15_px;
-        const float lampX = Hax::Lerp(bounds.Min.X + 3_px, bounds.Max.X - lampW - 3_px, state.ToggleAnim.Progress);
-        const Hax::Rect lamp = Hax::Rect::FromPosSize({lampX, bounds.Min.Y + 3_px}, {lampW, bounds.GetHeight() - 6_px});
-        const Hax::Gui::Color lampColor = Hax::Lerp(Hax::Gui::LinearColor(0x49301FFF), Hax::Gui::LinearColor(Theme::StatusGreen), state.ToggleAnim.Progress).ToColor();
-        Hax::Gui::DrawRect(lamp.Min, lamp.Max,
-            {.BorderColor = state.ToggleAnim.Progress > 0.5f ? 0xC5E55AFF : 0x68412AFF, .BorderTh = 1_px, .FillColor = lampColor, .Rounding = 2_px});
+        const float knobR = 7_px;
+        const float knobX = Hax::Lerp(bounds.Min.X + toggleSize.Y / 2.f, bounds.Max.X - toggleSize.Y / 2.f, t);
+        Hax::Gui::DrawCircle({knobX, bounds.GetCenter().Y}, knobR, {.FillColor = Mix(Theme::Faint, Theme::Ink, t)});
 
         return Hax::Gui::IsItemClicked(id);
     }
 
     void OpenPopup(size_t id, const Hax::Vector2& pos);
-    
+
     bool ToggleEx(size_t id, bool& value, Hax::WStringView text, Hax::WStringView desc, ToggleExParams params)
     {
         bool changed = false;
@@ -306,7 +656,7 @@ namespace Cheat
             {
                 const Hax::Vector2 labelPos = Hax::Gui::GetCursorPos();
                 const Hax::Vector2 labelSize = Hax::Gui::CalcTextSize(MAIN_FONT, text, Hax::Gui::Scale(Theme::MainFontSize));
-                LabelAlignedByH(MAIN_FONT, text, Hax::Gui::Scale(Theme::MainFontSize), Theme::MainCol, toggleSize.Y);
+                LabelAlignedByH(MAIN_FONT, text, Hax::Gui::Scale(Theme::MainFontSize), Theme::Text, toggleSize.Y);
                 TextTooltip(id ^ 0x544F47474C454849ull, desc,
                     Hax::Rect::FromPosSize(labelPos, {labelSize.X, toggleSize.Y}));
                 float space = Hax::Gui::GetContentRegionAvail().X - toggleSize.X;
@@ -331,36 +681,64 @@ namespace Cheat
                 if (params.Disabled)
                 {
                     Hax::Rect bounds = Hax::Gui::GetLayoutBounds();
-                    Hax::Gui::DrawRect(bounds.Min, bounds.Max, { .FillColor = Theme::DisabledMaskCol });
+                    Hax::Gui::DrawRect(bounds.Min, bounds.Max, {.FillColor = Theme::DisabledMask});
                 }
             }
             Hax::Gui::EndHorizontal();
-
         }
         Hax::Gui::EndVertical();
 
         return changed;
     }
 
+    static constexpr Hax::Vector2 kButtonPadding = {12.f, 8.f};
+
     Hax::Vector2 CalcButtonSize(Hax::WStringView label)
     {
-        const float fontH = Theme::DescFontSize * Hax::Gui::G.ScaleFactor;
-        const Hax::Vector2 padding = {12_px, 5_px};
-
+        const float fontH = Hax::Gui::Scale(Theme::DescFontSize);
         const Hax::Vector2 textSize = Hax::Gui::CalcTextSize(MAIN_FONT, label, fontH);
-        return textSize + padding * 2.f;
+        return textSize + Hax::Gui::Scale(kButtonPadding) * 2.f;
     }
 
     float CalcButtonHeight()
     {
-        const float fontH = Theme::DescFontSize * Hax::Gui::G.ScaleFactor;
-        return Hax::Gui::GetFontLineHeight(MAIN_FONT, fontH) + 5_px * 2.f;
+        const float fontH = Hax::Gui::Scale(Theme::DescFontSize);
+        return Hax::Gui::GetFontLineHeight(MAIN_FONT, fontH) + Hax::Gui::Scale(kButtonPadding.Y) * 2.f;
+    }
+
+    struct ButtonColors
+    {
+        Hax::Gui::Color Bg, Fg, Border;
+    };
+
+    static ButtonColors ButtonBeh(size_t id, ButtonStyle style)
+    {
+        Hax::Gui::LinearAnim& state = Hax::Gui::GetState<Hax::Gui::LinearAnim>(id);
+        const bool hovered = Hax::Gui::IsItemHovered(id);
+        AnimateHover(state, hovered);
+        if (hovered)
+            Hax::Gui::SetMouseIcon(Hax::Gui::MouseIcon_Hand);
+
+        const bool pressed = Hax::Gui::IsItemActive(id);
+        const float t = state.Progress;
+
+        switch (style)
+        {
+        case ButtonStyle::Primary:
+            return {pressed ? 0xD98F1CFF : Mix(Theme::Accent, 0xFFB940FF, t), Theme::Ink, Hax::Gui::Color::Transparent};
+        case ButtonStyle::Danger:
+            return {pressed ? 0xFF7A6E40 : Mix(Theme::DangerSoft, 0xFF7A6E2A, t), Theme::Danger, 0xFF7A6E59};
+        case ButtonStyle::Ghost:
+            return {pressed ? Theme::Surface3 : Mix(0x1B1F2400, Theme::Surface2, t), Mix(Theme::Muted, Theme::Text, t), Hax::Gui::Color::Transparent};
+        default:
+            return {pressed ? Theme::AccentSoft : Mix(Theme::Surface2, Theme::Surface3, t), pressed ? Theme::Accent : Theme::Text, Theme::Line2};
+        }
     }
 
     bool Button(size_t id, Hax::WStringView label, Hax::WStringView desc, const ButtonParams& params)
     {
-        const float fontH = Theme::DescFontSize * Hax::Gui::G.ScaleFactor;
-        const Hax::Vector2 padding = {12_px, 5_px};
+        const float fontH = Hax::Gui::Scale(Theme::DescFontSize);
+        const Hax::Vector2 padding = Hax::Gui::Scale(kButtonPadding);
 
         const Hax::Vector2 textSize = Hax::Gui::CalcTextSize(MAIN_FONT, label, fontH);
         const Hax::Vector2 btnSize = {Hax::Max(textSize.X + padding.X * 2.f, params.MinW), textSize.Y + padding.Y * 2.f};
@@ -376,43 +754,21 @@ namespace Cheat
         if (params.Enabled)
             Hax::Gui::Interact(id, bounds);
 
-        Hax::Gui::LinearAnim& state = Hax::Gui::GetState<Hax::Gui::LinearAnim>(id);
-
-        Hax::Gui::Color bg = 0x6B470FFF;
-        Hax::Gui::Color fg = 0x0B0C08FF;
-        if (!Hax::Gui::IsItemActive(id))
-        {
-            constexpr Hax::Gui::LinearColor fromBg = 0x1A1A11FF;
-            constexpr Hax::Gui::LinearColor toBg = 0x7B5312FF;
-            bg = Hax::Lerp(fromBg, toBg, state.Progress).ToColor();
-
-            constexpr Hax::Gui::LinearColor fromFg = 0xD0C59AFF;
-            constexpr Hax::Gui::LinearColor toFg = 0xFFE17AFF;
-            fg = Hax::Lerp(fromFg, toFg, state.Progress).ToColor();
-        }
-
-        const float deltaTime = Hax::Gui::GetDeltaTime();
-        if (Hax::Gui::IsItemHovered(id))
-        {
-            state.Elapse(deltaTime, 0.1f);
-            Hax::Gui::SetMouseIcon(Hax::Gui::MouseIcon_Hand);
-        }
-        else
-            state.Elapse(-deltaTime, 0.1f);
-
+        const ButtonColors c = ButtonBeh(id, params.Style);
         Hax::Gui::DrawRect(bounds.Min, bounds.Max,
-            {.BorderColor = 0x8A6A2DFF, .BorderTh = 1_px, .FillColor = bg, .Rounding = 2_px});
+            {.BorderColor = c.Border, .BorderTh = 1_px, .FillColor = c.Bg, .Rounding = Hax::Gui::Scale(Theme::ControlR)});
         const Hax::Vector2 labelPos = bounds.Min + (btnSize - textSize) / 2.f;
-        Hax::Gui::DrawString(MAIN_FONT, label, labelPos, fontH, {.Color = fg});
-        TextTooltip(id ^ 0x425554544F4E4849ull, desc, Hax::Rect::FromPosSize(labelPos, textSize));
+        DrawSearchHighlight(label, bounds);
+        Hax::Gui::DrawString(MAIN_FONT, label, labelPos, fontH, {.Color = c.Fg});
+        TextTooltip(id ^ 0x425554544F4E4849ull, desc, bounds);
 
         if (!params.Enabled)
-            Hax::Gui::DrawRect(bounds.Min, bounds.Max, {.FillColor = Theme::DisabledMaskCol});
+            Hax::Gui::DrawRect(bounds.Min, bounds.Max, {.FillColor = Theme::DisabledMask, .Rounding = Hax::Gui::Scale(Theme::ControlR)});
 
         return Hax::Gui::IsItemClicked(id);
     }
 
-    void Image(Hax::Gui::TextureHandle tex, Hax::Vector2 customSize)
+    void Image(Hax::Gui::TextureHandle tex, Hax::Vector2 customSize, float rounding)
     {
         const Hax::Vector2 size = (bool)customSize ? customSize : Hax::Gui::GetImageSize(tex);
 
@@ -424,140 +780,7 @@ namespace Cheat
         if (!Hax::Gui::IsItemVisible(bounds))
             return;
 
-        Hax::Gui::DrawImage(tex, bounds.Min, bounds.Max);
-    }
-
-    bool TabButton(size_t id, Hax::WStringView text, Hax::char16 icon16, bool active)
-    {
-        const float fontSize = Hax::Gui::Scale(Theme::MainFontSize);
-        const float iconHeight = Hax::Gui::GetFontLineHeight(MAIN_FONT, fontSize);
-        const Hax::Vector2 padding = {12_px, 7_px};
-
-        Hax::Vector2 btnSize;
-        btnSize.X = Hax::Gui::GetContentRegionAvail().X;
-        btnSize.Y = Hax::Gui::GetFontLineHeight(MAIN_FONT, fontSize) + padding.Y * 2.f;
-
-        Hax::Rect btnBounds;
-        btnBounds.Min = Hax::Gui::GetCursorPos();
-        btnBounds.Max = btnBounds.Min + btnSize;
-
-        Hax::Gui::PlaceItem(btnSize);
-        if (!Hax::Gui::IsItemVisible(btnBounds))
-            return false;
-
-        Hax::Gui::LinearAnim& state = Hax::Gui::GetState<Hax::Gui::LinearAnim>(id);
-
-        // Interaction
-        {
-            auto res = Hax::Gui::Interact(id, btnBounds);
-            const float deltaTime = Hax::Gui::GetDeltaTime();
-            state.Elapse(res.Hovered ? deltaTime : -deltaTime, 0.1f);
-            if (res.Hovered)
-                Hax::Gui::SetMouseIcon(Hax::Gui::MouseIcon_Hand);
-        }
-
-        // Background
-        {
-            const Hax::Gui::Color btnColor = active ? Theme::BtnBgActive
-                : Hax::Lerp(Hax::Gui::LinearColor(0x12130DFF), Hax::Gui::LinearColor(0x2B2818FF), state.Progress).ToColor();
-            Hax::Gui::DrawRect(btnBounds.Min, btnBounds.Max,
-                {.BorderColor = active ? 0xE6A525FF : 0x51472BFF, .BorderTh = 1_px, .FillColor = btnColor, .Rounding = 2_px});
-            if (active)
-                Hax::Gui::DrawRect(btnBounds.Min, {btnBounds.Min.X + 4_px, btnBounds.Max.Y}, {.FillColor = 0xF0B52DFF, .Rounding = 1_px});
-        }
-
-        const Hax::WStringView icon = {&icon16, 1};
-        const Hax::Gui::Color labelColor = active ? 0x17130AFF
-            : Hax::Lerp(Hax::Gui::LinearColor(0x8F8769FF), Hax::Gui::LinearColor(0xE4D6A4FF), state.Progress).ToColor();
-
-        Hax::Vector2 posCursor = btnBounds.Min;
-        posCursor.Y += (btnSize.Y - iconHeight) / 2.f;
-        posCursor.X += padding.X;
-        Hax::Gui::DrawString(ICONS_FONT, icon, posCursor, iconHeight, {.Color = labelColor});
-
-        const float capHeight = Hax::Gui::GetFontCapHeight(MAIN_FONT, fontSize);
-        const Hax::Vector2 labelSize = Hax::Gui::CalcTextSize(MAIN_FONT, text, fontSize);
-        posCursor.X += 18_px + padding.X;
-        posCursor.Y += (iconHeight - capHeight) / 2.f - (Hax::Gui::GetFontAscent(MAIN_FONT, fontSize) - capHeight);
-        Hax::Gui::DrawString(MAIN_FONT, text, posCursor, fontSize, {.Color = active ? 0x17130AFF : 0xD9D0ACFF});
-
-        return Hax::Gui::IsItemClicked(id);
-    }
-
-    bool SubTabButton(size_t id, Hax::WStringView text, bool active, float width)
-    {
-        const float fontSize = Hax::Gui::Scale(Theme::MainFontSize);
-        const Hax::Vector2 padding = {14_px, 8_px};
-        const Hax::Vector2 textSize = Hax::Gui::CalcTextSize(MAIN_FONT, text, fontSize);
-        const Hax::Vector2 size = {width, textSize.Y + padding.Y * 2.f};
-        const Hax::Rect bounds = Hax::Rect::FromPosSize(Hax::Gui::GetCursorPos(), size);
-
-        Hax::Gui::PlaceItem(size);
-        if (!Hax::Gui::IsItemVisible(bounds))
-            return false;
-
-        const auto interaction = Hax::Gui::Interact(id, bounds);
-        Hax::Gui::LinearAnim& state = Hax::Gui::GetState<Hax::Gui::LinearAnim>(id);
-        state.Elapse(interaction.Hovered ? Hax::Gui::GetDeltaTime() : -Hax::Gui::GetDeltaTime(), 0.12f);
-        if (interaction.Hovered)
-            Hax::Gui::SetMouseIcon(Hax::Gui::MouseIcon_Hand);
-
-        const Hax::Gui::Color bg = active
-            ? 0x6A4A12FF
-            : Hax::Lerp(Hax::Gui::LinearColor(0x15160FFF), Hax::Gui::LinearColor(0x292719FF), state.Progress).ToColor();
-        Hax::Gui::DrawRect(bounds.Min, bounds.Max,
-            {.BorderColor = active ? 0xD49B27FF : 0x4B4228FF, .BorderTh = 1_px, .FillColor = bg, .Rounding = 2_px});
-
-        if (active)
-        {
-            Hax::Vector2 accentMax = bounds.Max;
-            accentMax.Y = bounds.Min.Y + 3_px;
-            Hax::Gui::DrawRect(bounds.Min, accentMax, {.FillColor = Theme::ActiveColor, .Rounding = 1_px});
-        }
-
-        Hax::Gui::DrawString(MAIN_FONT, text, bounds.Min + (size - textSize) / 2.f, fontSize,
-            {.Color = active ? 0xFFE17AFF : 0xAFA684FF});
-
-        return Hax::Gui::IsItemClicked(id);
-    }
-
-    void BeginPanel(size_t id)
-    {
-        Hax::Gui::BeginContainer(id, {.FitY = true});
-        const Hax::Vector2 containerSize = Hax::Gui::GetContentRegionAvail();
-        if (containerSize.Y > 0.f)
-        {
-            const Hax::Vector2 a = Hax::Gui::GetCursorPos();
-            const Hax::Vector2 b = a + containerSize;
-            Hax::Gui::DrawRect(a, b,
-                {.BorderColor = Theme::MetalBorder, .BorderTh = 1_px, .FillColor = 0x12130DFF, .Rounding = 3_px});
-            Hax::Gui::DrawLine({a.X + 7_px, a.Y + 4_px}, {b.X - 7_px, a.Y + 4_px}, {.FillColor = 0x2E2919FF, .Th = 1_px});
-            constexpr float boltR = 1.5f;
-            Hax::Gui::DrawCircle(a + Hax::Vector2(6_px, 6_px), Hax::Gui::Scale(boltR), {.FillColor = 0x8B7342FF});
-            Hax::Gui::DrawCircle({b.X - 6_px, a.Y + 6_px}, Hax::Gui::Scale(boltR), {.FillColor = 0x8B7342FF});
-        }
-        else
-            Hax::Gui::PushSkipDrawing();
-
-        Hax::Gui::BeginHorizontal();
-        const float padding = 12_px;
-        Hax::Gui::Space(padding);
-        Hax::Gui::BeginContainer(id + 1, {.W = containerSize.X - padding * 2.f, .H = 15.f, .FitY = true});
-        Hax::Gui::BeginVertical(padding);
-        Hax::Gui::Dummy({0.f, 0.f});
-    }
-
-    void EndPanel()
-    {
-        Hax::Gui::Dummy({0.f, 0.f});
-        Hax::Gui::EndVertical();
-        Hax::Gui::EndContainer();
-        Hax::Gui::EndHorizontal();
-
-        if (Hax::Gui::IsDrawingSkipped())
-            Hax::Gui::PopSkipDrawing();
-
-        Hax::Gui::EndContainer();
+        Hax::Gui::DrawImage(tex, bounds.Min, bounds.Max, {.R = rounding});
     }
 
     int SliderConvertInt(int min, int max, float m)
@@ -570,67 +793,80 @@ namespace Cheat
         return Hax::Lerp(min, max, Hax::Clamp(m, 0.f, 1.f));
     }
 
-    //template <float Step>
-    //float SliderConvertFloatStep(float min, float max, float m)
-    //{
-    //    float rawVal = min + m * (max - min);
-    //
-    //    float stepsCount = Round((rawVal - min) / Step);
-    //
-    //    float finalVal = min + (stepsCount * Step);
-    //    return Clamp(finalVal, min, max);
-    //}
-
-    void ButtonBeh(size_t id, Hax::Gui::Color& bg, Hax::Gui::Color& fg)
+    void DrawSliderVisual(const Hax::Rect& bounds, float t, float activeProgress)
     {
-        Hax::Gui::LinearAnim& state = Hax::Gui::GetState<Hax::Gui::LinearAnim>(id);
+        const float r = bounds.GetHeight() / 2.f;
+        const float minX = bounds.Min.X + r;
+        const float maxX = bounds.Max.X - r;
+        const float thumbX = Hax::Lerp(minX, maxX, Hax::Clamp(t, 0.f, 1.f));
+        const float cy = bounds.GetCenter().Y;
+        const float trackH = 4_px;
 
-        bg = 0x6B470FFF;
-        fg = 0x1A1408FF;
-        if (!Hax::Gui::IsItemActive(id))
+        Hax::Gui::DrawRect({bounds.Min.X, cy - trackH / 2.f}, {bounds.Max.X, cy + trackH / 2.f},
+            {.FillColor = Theme::Surface3, .Rounding = trackH / 2.f});
+        Hax::Gui::DrawRect({bounds.Min.X, cy - trackH / 2.f}, {thumbX, cy + trackH / 2.f},
+            {.FillColor = Theme::Accent, .Rounding = trackH / 2.f});
+
+        const float outer = Hax::Lerp(7.5_px, 8.5_px, activeProgress);
+        Hax::Gui::DrawCircle({thumbX, cy}, outer + 2.5_px, {.FillColor = Theme::Surface1});
+        Hax::Gui::DrawCircle({thumbX, cy}, outer, {.FillColor = Theme::Accent});
+        Hax::Gui::DrawCircle({thumbX, cy}, outer - 3_px, {.FillColor = Theme::Thumb});
+    }
+
+    void ValuePill(Hax::WStringView text)
+    {
+        const float fontH = Hax::Gui::Scale(11.5f);
+        const Hax::Vector2 textSize = Hax::Gui::CalcTextSize(BOLD_FONT, text, fontH);
+        const Hax::Vector2 size = textSize + Hax::Vector2(14_px, 4_px);
+        const Hax::Rect bounds = Hax::Rect::FromPosSize(Hax::Gui::GetCursorPos(), size);
+        Hax::Gui::PlaceItem(size);
+        if (!Hax::Gui::IsItemVisible(bounds))
+            return;
+
+        Hax::Gui::DrawRect(bounds.Min, bounds.Max, {.FillColor = Theme::AccentSoft, .Rounding = 5_px});
+        Hax::Gui::DrawString(BOLD_FONT, text, bounds.Min + (size - textSize) / 2.f, fontH, {.Color = Theme::Accent});
+    }
+
+    Hax::Vector2 CalcValuePillSize(Hax::WStringView text)
+    {
+        return Hax::Gui::CalcTextSize(BOLD_FONT, text, Hax::Gui::Scale(11.5f)) + Hax::Vector2(14_px, 4_px);
+    }
+
+    void SliderHeader(Hax::WStringView text, Hax::WStringView valTxt)
+    {
+        Hax::Gui::BeginHorizontal();
         {
-            constexpr Hax::Gui::LinearColor fromBg = 0x17180FFF;
-            constexpr Hax::Gui::LinearColor toBg = 0x3B341CFF;
-            bg = Hax::Lerp(fromBg, toBg, state.Progress).ToColor();
-
-            constexpr Hax::Gui::LinearColor fromFg = 0xC8BE94FF;
-            constexpr Hax::Gui::LinearColor toFg = 0xF2C64FFF;
-            fg = Hax::Lerp(fromFg, toFg, state.Progress).ToColor();
+            const Hax::Vector2 pillSize = CalcValuePillSize(valTxt);
+            LabelAlignedByH(MAIN_FONT, text, Hax::Gui::Scale(Theme::MainFontSize), Theme::Text, pillSize.Y);
+            Hax::Gui::Space(Hax::Max(0.f, Hax::Gui::GetContentRegionAvail().X - pillSize.X));
+            ValuePill(valTxt);
         }
-
-        const float deltaTime = Hax::Gui::GetDeltaTime();
-        if (Hax::Gui::IsItemHovered(id))
-        {
-            state.Elapse(deltaTime, 0.1f);
-            Hax::Gui::SetMouseIcon(Hax::Gui::MouseIcon_Hand);
-        }
-        else
-            state.Elapse(-deltaTime, 0.1f);
+        Hax::Gui::EndHorizontal();
     }
 
     bool AutoLayoutButton(size_t id, Hax::WStringView text, const AutoLayoutButtonParams& params)
     {
-        const float fontH = Theme::DescFontSize * Hax::Gui::G.ScaleFactor;
-        const Hax::Vector2 padding = {12_px, 5_px};
+        const float fontH = Hax::Gui::Scale(Theme::DescFontSize);
+        const Hax::Vector2 padding = {12_px, 7_px};
 
         const Hax::Vector2 textSize = Hax::Gui::CalcTextSize(MAIN_FONT, text, fontH);
         Hax::Vector2 btnSize = textSize + padding * 2.f;
 
-        Hax::Rect bounds; 
+        Hax::Rect bounds;
         bounds.Min = Hax::Gui::GetCursorPos();
         bounds.Max = bounds.Min + btnSize;
 
         if (params.Icon != 0)
         {
             Hax::Vector2 iconSize = Hax::Gui::GetImageSize(params.Icon);
-            bounds.Max.X += padding.X + (textSize.Y * (iconSize.X / iconSize.Y));
+            bounds.Max.X += padding.X / 2.f + (textSize.Y * (iconSize.X / iconSize.Y));
             btnSize = bounds.GetSize();
         }
 
         if (btnSize.X > Hax::Gui::GetContentRegionAvail().X)
         {
             Hax::Gui::EndHorizontal();
-            Hax::Gui::BeginHorizontal(5_px);
+            Hax::Gui::BeginHorizontal(6_px);
 
             bounds.Min = Hax::Gui::GetCursorPos();
             bounds.Max = bounds.Min + btnSize;
@@ -643,10 +879,9 @@ namespace Cheat
         if (!params.Disabled)
             Hax::Gui::Interact(id, bounds);
 
-        Hax::Gui::Color bg, fg;
-        ButtonBeh(id, bg, fg);
-
-        Hax::Gui::DrawRect(bounds.Min, bounds.Max, {.BorderColor = 0x62532CFF, .BorderTh = 1_px, .FillColor = bg, .Rounding = 2_px});
+        const ButtonColors c = ButtonBeh(id, ButtonStyle::Secondary);
+        Hax::Gui::DrawRect(bounds.Min, bounds.Max,
+            {.BorderColor = c.Border, .BorderTh = 1_px, .FillColor = c.Bg, .Rounding = Hax::Gui::Scale(Theme::ControlR)});
 
         Hax::Vector2 drawPos = bounds.Min + padding;
         if (params.Icon != 0)
@@ -660,18 +895,19 @@ namespace Cheat
 
             drawPos.X = iconBR.X + padding.X / 2.f;
         }
-        Hax::Gui::DrawString(MAIN_FONT, text, drawPos, fontH, {.Color = fg});
+        DrawSearchHighlight(text, bounds);
+        Hax::Gui::DrawString(MAIN_FONT, text, drawPos, fontH, {.Color = c.Fg});
 
         if (params.Disabled)
-            Hax::Gui::DrawRect(bounds.Min, bounds.Max, {.FillColor = Theme::DisabledMaskCol});
+            Hax::Gui::DrawRect(bounds.Min, bounds.Max, {.FillColor = Theme::DisabledMask, .Rounding = Hax::Gui::Scale(Theme::ControlR)});
 
         return Hax::Gui::IsItemClicked(id);
     }
 
     bool DropdownBtn(size_t id, Hax::WStringView preview, float w)
     {
-        const float fontH = Theme::DescFontSize * Hax::Gui::G.ScaleFactor;
-        const Hax::Vector2 padding = {12_px, 5_px};//!
+        const float fontH = Hax::Gui::Scale(Theme::DescFontSize);
+        const Hax::Vector2 padding = Hax::Gui::Scale(kButtonPadding);
         const float textH = Hax::Gui::GetFontLineHeight(MAIN_FONT, fontH);
 
         const Hax::Vector2 size = {w, textH + padding.Y * 2.f};
@@ -682,19 +918,16 @@ namespace Cheat
             return false;
 
         Hax::Gui::Interact(id, bounds);
+        const ButtonColors c = ButtonBeh(id, ButtonStyle::Secondary);
 
-        Hax::Gui::Color bg, fg;
-        ButtonBeh(id, bg, fg);
+        Hax::Gui::DrawRect(bounds.Min, bounds.Max,
+            {.BorderColor = c.Border, .BorderTh = 1_px, .FillColor = c.Bg, .Rounding = Hax::Gui::Scale(Theme::ControlR)});
+        Hax::Gui::DrawString(MAIN_FONT, preview, bounds.Min + padding, fontH, {.Color = Theme::Text});
 
-        Hax::Gui::DrawRect(bounds.Min, bounds.Max, {.BorderColor = 0x62532CFF, .BorderTh = 1_px, .FillColor = bg, .Rounding = 2_px});
-        Hax::Gui::DrawString(MAIN_FONT, preview, bounds.Min + padding, fontH, {.Color = fg});
-
-        const Hax::Vector2 arrowSize = padding;
-        Hax::Vector2 arrowPos;
-        arrowPos.X = bounds.Max.X - arrowSize.X - padding.X;
-        arrowPos.Y = bounds.Min.Y + (bounds.GetHeight() - arrowSize.Y) / 2.f;
-
-        Hax::Gui::DrawTriangle(arrowPos, arrowPos + Hax::Vector2(arrowSize.X, 0.f), arrowPos + Hax::Vector2(arrowSize.X / 2.f, arrowSize.Y), {.FillColor = Theme::ActiveColor});
+        const float chevH = 10_px;
+        const Hax::Vector2 chevSize = Hax::Gui::CalcTextSize(ICONS_FONT, L"", chevH);
+        Hax::Gui::DrawString(ICONS_FONT, L"", {bounds.Max.X - padding.X - chevSize.X, bounds.Min.Y + (size.Y - chevSize.Y) / 2.f}, chevH,
+            {.Color = Theme::Faint});
 
         return Hax::Gui::IsItemClicked(id);
     }
@@ -714,6 +947,19 @@ namespace Cheat
         state.Opened = false;
     }
 
+    static Hax::Gui::ScrollStyle ListScrollStyle()
+    {
+        return
+        {
+            .TrackWidth = 6_px,
+            .ThumbPadding = 1_px,
+            .TrackCol = 0x0,
+            .ThumbCol = Theme::Surface3,
+            .ThumbHovCol = 0x3A414AFF,
+            .ThumbActiveCol = Theme::Accent
+        };
+    }
+
     bool BeginDropList(size_t id, const Hax::Vector2& size)
     {
         PopupState& state = Hax::Gui::GetState<PopupState>(id);
@@ -722,7 +968,7 @@ namespace Cheat
             return false;
 
         Hax::Gui::SwitchLayer(L"Popups");
-        Hax::Gui::SetCursorPos(state.Pos);
+        Hax::Gui::SetCursorPos(state.Pos + Hax::Vector2(0.f, 4_px));
 
         Hax::Rect bounds;
         bounds.Min = Hax::Gui::GetCursorPos();
@@ -738,23 +984,15 @@ namespace Cheat
 
         state.IsFirstFrame = false;
 
-        const float r = 2_px;
-        Hax::Gui::DrawRect(bounds.Min, bounds.Max, {.BorderColor = Theme::MetalHighlight, .BorderTh = 1_px, .FillColor = Theme::FrameColor, .Rounding = r});
+        const float r = 8_px;
+        Hax::Gui::DrawRect(bounds.Min + Hax::Vector2(0.f, 6_px), bounds.Max + Hax::Vector2(0.f, 6_px), {.FillColor = 0x00000070, .Rounding = r});
+        Hax::Gui::DrawRect(bounds.Min, bounds.Max, {.BorderColor = Theme::Line2, .BorderTh = 1_px, .FillColor = Theme::Surface2, .Rounding = r});
 
-        bounds.Min.Y += r;
-        bounds.Max.Y -= r;
+        bounds.Min.Y += 4_px;
+        bounds.Max.Y -= 4_px;
 
         Hax::Gui::SetCursorPos(bounds.Min);
-        Hax::Gui::ScrollStyle ScrollSt = 
-        {
-            .TrackWidth = 6_px,
-            .ThumbPadding = 0.f,
-            .TrackCol = 0x0,
-            .ThumbCol = 0x8F6D29FF,
-            .ThumbHovCol = 0xC58B23FF,
-            .ThumbActiveCol = 0xE5A32BFF
-        };
-        Hax::Gui::BeginContainer(id, {.W = size.X, .H = size.Y - r * 2.f, .Clip = true, .ScrollY = true, .Style = ScrollSt});
+        Hax::Gui::BeginContainer(id, {.W = size.X, .H = size.Y - 8_px, .Clip = true, .ScrollY = true, .Style = ListScrollStyle()});
         Hax::Gui::BeginVertical();
 
         return true;
@@ -791,9 +1029,10 @@ namespace Cheat
 
         if (bounds.GetSize().X > 0)
         {
-            const float r = 2_px;
+            const float r = 12_px;
+            Hax::Gui::DrawRect(bounds.Min + Hax::Vector2(0.f, 8_px), bounds.Max + Hax::Vector2(0.f, 8_px), {.FillColor = 0x00000070, .Rounding = r});
             Hax::Gui::DrawRect(bounds.Min, bounds.Max,
-                {.BorderColor = Theme::MetalHighlight, .BorderTh = 1_px, .FillColor = Theme::PopupBg, .Rounding = r});
+                {.BorderColor = Theme::Line2, .BorderTh = 1_px, .FillColor = Theme::Surface1, .Rounding = r});
         }
         else
             Hax::Gui::PushSkipDrawing();
@@ -812,15 +1051,15 @@ namespace Cheat
 
     bool Selectable(size_t id, Hax::WStringView label, bool selected, SelectableParams params)
     {
-        const float fontH = Theme::DescFontSize * Hax::Gui::G.ScaleFactor;
-        const float markH = fontH * 1.2f;
-        const Hax::Vector2 padding = {12_px, 5_px};
+        const float fontH = Hax::Gui::Scale(Theme::DescFontSize);
+        const float markH = 10_px;
+        const Hax::Vector2 padding = {10_px, 7_px};
 
         Hax::Vector2 markSize{};
         float markSpacing = 0.f;
         if (selected)
         {
-            markSize = Hax::Gui::CalcTextSize(ICONS_FONT, L"\uF00C", markH);
+            markSize = Hax::Gui::CalcTextSize(ICONS_FONT, L"", markH);
             markSpacing = padding.X;
         }
 
@@ -834,7 +1073,7 @@ namespace Cheat
         if (params.AutoLayout && btnSize.X > Hax::Gui::GetContentRegionAvail().X)
         {
             Hax::Gui::EndHorizontal();
-            Hax::Gui::BeginHorizontal(5_px);
+            Hax::Gui::BeginHorizontal(6_px);
 
             bounds.Min = Hax::Gui::GetCursorPos();
             bounds.Max = bounds.Min + btnSize;
@@ -847,25 +1086,24 @@ namespace Cheat
         if (!params.Disabled)
             Hax::Gui::Interact(id, bounds);
 
-        bool active = Hax::Gui::IsItemActive(id);
-        bool hovered = Hax::Gui::IsItemHovered(id);
-        Hax::Gui::Color bg = selected ? 0x765015FF : (hovered ? 0x2B291AFF : 0x15160FFF);
-        Hax::Gui::Color fg = selected ? 0xFFE17AFF : 0xC8BE94FF;
-
+        const bool hovered = Hax::Gui::IsItemHovered(id);
         if (hovered)
             Hax::Gui::SetMouseIcon(Hax::Gui::MouseIcon_Hand);
 
-        Hax::Gui::DrawRect(bounds.Min, bounds.Max,
-            {.BorderColor = selected ? 0xD49323FF : 0x443B23FF, .BorderTh = 1_px, .FillColor = bg, .Rounding = Hax::Min(params.R, 2_px)});
-        Hax::Gui::DrawString(MAIN_FONT, label, bounds.Min + padding, fontH, {.Color = fg});
+        // Lists inside drop-downs keep a flat look; free-standing chips get a frame.
+        const float r = params.AutoLayout ? 8_px : 6_px;
+        const Hax::Gui::Color bg = selected ? Theme::AccentSoft : (hovered ? Theme::Surface3 : (params.AutoLayout ? Theme::Surface2 : 0x00000000));
+        const Hax::Gui::Color border = params.AutoLayout ? (selected ? 0xF5A52466 : Theme::Line) : Hax::Gui::Color::Transparent;
+        Hax::Gui::DrawRect(bounds.Min, bounds.Max, {.BorderColor = border, .BorderTh = 1_px, .FillColor = bg, .Rounding = r});
+        Hax::Gui::DrawString(MAIN_FONT, label, bounds.Min + padding, fontH, {.Color = selected ? Theme::Accent : Theme::Text});
         if (selected)
         {
             Hax::Vector2 pos = {bounds.Max.X - padding.X - markSize.X, bounds.Min.Y + (btnSize.Y - markSize.Y) / 2.f};
-            Hax::Gui::DrawString(ICONS_FONT, L"\uF00C", pos, markH, {.Color = Theme::StatusGreen});
+            Hax::Gui::DrawString(ICONS_FONT, L"", pos, markH, {.Color = Theme::Accent});
         }
 
         if (params.Disabled)
-            Hax::Gui::DrawRect(bounds.Min, bounds.Max, {.FillColor = Theme::DisabledMaskCol});
+            Hax::Gui::DrawRect(bounds.Min, bounds.Max, {.FillColor = Theme::DisabledMask, .Rounding = r});
 
         return Hax::Gui::IsItemClicked(id);
     }
@@ -878,18 +1116,15 @@ namespace Cheat
 
     Hax::Vector2 CalcRepeatBtnSize(Hax::WStringView label)
     {
-        const float fontH = Theme::DescFontSize * Hax::Gui::G.ScaleFactor;
-        const Hax::Vector2 padding = {8_px, 3_px};
-
-        const Hax::Vector2 textSize = Hax::Gui::CalcTextSize(MAIN_FONT, label, fontH);
-        const Hax::Vector2 btnSize = textSize + padding * 2.f;
-        return btnSize;
+        const float fontH = Hax::Gui::Scale(Theme::DescFontSize);
+        const Hax::Vector2 padding = {9_px, 5_px};
+        return Hax::Gui::CalcTextSize(MAIN_FONT, label, fontH) + padding * 2.f;
     }
 
     bool RepeatBtn(size_t id, Hax::WStringView label, bool enabled)
     {
-        const float fontH = Theme::DescFontSize * Hax::Gui::G.ScaleFactor;
-        const Hax::Vector2 padding = {8_px, 3_px};
+        const float fontH = Hax::Gui::Scale(Theme::DescFontSize);
+        const Hax::Vector2 padding = {9_px, 5_px};
 
         const Hax::Vector2 textSize = Hax::Gui::CalcTextSize(MAIN_FONT, label, fontH);
         const Hax::Vector2 btnSize = textSize + padding * 2.f;
@@ -905,36 +1140,13 @@ namespace Cheat
         if (enabled)
             Hax::Gui::Interact(id, bounds);
 
-        Hax::Gui::LinearAnim& state = Hax::Gui::GetState<Hax::Gui::LinearAnim>(id);
-
-        Hax::Gui::Color bg = 0x6B470FFF;
-        Hax::Gui::Color fg = 0x1A1408FF;
-        if (!Hax::Gui::IsItemActive(id))
-        {
-            constexpr Hax::Gui::LinearColor fromBg = 0x17180FFF;
-            constexpr Hax::Gui::LinearColor toBg = 0x3B341CFF;
-            bg = Hax::Lerp(fromBg, toBg, state.Progress).ToColor();
-
-            constexpr Hax::Gui::LinearColor fromFg = 0xC8BE94FF;
-            constexpr Hax::Gui::LinearColor toFg = 0xF2C64FFF;
-            fg = Hax::Lerp(fromFg, toFg, state.Progress).ToColor();
-        }
-
-        const float deltaTime = Hax::Gui::GetDeltaTime();
-        if (Hax::Gui::IsItemHovered(id))
-        {
-            state.Elapse(deltaTime, 0.1f);
-            Hax::Gui::SetMouseIcon(Hax::Gui::MouseIcon_Hand);
-        }
-        else
-            state.Elapse(-deltaTime, 0.1f);
-
+        const ButtonColors c = ButtonBeh(id, ButtonStyle::Secondary);
         Hax::Gui::DrawRect(bounds.Min, bounds.Max,
-            {.BorderColor = 0x66552CFF, .BorderTh = 1_px, .FillColor = bg, .Rounding = 2_px});
-        Hax::Gui::DrawString(MAIN_FONT, label, bounds.Min + (btnSize - textSize) / 2.f, fontH, {.Color = fg});
+            {.BorderColor = c.Border, .BorderTh = 1_px, .FillColor = c.Bg, .Rounding = 7_px});
+        Hax::Gui::DrawString(MAIN_FONT, label, bounds.Min + (btnSize - textSize) / 2.f, fontH, {.Color = c.Fg});
 
         if (!enabled)
-            Hax::Gui::DrawRect(bounds.Min, bounds.Max, {.FillColor = Theme::DisabledMaskCol});
+            Hax::Gui::DrawRect(bounds.Min, bounds.Max, {.FillColor = Theme::DisabledMask, .Rounding = 7_px});
 
         return Hax::Gui::IsItemPressedRepeat(id);
     }
@@ -957,7 +1169,7 @@ namespace Cheat
             state.Initialized = true;
         }
 
-        const float fontH = Theme::DescFontSize * Hax::Gui::G.ScaleFactor;
+        const float fontH = Hax::Gui::Scale(Theme::DescFontSize);
         const Hax::Vector2 size = {width, CalcButtonHeight()};
         const Hax::Rect bounds = Hax::Rect::FromPosSize(Hax::Gui::GetCursorPos(), size);
         Hax::Gui::PlaceItem(size);
@@ -965,16 +1177,16 @@ namespace Cheat
             return false;
 
         Hax::Gui::DrawRect(bounds.Min, bounds.Max,
-            {.BorderColor = wasFocused ? Theme::ActiveColor : 0x66552CFF, .BorderTh = wasFocused ? 2_px : 1_px,
-             .FillColor = 0x0D0E09FF, .Rounding = 2_px});
+            {.BorderColor = wasFocused ? Theme::Accent : Theme::Line2, .BorderTh = 1_px,
+             .FillColor = Theme::Surface2, .Rounding = 7_px});
 
         bool changed = false;
-        const Hax::Vector2 padding = {8_px, 3_px};
+        const Hax::Vector2 padding = {10_px, 5_px};
         const Hax::Rect editBounds = {bounds.Min + padding, bounds.Max - padding};
         if (enabled)
         {
-            changed = Hax::Gui::StringEdit(id, MAIN_FONT, state.Buffer, _countof(state.Buffer), fontH, editBounds,
-                {.CaretColor = Theme::ActiveColor, .Hint = L"0", .HintColor = 0x635D48FF, .TextColor = 0xF0C34AFF});
+            changed = Hax::Gui::StringEdit(id, BOLD_FONT, state.Buffer, _countof(state.Buffer), fontH, editBounds,
+                {.CaretColor = Theme::Accent, .Hint = L"0", .HintColor = Theme::Faint, .TextColor = Theme::Text});
 
             const bool focused = Hax::Gui::IsItemFocused(id);
             if (!wasFocused && focused)
@@ -1009,9 +1221,9 @@ namespace Cheat
         }
         else
         {
-            const Hax::Vector2 textSize = Hax::Gui::CalcTextSize(MAIN_FONT, state.Buffer, fontH);
-            Hax::Gui::DrawString(MAIN_FONT, state.Buffer, bounds.Min + (size - textSize) / 2.f, fontH, {.Color = 0x756E55FF});
-            Hax::Gui::DrawRect(bounds.Min, bounds.Max, {.FillColor = Theme::DisabledMaskCol, .Rounding = 2_px});
+            const Hax::Vector2 textSize = Hax::Gui::CalcTextSize(BOLD_FONT, state.Buffer, fontH);
+            Hax::Gui::DrawString(BOLD_FONT, state.Buffer, bounds.Min + (size - textSize) / 2.f, fontH, {.Color = Theme::Faint});
+            Hax::Gui::DrawRect(bounds.Min, bounds.Max, {.FillColor = Theme::DisabledMask, .Rounding = 7_px});
         }
 
         if (Hax::Gui::IsItemHovered(id))
@@ -1021,12 +1233,12 @@ namespace Cheat
 
     bool Hotkey(size_t id, int& key)
     {
-        const float fontH = Theme::DescFontSize * Hax::Gui::G.ScaleFactor;
+        const float fontH = Hax::Gui::Scale(11.5f);
         const Hax::Vector2 padding = {8_px, 4_px};
 
-        Hax::WStringView keyName = Hax::Gui::GetKeyName(key);
-        const Hax::Vector2 textSize = Hax::Gui::CalcTextSize(MAIN_FONT, keyName, fontH);
-        const Hax::Vector2 btnSize = textSize + padding * 2.f;
+        Hax::WStringView keyName = Hax::Gui::GetKeyName((Hax::uint8)key);
+        const Hax::Vector2 textSize = Hax::Gui::CalcTextSize(BOLD_FONT, keyName, fontH);
+        const Hax::Vector2 btnSize = {Hax::Max(28_px, textSize.X + padding.X * 2.f), textSize.Y + padding.Y * 2.f + 1_px};
 
         Hax::Rect bounds;
         bounds.Min = Hax::Gui::GetCursorPos();
@@ -1044,12 +1256,14 @@ namespace Cheat
             G->KeyListenerId = (G->KeyListenerId == 0) ? id : 0;
             state = Hax::Gui::GetTime();
         }
-        if (Hax::Gui::IsItemHovered(id))
+        const bool hovered = Hax::Gui::IsItemHovered(id);
+        if (hovered)
             Hax::Gui::SetMouseIcon(Hax::Gui::MouseIcon_Hand);
 
         bool changed = false;
+        const bool listening = G->KeyListenerId == id;
 
-        if (G->KeyListenerId == id)
+        if (listening)
         {
             auto& keys = Hax::Gui::GetJustPressedKeys();
             if (keys.Size() > 0)
@@ -1065,36 +1279,31 @@ namespace Cheat
             }
         }
 
-        Hax::Gui::LinearColor color = 0xE49B1800;
-        color.A = (Hax::Sin(Hax::kPi * (float)(Hax::Gui::GetTime() - state) / 0.5f) + 1.f) * 0.5f;
-
-        float px3 = 3_px; float px1 = 1_px;
-        if (G->KeyListenerId == id)
+        if (listening)
         {
-            Hax::Gui::DrawRect(bounds.Min - Hax::Vector2(px3, px3), bounds.Max + Hax::Vector2(px3, px3), { .FillColor = color.ToColor(), .Rounding = 2_px });
-            Hax::Gui::DrawRect(bounds.Min - Hax::Vector2(px1, px1), bounds.Max + Hax::Vector2(px1, px1), { .FillColor = 0x18180FFF, .Rounding = 2_px });
+            Hax::Gui::LinearColor glow(Theme::Accent);
+            glow.A = 0.25f + 0.35f * (Hax::Sin(Hax::kPi * (float)(Hax::Gui::GetTime() - state) / 0.5f) + 1.f) * 0.5f;
+            Hax::Gui::DrawRect(bounds.Min - Hax::Vector2(3_px, 3_px), bounds.Max + Hax::Vector2(3_px, 3_px), {.FillColor = glow.ToColor(), .Rounding = 7_px});
         }
-        Hax::Gui::DrawRect(bounds.Min, bounds.Max,
-            {.BorderColor = 0x66552CFF, .BorderTh = 1_px, .FillColor = 0x15160FFF, .Rounding = 2_px});
-        Hax::Gui::DrawString(MAIN_FONT, keyName, bounds.Min + padding, fontH, {.Color = Theme::MainCol});
-
-        Hax::Gui::DrawString(ICONS_FONT, L"\uf11c", bounds.Max - Hax::Vector2(8_px, 8_px), Theme::DescFontSize * Hax::Gui::G.ScaleFactor, {.Color = Theme::DescColor});
+        DrawKeyCap(bounds, listening ? Theme::Accent : (hovered ? 0x46505BFF : Theme::Line2));
+        Hax::Gui::DrawString(BOLD_FONT, keyName, {bounds.Min.X + (btnSize.X - textSize.X) / 2.f, bounds.Min.Y + padding.Y}, fontH,
+            {.Color = listening ? Theme::Accent : Theme::Muted});
 
         return changed;
     }
 
     bool HotkeyEx(size_t id, int& key, Hax::WStringView label, Hax::WStringView desc)
     {
-        const float fontH = Theme::DescFontSize * Hax::Gui::G.ScaleFactor;
+        const float fontH = Hax::Gui::Scale(11.5f);
         const Hax::Vector2 padding = {8_px, 4_px};
-        const Hax::Vector2 textSize = Hax::Gui::CalcTextSize(MAIN_FONT, Hax::Gui::GetKeyName(key), fontH);
-        Hax::Vector2 btnSize = textSize + padding * 2.f;
+        const Hax::Vector2 textSize = Hax::Gui::CalcTextSize(BOLD_FONT, Hax::Gui::GetKeyName((Hax::uint8)key), fontH);
+        const Hax::Vector2 btnSize = {Hax::Max(28_px, textSize.X + padding.X * 2.f), textSize.Y + padding.Y * 2.f + 1_px};
 
         Hax::Gui::BeginVertical();
         Hax::Gui::BeginHorizontal();
         const Hax::Vector2 labelPos = Hax::Gui::GetCursorPos();
         const Hax::Vector2 labelSize = Hax::Gui::CalcTextSize(MAIN_FONT, label, Hax::Gui::Scale(Theme::MainFontSize));
-        LabelAlignedByH(MAIN_FONT, label, Hax::Gui::Scale(Theme::MainFontSize), Theme::MainCol, btnSize.Y);
+        LabelAlignedByH(MAIN_FONT, label, Hax::Gui::Scale(Theme::MainFontSize), Theme::Muted, btnSize.Y);
         TextTooltip(id ^ 0x484F544B45594849ull, desc,
             Hax::Rect::FromPosSize(labelPos, {labelSize.X, btnSize.Y}));
         Hax::Gui::Space(Hax::Gui::GetContentRegionAvail().X - btnSize.X);
@@ -1106,7 +1315,7 @@ namespace Cheat
 
     bool Checkbox(size_t id, bool& val)
     {
-        float size = Theme::CheckboxSize * Hax::Gui::G.ScaleFactor;
+        const float size = Hax::Gui::Scale(Theme::CheckboxSize);
 
         Hax::Rect bounds;
         bounds.Min = Hax::Gui::GetCursorPos();
@@ -1121,31 +1330,33 @@ namespace Cheat
         if (Hax::Gui::IsItemClicked(id))
             val = !val;
 
-        if (Hax::Gui::IsItemHovered(id))
+        const bool hovered = Hax::Gui::IsItemHovered(id);
+        if (hovered)
             Hax::Gui::SetMouseIcon(Hax::Gui::MouseIcon_Hand);
 
         Hax::Gui::DrawRect(bounds.Min, bounds.Max,
-            {.BorderColor = val ? 0xD9B33DFF : 0x5B4D2BFF, .BorderTh = 1_px,
-             .FillColor = val ? Theme::StatusGreen : Theme::FrameColor, .Rounding = 1_px});
+            {.BorderColor = val ? Theme::Accent : (hovered ? 0x46505BFF : Theme::Line2), .BorderTh = 1.5_px,
+             .FillColor = val ? Theme::Accent : Theme::Surface1, .Rounding = 4_px});
+        if (val)
+        {
+            const float markH = 10_px;
+            const Hax::Vector2 markSize = Hax::Gui::CalcTextSize(ICONS_FONT, L"", markH);
+            Hax::Gui::DrawString(ICONS_FONT, L"", bounds.GetCenter() - markSize / 2.f, markH, {.Color = Theme::Ink});
+        }
         return Hax::Gui::IsItemClicked(id);
     }
 
     bool CheckboxEx(size_t id, bool& val, Hax::WStringView text)
     {
         bool changed = false;
-        Hax::Gui::BeginHorizontal(5_px);
+        Hax::Gui::BeginHorizontal(8_px);
         {
             changed = Checkbox(id, val);
-            LabelAlignedByH(MAIN_FONT, text, Theme::DescFontSize * Hax::Gui::G.ScaleFactor, Hax::Gui::Color(val ? 0xD4C99FFF : 0x847C5FFF), Hax::Gui::Scale(Theme::CheckboxSize));
+            LabelAlignedByH(MAIN_FONT, text, Hax::Gui::Scale(Theme::DescFontSize), val ? Theme::Text : Theme::Muted, Hax::Gui::Scale(Theme::CheckboxSize));
             Hax::Gui::Interact(id, Hax::Gui::GetLayoutBounds());
         }
         Hax::Gui::EndHorizontal();
 
         return changed;
-    }
-
-    void HorizontalLine(float th, float w)
-    {
-        Hax::Gui::HorizontalLine(th, Theme::SeparatorCol, w);
     }
 }

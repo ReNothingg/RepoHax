@@ -4,16 +4,17 @@
 
 #include "../localization.h"
 #include "../widgets.h"
+#include "../theme.h"
 #include "tabs.h"
 
 #define LINE_ID (HAX_LINE * 789)
 
 namespace Cheat
 {
-    static void StatusLine(Hax::WStringView name, Hax::WStringView value, Hax::Gui::Color valueColor = 0xD8D0ACFF)
+    static void StatusLine(Hax::WStringView name, Hax::WStringView value, Hax::Gui::Color valueColor = Theme::Text)
     {
         Hax::Gui::BeginHorizontal();
-        MainLabel(name, 0x978D67FF);
+        MainLabel(name, Theme::Faint);
         const Hax::Vector2 valueSize = CalcMainLabelSize(value);
         Hax::Gui::Space(Hax::Max(0.f, Hax::Gui::GetContentRegionAvail().X - valueSize.X));
         MainLabel(value, valueColor);
@@ -28,20 +29,13 @@ namespace Cheat
         if (!Hax::Gui::IsItemVisible(bounds))
             return;
 
-        constexpr Hax::Gui::Color rust = 0xD88813FF;
         Hax::Gui::DrawRect(bounds.Min, bounds.Max,
-            {.BorderColor = 0x725A27FF, .BorderTh = 1_px, .FillColor = 0x101108FF, .Rounding = 2_px});
-        Hax::Gui::DrawRect(bounds.Min, {bounds.Min.X + 5_px, bounds.Max.Y}, {.FillColor = rust, .Rounding = Hax::Vector4(3_px, 0.f, 0.f, 3_px)});
+            {.BorderColor = Theme::Line, .BorderTh = 1_px, .FillColor = Theme::Surface2, .Rounding = 10_px});
 
-        const float amountH = Hax::Gui::Scale(25.f);
+        const float amountH = Hax::Gui::Scale(26.f);
         const Hax::Vector2 amountSize = Hax::Gui::CalcTextSize(G->NunitoSans_ExtraBold, amount, amountH);
         Hax::Gui::DrawString(G->NunitoSans_ExtraBold, amount,
-            {bounds.Max.X - amountSize.X - 13_px, bounds.GetCenter().Y - amountSize.Y / 2.f}, amountH, {.Color = 0x9ED52AFF});
-
-        // A pair of worn terminal marks gives the control the same industrial
-        // readout language as the extraction machine without changing the global theme.
-        Hax::Gui::DrawLine({bounds.Max.X - 27_px, bounds.Min.Y + 7_px}, {bounds.Max.X - 19_px, bounds.Min.Y + 7_px}, {.FillColor = rust, .Th = 2_px});
-        Hax::Gui::DrawLine({bounds.Max.X - 15_px, bounds.Min.Y + 7_px}, {bounds.Max.X - 9_px, bounds.Min.Y + 7_px}, {.FillColor = 0x63502AFF, .Th = 2_px});
+            {bounds.Min.X + 16_px, bounds.GetCenter().Y - amountSize.Y / 2.f}, amountH, {.Color = Theme::Text});
     }
 
     void DrawValuablesTab()
@@ -64,7 +58,7 @@ namespace Cheat
                 swprintf_s(current, _countof(current), L"$%dK", G->CurrentQuota);
                 swprintf_s(target, _countof(target), L"$%dK", G->QuotaTarget);
                 StatusLine(G->Loc[LocKey_CurrentQuota], G->IsInGame ? Hax::WStringView(current) : Hax::WStringView(L"-"),
-                    G->IsInGame ? 0xE8B93FFF : 0x978D67FF);
+                    G->IsInGame ? Theme::Accent : Theme::Faint);
                 HorizontalLine(1_px);
                 SliderEx(LINE_ID, G->Loc[LocKey_QuotaTarget], target, &G->QuotaTarget, 0, 1000000, SliderConvertInt);
                 const bool canApply = G->IsInGame && !G->IsClient && RoundDirector::instance();

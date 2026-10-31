@@ -4,6 +4,7 @@
 
 #include "../localization.h"
 #include "../widgets.h"
+#include "../theme.h"
 
 #define LINE_ID (HAX_LINE * 456)
 
@@ -27,11 +28,11 @@ namespace Cheat
         player = null;
     }
 
-    static void StatusLine(Hax::WStringView name, Hax::WStringView value, Hax::Gui::Color valueColor = 0xD8D0ACFF)
+    static void StatusLine(Hax::WStringView name, Hax::WStringView value, Hax::Gui::Color valueColor = Theme::Text)
     {
         Hax::Gui::BeginHorizontal();
         {
-            MainLabel(name, 0x978D67FF);
+            MainLabel(name, Theme::Faint);
             const Hax::Vector2 valueSize = CalcMainLabelSize(value);
             Hax::Gui::Space(Hax::Max(0.f, Hax::Gui::GetContentRegionAvail().X - valueSize.X));
             MainLabel(value, valueColor);
@@ -104,7 +105,7 @@ namespace Cheat
 
         Hax::Gui::BeginVertical(4_px);
         {
-            MainLabel(label, data.Active ? 0xD8D0ACFF : 0x978D67FF);
+            MainLabel(label, data.Active ? Theme::Text : Theme::Faint);
 
             const float spacing = 5_px;
             const float w = Hax::Gui::GetContentRegionAvail().X;
@@ -139,7 +140,7 @@ namespace Cheat
             swprintf_s(subtractLabel, _countof(subtractLabel), L"- $%dK", G->CurrencyChangeAmount);
             swprintf_s(addLabel, _countof(addLabel), L"+ $%dK", G->CurrencyChangeAmount);
 
-            StatusLine(G->Loc[LocKey_CurrentBalance], G->IsInGame ? Hax::WStringView(current) : Hax::WStringView(L"-"), G->IsInGame ? 0x9ED52AFF : 0x978D67FF);
+            StatusLine(G->Loc[LocKey_CurrentBalance], G->IsInGame ? Hax::WStringView(current) : Hax::WStringView(L"-"), G->IsInGame ? Theme::Ok : Theme::Faint);
             HorizontalLine(1_px);
             SliderEx(LINE_ID, G->Loc[LocKey_CurrencyChangeAmount], amount, &G->CurrencyChangeAmount, 1, 100000, SliderConvertInt);
 

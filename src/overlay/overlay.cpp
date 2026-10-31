@@ -3,6 +3,7 @@
 #include <src/cheat.h>
 
 #include "menu/menu.h"
+#include "menu/theme.h"
 #include "esp/esp.h"
 
 namespace Cheat
@@ -221,23 +222,24 @@ namespace Cheat
 
             const Hax::Vector2 boxMin = Hax::Gui::GetViewportCenter() + Hax::Vector2(-155_px, -Hax::Gui::GetViewportSize().Y / 2.f + 18_px);
             const Hax::Vector2 boxMax = boxMin + Hax::Vector2(310_px, 34_px);
-            Hax::Gui::DrawRect(boxMin, boxMax, {.FillColor = 0x111722E8, .Rounding = 8_px});
+            Hax::Gui::DrawRect(boxMin, boxMax, {.BorderColor = Theme::Line2, .BorderTh = 1_px, .FillColor = 0x101215E6, .Rounding = 10_px});
             const wchar_t* mode = G->GodGizmoModeCurrent == GodGizmoMode::Move ? L"MOVE [W]" :
                 (G->GodGizmoModeCurrent == GodGizmoMode::Rotate ? L"ROTATE [E]" : L"SCALE [R]");
-            Hax::Gui::DrawString(G->NunitoSans_Bold, mode, boxMin + Hax::Vector2(14_px, 9_px), 13_px, {.Color = 0xFFFFFFFF});
+            Hax::Gui::DrawString(G->NunitoSans_Bold, mode, boxMin + Hax::Vector2(14_px, 9_px), 13_px, {.Color = Theme::Accent});
             Hax::Gui::DrawString(G->NunitoSans_SemiBold, L"LMB drag · Shift precision · Esc menu",
-                boxMin + Hax::Vector2(105_px, 10_px), 11_px, {.Color = 0x9DA8BAFF});
+                boxMin + Hax::Vector2(105_px, 10_px), 11_px, {.Color = Theme::Muted});
         }
     }
 
     static bool IsKeyJustDown(size_t id, Hax::uint8 vk)
     {
-        return (G->KeyListenerId == 0 || G->KeyListenerId == id) && Hax::Gui::IsKeyJustDown(vk);
+        return (G->KeyListenerId == 0 || G->KeyListenerId == id) && !IsTextInputActive() && Hax::Gui::IsKeyJustDown(vk);
     }
 
     void RenderOverlay()
     {
-        if (IsKeyJustDown(HAX_LINE, G->VkOpenClose))
+        // The menu key stays live while typing in search so the menu can always be closed.
+        if ((G->KeyListenerId == 0 || G->KeyListenerId == HAX_LINE) && Hax::Gui::IsKeyJustDown((Hax::uint8)G->VkOpenClose))
             ToggleMenuVisibility();
 
         constexpr size_t reviveSelfHotkeyId = Hax::Hash(L"ReviveSelfHotkeyAction");

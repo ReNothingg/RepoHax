@@ -4,17 +4,18 @@
 
 #include "../localization.h"
 #include "../widgets.h"
+#include "../theme.h"
 #include "tabs.h"
 
 #define LINE_ID (HAX_LINE * 345)
 
 namespace Cheat
 {
-    static void StatusLine(Hax::WStringView name, Hax::WStringView value, Hax::Gui::Color valueColor = 0xD8D0ACFF)
+    static void StatusLine(Hax::WStringView name, Hax::WStringView value, Hax::Gui::Color valueColor = Theme::Text)
     {
         Hax::Gui::BeginHorizontal();
         {
-            MainLabel(name, 0x978D67FF);
+            MainLabel(name, Theme::Faint);
             const Hax::Vector2 valueSize = CalcMainLabelSize(value);
             Hax::Gui::Space(Hax::Max(0.f, Hax::Gui::GetContentRegionAvail().X - valueSize.X));
             MainLabel(value, valueColor);
@@ -46,8 +47,8 @@ namespace Cheat
                 RunManager manager = RunManager::instance();
                 System::String levelName = (manager && manager.levelCurrent()) ? manager.levelCurrent().NarrativeName() : null;
                 StatusLine(G->Loc[LocKey_LevelName], levelName != null ? levelName.ToHaxView() : Hax::WStringView(L"-"));
-                StatusLine(G->Loc[LocKey_InGame], G->IsInGame ? G->Loc[LocKey_Yes] : G->Loc[LocKey_No], G->IsInGame ? 0x9ED52AFF : 0xE34B22FF);
-                StatusLine(G->Loc[LocKey_Authority], G->IsClient ? G->Loc[LocKey_Client] : G->Loc[LocKey_HostSingleplayer], G->IsClient ? 0xE8A52DFF : 0x9ED52AFF);
+                StatusLine(G->Loc[LocKey_InGame], G->IsInGame ? G->Loc[LocKey_Yes] : G->Loc[LocKey_No], G->IsInGame ? Theme::Ok : Theme::Danger);
+                StatusLine(G->Loc[LocKey_Authority], G->IsClient ? G->Loc[LocKey_Client] : G->Loc[LocKey_HostSingleplayer], G->IsClient ? Theme::Accent : Theme::Ok);
 
                 Hax::char16 buf[64]{};
                 swprintf_s(buf, _countof(buf), L"%d", manager ? manager.levelsCompleted() : 0);
@@ -78,7 +79,7 @@ namespace Cheat
                 StatsManager stats = StatsManager::instance();
                 System::String saveName = stats ? stats.saveFileCurrent() : null;
                 StatusLine(G->Loc[LocKey_SaveFile], saveName != null ? saveName.ToHaxView() : Hax::WStringView(L"-"));
-                StatusLine(G->Loc[LocKey_LastAction], LastActionText(), 0xC9C09AFF);
+                StatusLine(G->Loc[LocKey_LastAction], LastActionText(), Theme::Muted);
             }
             EndPanel();
 

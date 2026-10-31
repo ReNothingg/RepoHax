@@ -5,15 +5,16 @@
 #include "../localization.h"
 #include "../menu.h"
 #include "../widgets.h"
+#include "../theme.h"
 
 #define LINE_ID (HAX_LINE * 917)
 
 namespace Cheat
 {
-    static void StatusLine(Hax::WStringView name, Hax::WStringView value, Hax::Gui::Color valueColor = 0xD8D0ACFF)
+    static void StatusLine(Hax::WStringView name, Hax::WStringView value, Hax::Gui::Color valueColor = Theme::Text)
     {
         Hax::Gui::BeginHorizontal();
-        MainLabel(name, 0x978D67FF);
+        MainLabel(name, Theme::Faint);
         const Hax::Vector2 valueSize = CalcMainLabelSize(value);
         Hax::Gui::Space(Hax::Max(0.f, Hax::Gui::GetContentRegionAvail().X - valueSize.X));
         MainLabel(value, valueColor);
@@ -230,13 +231,13 @@ namespace Cheat
                 HorizontalLine(1_px);
 
                 StatusLine(G->Loc[LocKey_AimedObject], G->GodAimedObjectName,
-                    G->GodAimedObjectValid ? 0xE8A52DFF : 0x978D67FF);
+                    G->GodAimedObjectValid ? Theme::Accent : Theme::Faint);
                 StatusLine(G->Loc[LocKey_LockedObject], G->GodTargetName,
-                    G->GodTargetObjectValid ? 0x9ED52AFF : 0x978D67FF);
+                    G->GodTargetObjectValid ? Theme::Ok : Theme::Faint);
                 Hax::WStringView authority = !G->GodTargetObjectValid ? Hax::WStringView(L"-") :
                     (G->GodTargetNetworked ? G->Loc[LocKey_NetworkObject] : G->Loc[LocKey_LocalObject]);
                 StatusLine(G->Loc[LocKey_ObjectAuthority], authority,
-                    G->GodTargetNetworked ? 0xE8B93FFF : 0xC9C09AFF);
+                    G->GodTargetNetworked ? Theme::Accent : Theme::Muted);
 
                 if (G->GodTargetObjectValid)
                 {

@@ -29,6 +29,15 @@ X(LocKey_CosmeticPageDesc, L"Local appearance and cosmetic spawning", L"Лока
 X(LocKey_TeleportPageDesc, L"Quick destinations, players and saved positions", L"Быстрые точки, игроки и сохранённые позиции") \
 X(LocKey_SettingsPageDesc, L"Interface, language and hotkeys", L"Интерфейс, язык и горячие клавиши") \
 X(LocKey_EditorPageDesc, L"Select, move, rotate, scale and manipulate scene objects", L"Выбор, перемещение, вращение и изменение объектов сцены") \
+X(LocKey_SearchHint, L"Search features", L"Поиск функций") \
+X(LocKey_NothingFound, L"Nothing found", L"Ничего не найдено") \
+X(LocKey_HideMenu, L"Hide menu", L"Скрыть меню") \
+X(LocKey_CloseMenu, L"Close menu", L"Закрыть меню") \
+X(LocKey_SettingsAutosave, L"Settings are saved to haxsdk.ini", L"Настройки сохраняются в haxsdk.ini") \
+X(LocKey_PlayersLabel, L"Players", L"Игроки") \
+X(LocKey_HostBadge, L"HOST", L"ХОСТ") \
+X(LocKey_ClientBadge, L"CLIENT", L"КЛИЕНТ") \
+X(LocKey_ResetRiskyShort, L"Reset risky", L"Сбросить рискованное") \
 X(LocKey_QUOTA, L"QUOTA", L"КВОТА") \
 X(LocKey_CurrentQuota, L"Current quota", L"Текущая квота") \
 X(LocKey_QuotaTarget, L"New quota", L"Новая квота") \

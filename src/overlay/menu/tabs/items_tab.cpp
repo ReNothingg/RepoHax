@@ -4,6 +4,7 @@
 
 #include "../localization.h"
 #include "../widgets.h"
+#include "../theme.h"
 
 #define LINE_ID (HAX_LINE * 234)
 
@@ -110,7 +111,7 @@ namespace Cheat
                 HorizontalLine(1_px);
 
                 MainLabel(G->ObjectRemoverTargetValid ? G->Loc[LocKey_TargetReady] : G->Loc[LocKey_NoTarget],
-                    G->ObjectRemoverTargetValid ? 0xE34B22FF : 0x978D67FF);
+                    G->ObjectRemoverTargetValid ? Theme::Danger : Theme::Faint);
 
                 const bool canDelete = G->IsInGame && !G->IsClient && G->ObjectRemoverEnabled && G->ObjectRemoverTargetValid;
                 if (Button(LINE_ID, G->Loc[LocKey_DeleteTarget], G->Loc[LocKey_HostOnly], {.Enabled = canDelete, .MinW = Hax::Gui::GetContentRegionAvail().X}))
