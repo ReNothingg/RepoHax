@@ -51,6 +51,8 @@ namespace Cheat
     enum class WorldLightCommand { None, Blackout, FullBright, Restore };
     enum class PlayerGodCommand { None, HealAll, ReviveAll, GatherAll, ApplyScaleAll };
     enum class GodGizmoMode { Move, Rotate, Scale };
+    // Camera used while dead: the game's own orbit, a teammate's eyes, or a free-flying camera.
+    enum SpectatorView : int { SpectatorView_Game, SpectatorView_Eyes, SpectatorView_Free, SpectatorView_Count };
     enum class GodGizmoSpace { World, Local };
     inline constexpr int GodGizmoRingSegments = 32;
 
@@ -244,6 +246,19 @@ namespace Cheat
         bool                                ThirdPerson;
         bool                                MaxHeadBattery;
         int                                 Fov = 60;
+
+        // Spectator (while dead). LMB/RMB switch players, VkSpectatorView cycles the view.
+        bool                                SpectatorEnabled = true;
+        int                                 SpectatorViewMode = SpectatorView_Eyes;
+        int                                 VkSpectatorView = 'F';
+        bool                                SpectatorSkipDeathCam = true;
+        int                                 SpectatorFreeSpeed = 8;   // m/s
+        // HUD state (game thread writes, overlay reads)
+        bool                                SpectatorActive;
+        bool                                SpectatorDeathCam;
+        int                                 SpectatorTargetIndex;
+        int                                 SpectatorTargetCount;
+        Hax::char16                         SpectatorTargetName[64]{};
         struct
         {
             int                             Intensity = 10;

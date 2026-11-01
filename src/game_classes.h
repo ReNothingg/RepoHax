@@ -110,6 +110,7 @@ private:
 };
 
 struct PlayerDeathHead;
+struct PlayerLocalCamera;
 struct PhysGrabber;
 struct PlayerVoiceChat;
 struct PlayerTumble;
@@ -159,11 +160,20 @@ struct PlayerAvatar : Unity::MonoBehaviour
     FIELD(playerTransform, Unity::Transform);
     FIELD(playerAvatarVisuals, PlayerAvatarVisuals);
     FIELD(voiceChatFetched, bool);
+    FIELD(localCamera, PlayerLocalCamera);
 
     METHOD_WRAPPER(OnDestroy);
     METHOD_WRAPPER(PlayerDeath);
     METHOD_WRAPPER(Revive);
     METHOD_WRAPPER(ForceImpulse);
+};
+
+// Synced over the network: on remote players it follows where that player looks.
+struct PlayerLocalCamera : Unity::MonoBehaviour
+{
+    using Unity::MonoBehaviour::MonoBehaviour;
+
+    META("Assembly-CSharp", "", "PlayerLocalCamera");
 };
 
 struct PlayerVoiceChat : Unity::MonoBehaviour
@@ -392,6 +402,9 @@ struct PhysGrabObject : Unity::Behaviour
     }
 
     FIELD(grabbedLocal, bool);
+    FIELD(rb, Unity::Rigidbody);
+    FIELD(dead, bool);
+    FIELD(isPlayer, bool);
     FIELD(centerPoint, Unity::Vector3);
     FIELD(boundingBox, Unity::Vector3);
     FIELD(midPoint, Unity::Vector3);
@@ -498,6 +511,50 @@ struct DataDirector : Unity::MonoBehaviour
     METHOD_WRAPPER(SaveDeleteCheck);
 };
 
+struct FunCameraShake : Unity::MonoBehaviour
+{
+    using Unity::MonoBehaviour::MonoBehaviour;
+
+    META("Assembly-CSharp", "", "CameraShake");
+
+    // Local camera only; strength fades from distanceMin to distanceMax around position.
+    void ShakeDistance(float strength, float distanceMin, float distanceMax, const Unity::Vector3& position, float time)
+    {
+        THROW_IF_NULL();
+        s_ShakeDistance.Call<void>(*this, strength, distanceMin, distanceMax, System::Box(position), time);
+    }
+
+private:
+    METHOD_WRAPPER(ShakeDistance);
+};
+
+// Local-only visuals built from engine primitives (black hole core, rings, light).
+struct FunPrimitive
+{
+    META("UnityEngine.CoreModule", "UnityEngine", "GameObject");
+
+    enum Type { Sphere = 0, Capsule = 1, Cylinder = 2, Cube = 3, Plane = 4, Quad = 5 };
+
+    static Unity::GameObject Create(Type type) { return s_CreatePrimitive.Call<Unity::GameObject>((int)type); }
+    METHOD_WRAPPER(CreatePrimitive);
+};
+
+struct FunLight : Unity::Light
+{
+    using Unity::Light::Light;
+
+    META("UnityEngine.CoreModule", "UnityEngine", "Light");
+
+    void SetColor(const Unity::Color& color)
+    {
+        THROW_IF_NULL();
+        s_set_color.Call<void>(*this, System::Box(color));
+    }
+
+private:
+    METHOD_WRAPPER(set_color);
+};
+
 struct GameDirector : Unity::MonoBehaviour
 {
     using Unity::MonoBehaviour::MonoBehaviour;
@@ -506,6 +563,7 @@ struct GameDirector : Unity::MonoBehaviour
 
     STATIC_FIELD(instance, GameDirector);
     FIELD(MainCamera, Unity::Camera);
+    FIELD_EX(cameraShake, "CameraShake", FunCameraShake);
     FIELD(currentState, int);
     FIELD(PlayerList, System::List<PlayerAvatar>);
 };
@@ -527,6 +585,10 @@ struct SpectateCamera : Unity::MonoBehaviour
     STATIC_FIELD(instance, SpectateCamera);
     FIELD(headEnergy, float);
     FIELD(headEnergyEnough, bool);    
+    FIELD(currentState, int);               // SpectateCamera/State: 0 Death, 1 Normal, 2 Head
+    FIELD(stateTimer, float);
+    FIELD(stateDeathDelayTimer, float);
+    FIELD(player, PlayerAvatar);            // who is being watched
 
     METHOD_WRAPPER(HeadEnergyLogic);
 };

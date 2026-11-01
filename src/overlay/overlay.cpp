@@ -215,7 +215,7 @@ namespace Cheat
                     G->VkTeleportPlayerToCamera == vk || G->VkSpawnItem == vk ||
                     G->VkDeleteObject == vk || G->VkLockGodTarget == vk || G->VkReviveSelf == vk ||
                     G->VkDroneLaunch == vk || G->VkDroneDetonate == vk || G->VkDroneFpv == vk ||
-                    G->VkOrbitalStrike == vk || G->VkBlackHole == vk;
+                    G->VkOrbitalStrike == vk || G->VkBlackHole == vk || G->VkSpectatorView == vk;
             };
 
             if (!isGameplayHotkey('W') && GizmoKeyJustPressed('W')) G->GodGizmoModeCurrent = GodGizmoMode::Move;
@@ -357,6 +357,50 @@ namespace Cheat
                 {center.X, size.Y - margin - 20_px}, 15_px, 0xE8F4E8B0);
     }
 
+    // Spectator HUD: who is being watched, the current view and the controls.
+    static void RenderSpectatorHud()
+    {
+        if (G->MenuVisible || !G->IsInGame || (!G->SpectatorActive && !G->SpectatorDeathCam))
+            return;
+
+        const Hax::Vector2 size = Hax::Gui::GetViewportSize();
+        const float centerX = size.X / 2.f;
+        const float bottom = size.Y - 70_px;
+        const Hax::Gui::Color hint = 0xE8EAF0B8;
+
+        if (!G->SpectatorActive)
+        {
+            if (G->SpectatorSkipDeathCam)
+                DrawHudTextCentered(G->NunitoSans_SemiBold, G->Loc[LocKey_SpectatorDeathHint], {centerX, bottom}, 16_px, hint);
+            return;
+        }
+
+        Hax::char16 title[128]{};
+        if (G->SpectatorViewMode == SpectatorView_Free)
+            swprintf_s(title, L"%ls", G->Loc[LocKey_SpectatorFreeCamTag].Data());
+        else if (G->SpectatorTargetName[0])
+            swprintf_s(title, L"%ls · %ls  %d/%d", G->Loc[LocKey_SpectatorWatchingTag].Data(), G->SpectatorTargetName,
+                G->SpectatorTargetIndex, G->SpectatorTargetCount);
+        else
+            swprintf_s(title, L"%ls · %ls", G->Loc[LocKey_SpectatorWatchingTag].Data(), G->Loc[LocKey_SpectatorNobodyStatus].Data());
+
+        const Hax::WStringView titleText = title;
+        const float titleSize = 20_px;
+        const Hax::Vector2 textSize = Hax::Gui::CalcTextSize(G->NunitoSans_ExtraBold, titleText, titleSize);
+        const Hax::Vector2 boxCenter = {centerX, bottom - 34_px};
+        const Hax::Vector2 pad = {18_px, 8_px};
+        Hax::Gui::DrawRect(boxCenter - textSize / 2.f - pad, boxCenter + textSize / 2.f + pad,
+            {.BorderColor = Theme::Accent, .BorderTh = 1_px, .FillColor = 0x101215C8, .Rounding = 10_px});
+        DrawHudTextCentered(G->NunitoSans_ExtraBold, titleText, boxCenter, titleSize, Theme::Accent);
+
+        Hax::char16 controls[160]{};
+        const Hax::WStringView key = G->VkSpectatorView ? Hax::Gui::GetKeyName((Hax::uint8)G->VkSpectatorView) : Hax::WStringView(L"—");
+        swprintf_s(controls, G->Loc[LocKey_SpectatorControlsHint].Data(), key.Data());
+        DrawHudTextCentered(G->NunitoSans_SemiBold, controls, {centerX, bottom}, 15_px, hint);
+        if (G->SpectatorViewMode == SpectatorView_Free)
+            DrawHudTextCentered(G->NunitoSans_SemiBold, G->Loc[LocKey_SpectatorFreeHint], {centerX, bottom + 20_px}, 15_px, hint);
+    }
+
     static void RenderChaosBanner(uint64_t now)
     {
         if (now >= G->ChaosBannerUntil || G->ChaosBanner[0] == 0)
@@ -491,6 +535,7 @@ namespace Cheat
         Hax::Gui::SwitchLayer(L"Background");
         const uint64_t hudNow = ::GetTickCount64();
         RenderDroneFpvHud(hudNow);
+        RenderSpectatorHud();
         RenderChaosBanner(hudNow);
         RenderEsp();
         RenderGodGizmo();

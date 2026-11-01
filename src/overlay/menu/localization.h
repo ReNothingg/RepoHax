@@ -488,6 +488,22 @@ X(LocKey_ActionOrbitalIncoming, L"Orbital strike incoming", L"Орбитальн
 X(LocKey_ActionBlackHoleOpened, L"Black hole opened", L"Чёрная дыра открыта") \
 X(LocKey_FpvSignalLost, L"SIGNAL LOST", L"СИГНАЛ ПОТЕРЯН") \
 X(LocKey_FpvThrottleHint, L"W/S throttle · mouse steers", L"W/S — газ · мышь — руль") \
+X(LocKey_SPECTATOR, L"SPECTATOR", L"СПЕКТАТОР") \
+X(LocKey_SpectatorDesc, L"Camera after you die: watch teammates through their eyes or fly around freely", L"Камера после смерти: смотри глазами тиммейтов или летай свободно") \
+X(LocKey_SpectatorView, L"Spectator view", L"Вид спектатора") \
+X(LocKey_SpecViewGameShort, L"Game", L"Игровой") \
+X(LocKey_SpecViewEyesShort, L"Eyes", L"Из глаз") \
+X(LocKey_SpecViewFreeShort, L"Free", L"Свободный") \
+X(LocKey_SpectatorViewKey, L"Switch view key", L"Клавиша смены вида") \
+X(LocKey_SpectatorSkipDeathCam, L"Skip death cam on click", L"Пропуск камеры смерти по клику") \
+X(LocKey_SpectatorSkipDeathCamDesc, L"LMB/RMB right after death jumps straight to a teammate", L"ЛКМ/ПКМ сразу после смерти — сразу к тиммейту") \
+X(LocKey_SpectatorFreeSpeed, L"Free camera speed", L"Скорость свободной камеры") \
+X(LocKey_SpectatorControlsHint, L"LMB / RMB — switch player · %ls — view", L"ЛКМ / ПКМ — сменить игрока · %ls — вид") \
+X(LocKey_SpectatorFreeHint, L"WASD · Space / Ctrl — up / down · Shift — faster", L"WASD · Пробел / Ctrl — вверх / вниз · Shift — быстрее") \
+X(LocKey_SpectatorDeathHint, L"LMB / RMB — watch teammates", L"ЛКМ / ПКМ — смотреть за тиммейтами") \
+X(LocKey_SpectatorWatchingTag, L"SPECTATING", L"НАБЛЮДЕНИЕ") \
+X(LocKey_SpectatorFreeCamTag, L"FREE CAMERA", L"СВОБОДНАЯ КАМЕРА") \
+X(LocKey_SpectatorNobodyStatus, L"nobody is alive", L"живых нет") \
 X(LocKey_UnlockAll, L"Unlock all", L"Открыть все")\
 X(LocKey_ResetAll, L"Reset all", L"Сбросить все")
 

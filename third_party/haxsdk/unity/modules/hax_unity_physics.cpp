@@ -20,8 +20,12 @@ namespace Unity
     {
         THROW_IF_NULL();
 
-        static auto s_Method = typeof().GetMethod("get_velocity", nullptr, true).Wrap();
-        return s_Method.Call<Vector3>(*this);
+        // Struct return through a managed thunk passes a bogus `this` and crashes
+        // inside Unity; read it through the internal call like Transform does.
+        static auto s_Method = typeof().GetMethod("get_linearVelocity_Injected", nullptr, true).Wrap();
+        Vector3 ret{};
+        s_Method.InternalCall<void>(GetCachedPtr(), &ret);
+        return ret;
     }
 
     void Rigidbody::SetVelocity(const Vector3& value)
@@ -90,6 +94,15 @@ namespace Unity
             return s_Method.Call<Transform>(System::Box(*this));
         else
             return s_Method.Call<Transform>(this);
+    }
+
+    Rigidbody RaycastHit::GetRigidbody()
+    {
+        static auto s_Method = typeof().GetMethod("get_rigidbody", nullptr, true).Wrap();
+        if constexpr (HAX_UNITY_IS_MONO)
+            return s_Method.Call<Rigidbody>(System::Box(*this));
+        else
+            return s_Method.Call<Rigidbody>(this);
     }
 
     System::Type Physics::typeof()

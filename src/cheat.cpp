@@ -132,6 +132,11 @@ namespace Cheat
         Hax::IniAddEntry(ini, "Vision",     "FlashAngle",          &G->Flashlight.Angle,    Hax::IniFileWrite_Int,  IniFileRead_IntClamped<60, 60, 120>);
         Hax::IniAddEntry(ini, "Vision",     "FlashInCrouch",       &G->Flashlight.InCrouch, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Vision",     "MaxHeadBattery",      &G->MaxHeadBattery,      Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Spectator",  "Enabled",             &G->SpectatorEnabled,    Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Spectator",  "View",                &G->SpectatorViewMode,   Hax::IniFileWrite_Int,  IniFileRead_IntClamped<SpectatorView_Eyes, 0, SpectatorView_Count - 1>);
+        Hax::IniAddEntry(ini, "Spectator",  "VkView",              &G->VkSpectatorView,     Hax::IniFileWrite_Int,  IniFileRead_IntClamped<'F', 0, 255>);
+        Hax::IniAddEntry(ini, "Spectator",  "SkipDeathCam",        &G->SpectatorSkipDeathCam, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
+        Hax::IniAddEntry(ini, "Spectator",  "FreeSpeed",           &G->SpectatorFreeSpeed,  Hax::IniFileWrite_Int,  IniFileRead_IntClamped<8, 2, 40>);
 
         Hax::IniAddEntry(ini, "Items",      "ObjectRemoverEnabled", &G->ObjectRemoverEnabled, Hax::IniFileWrite_Bool, Hax::IniFileRead_Bool);
         Hax::IniAddEntry(ini, "Items",      "VkDeleteObject",      &G->VkDeleteObject,      Hax::IniFileWrite_Int,  IniFileRead_IntClamped<VK_F10, 0, 255>);

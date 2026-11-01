@@ -485,6 +485,7 @@ namespace Unity
         bool                            GetUseOcclusionCulling();
         void                            SetUseOcclusionCulling(bool value);
         float                           GetNearClipPlane();
+        void                            SetNearClipPlane(float value);
         float                           GetFieldOfView();
         void                            SetFieldOfView(float value);
 

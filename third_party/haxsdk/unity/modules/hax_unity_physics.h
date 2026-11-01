@@ -27,6 +27,7 @@ namespace Unity
         static System::Type             typeof();
 
         Transform                       GetTransform();
+        Rigidbody                       GetRigidbody();
 
         Vector3                         m_Point;
         Vector3                         m_Normal;

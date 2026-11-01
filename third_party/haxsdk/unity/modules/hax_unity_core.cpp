@@ -755,6 +755,13 @@ namespace Unity
         return s_Method.Call<float>(*this);
     }
 
+    void Camera::SetNearClipPlane(float value)
+    {
+        THROW_IF_NULL();
+        static auto s_Method = Camera::typeof().GetMethod("set_nearClipPlane", nullptr, true).Wrap();
+        s_Method.Call<void>(*this, value);
+    }
+
     float Camera::GetFieldOfView()
     {
         THROW_IF_NULL();

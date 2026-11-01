@@ -4801,9 +4801,11 @@ namespace Cheat
     struct FpvCameraBackup
     {
         bool Valid = false;
+        Unity::Camera Camera = null;
         Unity::Transform Transform = null;
         Unity::Vector3 LocalPosition{};
         Unity::Quaternion Rotation = Unity::Quaternion::identity();
+        float FieldOfView = 60.f;
     };
     static FpvCameraBackup s_FpvBackup;
 
@@ -4918,7 +4920,7 @@ namespace Cheat
 
         // Only for this frame's render: Hooked__PresentAfterDrawLoop puts the
         // camera back, so the game's own logic never sees the drone camera.
-        s_FpvBackup = {true, transform, transform.GetLocalPosition(), transform.GetRotation()};
+        s_FpvBackup = {true, camera, transform, transform.GetLocalPosition(), transform.GetRotation(), camera.GetFieldOfView()};
         transform.SetPosition(position);
         transform.SetRotation(rotation);
         camera.SetFieldOfView(100.f);
@@ -4936,12 +4938,15 @@ namespace Cheat
                 s_FpvBackup.Transform.SetLocalPosition(s_FpvBackup.LocalPosition);
                 s_FpvBackup.Transform.SetRotation(s_FpvBackup.Rotation);
             }
+            if (s_FpvBackup.Camera)
+                s_FpvBackup.Camera.SetFieldOfView(s_FpvBackup.FieldOfView);
         }
         catch (System::Exception& ex)
         {
             LogFunException(L"FPV restore", ex);
         }
         s_FpvBackup.Transform = null;
+        s_FpvBackup.Camera = null;
     }
 
     static void UpdateDroneSlot(DroneSlot& slot, PlayerAvatar local, const Unity::Vector3& crosshair, bool hasCrosshair,
@@ -5445,75 +5450,462 @@ namespace Cheat
     // spiral; players are knocked over and dragged in with the game's own tumble
     // force RPC. At the end the core grenades go off and everything is flung out.
 
+    // Look: a black core with a purple halo, a tilted glowing accretion disc,
+    // spiral arms being sucked in and a pulsing light. These are local engine
+    // objects (only the host sees them); everybody sees the networked part: a
+    // ring of glowing orbs spiralling in, everything in range flying around and
+    // the final ring of blasts.
+
+    constexpr int   BlackHoleOrbCount = 6;
+    constexpr int   BlackHoleFinaleShells = 6;
+    constexpr int   BlackHoleRingCount = 3;
+    constexpr int   BlackHoleArmCount = 6;
+    constexpr int   BlackHoleRingPoints = 48;
+    constexpr int   BlackHoleArmPoints = 28;
+    constexpr float BlackHolePullInterval = 0.08f;
+    constexpr float BlackHoleImplosionTime = 0.6f;   // everything rushes in before the bang
+    constexpr float BlackHoleFinaleSpawnLead = 0.45f; // finale grenades need Start() before TickEnd
+    constexpr float BlackHoleFinaleTime = 0.8f;      // shockwave + flash after the bang
+
+    struct BlackHoleVisuals
+    {
+        Unity::GameObject Root = null;
+        Unity::GameObject Core = null;
+        Unity::GameObject Halo = null;
+        Unity::LineRenderer Rings[BlackHoleRingCount]{};
+        Unity::LineRenderer Arms[BlackHoleArmCount]{};
+        Unity::LineRenderer Shock{};
+        FunLight Light{};
+        Unity::Material Materials[16]{};
+        int MaterialCount = 0;
+    };
+
     struct BlackHoleState
     {
         bool Active = false;
+        bool Finale = false;
+        bool FinaleSpawned = false;
         float Time = 0.f;
+        float FinaleTime = 0.f;
         float Duration = 6.f;
         float Radius = 14.f;
         float Strength = 12.f;
         bool IncludeSelf = false;
         Unity::Vector3 Center{};
-        std::vector<Unity::Rigidbody> Bodies;
-        float ScanTimer = 0.f;
+        float PullTimer = 0.f;
+        float PullDt = 0.f;
         float PlayerTimer = 0.f;
+        float ShakeTimer = 0.f;
         Unity::GameObject Core[2]{null, null};
         Unity::Rigidbody CoreBodies[2]{null, null};
         ItemGrenade CoreGrenades[2]{null, null};
+        Unity::GameObject Shells[BlackHoleFinaleShells]{};
+        Unity::Rigidbody ShellBodies[BlackHoleFinaleShells]{};
+        ItemGrenade ShellGrenades[BlackHoleFinaleShells]{};
+        Unity::GameObject Orbs[BlackHoleOrbCount]{};
+        Unity::Rigidbody OrbBodies[BlackHoleOrbCount]{};
+        BlackHoleVisuals Visuals{};
     };
 
     static BlackHoleState s_BlackHole;
+    static Item s_BlackHoleOrbItem = null;
+    static bool s_BlackHoleOrbSearched;
 
-    static void ScanBlackHoleBodies()
+    static bool BlackHoleOwns(Unity::Transform transform)
+    {
+        BlackHoleState& hole = s_BlackHole;
+        auto owns = [&](Unity::GameObject object) { return object && IsTransformBelow(transform, object.GetTransform()); };
+        for (Unity::GameObject object : hole.Core)
+            if (owns(object))
+                return true;
+        for (Unity::GameObject object : hole.Shells)
+            if (owns(object))
+                return true;
+        for (Unity::GameObject object : hole.Orbs)
+            if (owns(object))
+                return true;
+        return false;
+    }
+
+    // Any glowing orb item works as a "planet" circling the hole.
+    static Item FindBlackHoleOrbItem()
+    {
+        if (s_BlackHoleOrbSearched || G->ItemsPool.Empty())
+            return s_BlackHoleOrbItem;
+        s_BlackHoleOrbSearched = true;
+        for (const auto& entry : G->ItemsPool)
+        {
+            if (!DroneNameContains(entry.key, L"orb"))
+                continue;
+            Item item = entry.value;
+            if (item && item.prefab() != null && item.prefab().Prefab())
+            {
+                s_BlackHoleOrbItem = item;
+                Hax::Log(G->Logger, L"Black hole: orbiting %ls", item.itemName().GetRawStringData());
+                break;
+            }
+        }
+        return s_BlackHoleOrbItem;
+    }
+
+    // ----- local visuals
+    static Unity::Material MakeBlackHoleMaterial(BlackHoleVisuals& visuals, const Unity::Color& color)
+    {
+        static Unity::Shader s_Shader = null;
+        static bool s_Searched = false;
+        if (!s_Searched)
+        {
+            s_Searched = true;
+            s_Shader = Unity::Shader::Find(System::String::New("Sprites/Default"));
+            if (!s_Shader)
+                s_Shader = Unity::Shader::Find(System::String::New("Hidden/Internal-Colored"));
+            if (!s_Shader)
+                Hax::LogError(G->Logger, L"Black hole: no unlit shader, visuals disabled");
+        }
+        if (!s_Shader || visuals.MaterialCount >= (int)std::size(visuals.Materials))
+            return null;
+        Unity::Material material = Unity::Material::New(s_Shader);
+        material.SetColor(color);
+        visuals.Materials[visuals.MaterialCount++] = material;
+        return material;
+    }
+
+    static Unity::GameObject MakeBlackHoleSphere(BlackHoleVisuals& visuals, const Unity::Color& color)
+    {
+        Unity::Material material = MakeBlackHoleMaterial(visuals, color);
+        if (!material)
+            return null;
+        Unity::GameObject sphere = FunPrimitive::Create(FunPrimitive::Sphere);
+        if (!sphere)
+            return null;
+        if (Unity::Collider collider = sphere.GetComponent<Unity::Collider>())
+            collider.SetEnabled(false);
+        if (Unity::MeshRenderer renderer = sphere.GetComponent<Unity::MeshRenderer>())
+            renderer.SetMaterial(material);
+        sphere.GetTransform().SetParent(visuals.Root.GetTransform());
+        return sphere;
+    }
+
+    static Unity::LineRenderer MakeBlackHoleLine(BlackHoleVisuals& visuals, const Unity::Color& color, float width, int points)
+    {
+        Unity::Material material = MakeBlackHoleMaterial(visuals, color);
+        if (!material)
+            return {};
+        Unity::GameObject object = Unity::GameObject::New("RepoHaxBlackHoleLine");
+        object.GetTransform().SetParent(visuals.Root.GetTransform());
+        Unity::LineRenderer line = object.AddComponent<Unity::LineRenderer>();
+        line.SetMaterial(material);
+        line.SetStartWidth(width);
+        line.SetEndWidth(width);
+        line.SetPositionCount(points);
+        return line;
+    }
+
+    static void BuildBlackHoleVisuals(BlackHoleState& hole)
+    {
+        BlackHoleVisuals& visuals = hole.Visuals;
+        visuals.Root = Unity::GameObject::New("RepoHaxBlackHole");
+        visuals.Root.GetTransform().SetPosition(hole.Center);
+
+        visuals.Halo = MakeBlackHoleSphere(visuals, Unity::Color(0.55f, 0.15f, 1.f, 0.28f));
+        visuals.Core = MakeBlackHoleSphere(visuals, Unity::Color(0.f, 0.f, 0.f, 1.f));
+
+        const Unity::Color ringColors[BlackHoleRingCount] =
+        {
+            Unity::Color(1.f, 0.85f, 0.35f, 0.95f),
+            Unity::Color(1.f, 0.45f, 0.1f, 0.8f),
+            Unity::Color(0.7f, 0.25f, 1.f, 0.6f),
+        };
+        for (int i = 0; i < BlackHoleRingCount; ++i)
+            visuals.Rings[i] = MakeBlackHoleLine(visuals, ringColors[i], 0.14f - 0.03f * (float)i, BlackHoleRingPoints + 1);
+        for (int i = 0; i < BlackHoleArmCount; ++i)
+        {
+            visuals.Arms[i] = MakeBlackHoleLine(visuals, i % 2 ? Unity::Color(0.75f, 0.3f, 1.f, 0.7f) : Unity::Color(1.f, 0.55f, 0.2f, 0.7f),
+                0.1f, BlackHoleArmPoints);
+            if (visuals.Arms[i] != null)
+            {
+                visuals.Arms[i].SetStartWidth(0.16f); // outer end
+                visuals.Arms[i].SetEndWidth(0.02f);   // vanishing into the core
+            }
+        }
+        visuals.Shock = MakeBlackHoleLine(visuals, Unity::Color(1.f, 0.9f, 0.7f, 0.9f), 0.35f, BlackHoleRingPoints + 1);
+        if (visuals.Shock != null)
+            visuals.Shock.GetGameObject().SetActive(false);
+
+        visuals.Light = visuals.Root.AddComponent<FunLight>();
+        if (visuals.Light)
+        {
+            visuals.Light.SetColor(Unity::Color(0.6f, 0.2f, 1.f, 1.f));
+            visuals.Light.SetRange(hole.Radius);
+            visuals.Light.SetIntensity(3.f);
+        }
+    }
+
+    static void DestroyBlackHoleVisuals(BlackHoleVisuals& visuals)
+    {
+        try
+        {
+            if (visuals.Root)
+                Unity::Object::Destroy(visuals.Root);
+            for (int i = 0; i < visuals.MaterialCount; ++i)
+                if (visuals.Materials[i])
+                    Unity::Object::Destroy(visuals.Materials[i]);
+        }
+        catch (System::Exception& ex)
+        {
+            LogFunException(L"Black hole visuals cleanup", ex);
+        }
+        visuals = {};
+    }
+
+    static float BlackHoleCoreRadius(const BlackHoleState& hole)
+    {
+        const float grow = std::clamp(hole.Time / std::max(hole.Duration, 0.1f), 0.f, 1.f);
+        float radius = (0.45f + 0.65f * grow) * (1.f + 0.07f * std::sin(hole.Time * 8.f));
+        // Shrinks to a point right before the bang.
+        const float left = hole.Duration - hole.Time;
+        if (left < BlackHoleImplosionTime)
+            radius *= std::clamp(left / BlackHoleImplosionTime, 0.05f, 1.f);
+        return radius;
+    }
+
+    static void UpdateBlackHoleVisuals(BlackHoleState& hole)
+    {
+        BlackHoleVisuals& visuals = hole.Visuals;
+        if (!visuals.Root)
+            return;
+
+        const Unity::Vector3 center = hole.Center;
+        if (hole.Finale)
+        {
+            // Shockwave ring racing outwards and a fading flash.
+            const float f = std::clamp(hole.FinaleTime / BlackHoleFinaleTime, 0.f, 1.f);
+            if (visuals.Core)
+                visuals.Core.SetActive(false);
+            if (visuals.Halo)
+                visuals.Halo.SetActive(false);
+            for (Unity::LineRenderer& ring : visuals.Rings)
+                if (ring != null)
+                    ring.GetGameObject().SetActive(false);
+            for (Unity::LineRenderer& arm : visuals.Arms)
+                if (arm != null)
+                    arm.GetGameObject().SetActive(false);
+            if (visuals.Shock != null)
+            {
+                visuals.Shock.GetGameObject().SetActive(true);
+                const float radius = 0.5f + hole.Radius * 1.2f * (1.f - (1.f - f) * (1.f - f));
+                visuals.Shock.SetStartWidth(0.6f * (1.f - f) + 0.05f);
+                visuals.Shock.SetEndWidth(0.6f * (1.f - f) + 0.05f);
+                for (int p = 0; p <= BlackHoleRingPoints; ++p)
+                {
+                    const float a = (float)p / (float)BlackHoleRingPoints * 6.2831853f;
+                    visuals.Shock.SetPosition(p, center + Unity::Vector3(std::cos(a), 0.f, std::sin(a)) * radius);
+                }
+            }
+            if (visuals.Light)
+            {
+                visuals.Light.SetColor(Unity::Color(1.f, 0.75f, 0.45f, 1.f));
+                visuals.Light.SetIntensity(28.f * (1.f - f));
+                visuals.Light.SetRange(hole.Radius * 2.f);
+            }
+            return;
+        }
+
+        const float coreRadius = BlackHoleCoreRadius(hole);
+        if (visuals.Core)
+            visuals.Core.GetTransform().SetLocalScale(Unity::Vector3(1.f, 1.f, 1.f) * (coreRadius * 2.f));
+        if (visuals.Halo)
+            visuals.Halo.GetTransform().SetLocalScale(Unity::Vector3(1.f, 1.f, 1.f) * (coreRadius * 3.4f));
+
+        // Accretion disc: tilted rings spinning at different speeds with a plasma wobble.
+        for (int i = 0; i < BlackHoleRingCount; ++i)
+        {
+            Unity::LineRenderer ring = visuals.Rings[i];
+            if (ring == null)
+                continue;
+            const float radius = coreRadius * (2.1f + 0.95f * (float)i);
+            const float spin = hole.Time * (3.2f - 0.8f * (float)i);
+            const Unity::Quaternion tilt = Unity::Quaternion::Euler(16.f + 7.f * (float)i, 25.f * (float)i, 0.f);
+            for (int p = 0; p <= BlackHoleRingPoints; ++p)
+            {
+                const float a = (float)p / (float)BlackHoleRingPoints * 6.2831853f + spin;
+                const float wobble = 1.f + 0.06f * std::sin(a * 3.f + hole.Time * 6.f + (float)i);
+                ring.SetPosition(p, center + tilt * (Unity::Vector3(std::cos(a), 0.f, std::sin(a)) * (radius * wobble)));
+            }
+        }
+
+        // Spiral arms winding into the core.
+        const float outer = std::max(coreRadius * 4.f, hole.Radius * 0.55f);
+        for (int i = 0; i < BlackHoleArmCount; ++i)
+        {
+            Unity::LineRenderer arm = visuals.Arms[i];
+            if (arm == null)
+                continue;
+            const float base = (float)i / (float)BlackHoleArmCount * 6.2831853f + hole.Time * 2.4f;
+            for (int p = 0; p < BlackHoleArmPoints; ++p)
+            {
+                const float s = (float)p / (float)(BlackHoleArmPoints - 1); // 0 outer .. 1 core
+                const float radius = outer + (coreRadius - outer) * s;
+                const float a = base + s * 7.5f;
+                const float y = std::sin(a * 0.5f + hole.Time) * 0.25f * (1.f - s);
+                arm.SetPosition(p, center + Unity::Vector3(std::cos(a) * radius, y, std::sin(a) * radius));
+            }
+        }
+
+        if (visuals.Light)
+        {
+            const float left = hole.Duration - hole.Time;
+            const float boost = left < BlackHoleImplosionTime ? 3.f : 1.f;
+            visuals.Light.SetIntensity((3.f + 1.5f * std::sin(hole.Time * 5.f)) * boost);
+        }
+    }
+
+    // ----- networked part
+    static Unity::GameObject SpawnBlackHolePart(Item item, const Unity::Vector3& position, Unity::Rigidbody& body)
+    {
+        Unity::GameObject object = null;
+        try
+        {
+            object = SpawnDroneObject(item, position, Unity::Quaternion::identity());
+        }
+        catch (System::Exception& ex)
+        {
+            LogFunException(L"Black hole spawn", ex);
+            object = null;
+        }
+        body = object ? PrepareDroneBody(object) : Unity::Rigidbody{};
+        return object;
+    }
+
+    // Bodies are found and pushed in the same frame and never kept: a valuable
+    // can break, get sold or despawn at any moment.
+    static void PushBlackHoleBodies(float dt, bool collapse, float strengthScale)
     {
         BlackHoleState& hole = s_BlackHole;
         System::Array<Unity::RaycastHit> hits = Unity::Physics::SphereCastAll(hole.Center, hole.Radius, Unity::Vector3::up(), 0.01f, -1);
         if (hits == null)
             return;
 
+        const float strength = hole.Strength * strengthScale;
+        const float ramp = std::clamp(hole.Time, 0.f, 1.f);
+        const float blend = 1.f - std::exp(-3.f * dt);
+        const Unity::Vector3 up = Unity::Vector3::up();
+        std::vector<Unity::Rigidbody> seen;
+        seen.reserve(64);
+
         for (Unity::RaycastHit& hit : hits)
         {
-            Unity::Transform transform = hit.GetTransform();
-            PhysGrabObject grab = null;
-            for (int depth = 0; transform && depth < 6 && !grab; ++depth)
+            try
             {
-                grab = transform.GetComponent<PhysGrabObject>();
-                if (!grab)
-                    transform = transform.GetParent();
-            }
-            if (!grab || IsPlayerHierarchy(grab.GetTransform()))
-                continue;
+                Unity::Rigidbody body = hit.GetRigidbody();
+                if (!body)
+                    continue; // walls, floors: nothing to move
 
-            bool ours = false;
-            for (Unity::GameObject core : hole.Core)
-                ours |= core && IsTransformBelow(grab.GetTransform(), core.GetTransform());
-            if (ours)
-                continue;
-
-            Unity::Rigidbody body = grab.GetComponent<Unity::Rigidbody>();
-            if (!body)
-                continue;
-            bool known = false;
-            for (const Unity::Rigidbody& entry : hole.Bodies)
-            {
-                if (entry == body)
+                bool duplicate = false;
+                for (const Unity::Rigidbody& other : seen)
                 {
-                    known = true;
-                    break;
+                    if (other == body)
+                    {
+                        duplicate = true;
+                        break;
+                    }
                 }
+                if (duplicate)
+                    continue;
+                seen.push_back(body);
+
+                PhysGrabObject grab = body.GetComponent<PhysGrabObject>();
+                if (!grab || grab.isPlayer() || grab.dead())
+                    continue;
+
+                const Unity::Vector3 position = body.GetTransform().GetPosition();
+                Unity::Vector3 inward = hole.Center - position;
+                const float distance = inward.GetMagnitude();
+                inward = distance > 0.01f ? inward * (1.f / distance) : up;
+
+                if (collapse)
+                {
+                    body.SetVelocity(inward * -(strength * 2.5f) + up * 7.f);
+                    continue;
+                }
+
+                const Unity::Vector3 tangent = up.Cross(inward).GetNormalized();
+                const float closeness = 1.f - std::clamp(distance / hole.Radius, 0.f, 1.f);
+                Unity::Vector3 desired = distance < 1.2f
+                    ? tangent * (strength * 0.8f) + inward * distance * 2.f
+                    : inward * (strength * (0.6f + 1.4f * closeness)) + tangent * (strength * 0.9f * closeness) + up * 0.6f;
+                desired = desired * ramp;
+                const Unity::Vector3 velocity = body.GetVelocity();
+                body.SetVelocity(velocity + (desired - velocity) * blend);
             }
-            if (!known)
-                hole.Bodies.push_back(body);
+            catch (System::Exception&)
+            {
+            }
         }
     }
 
-    static void StopBlackHole(bool destroyCore)
+    static void PushBlackHolePlayers(PlayerAvatar local, bool collapse, float strengthScale)
     {
         BlackHoleState& hole = s_BlackHole;
-        if (destroyCore)
+        const float ramp = std::clamp(hole.Time, 0.f, 1.f);
+        const Unity::Vector3 up = Unity::Vector3::up();
+        EnsureFrameTargets();
+        for (const FunFrameTarget& entry : s_FramePlayers)
         {
-            for (Unity::GameObject& core : hole.Core)
-                DestroyDroneObject(core);
+            if (entry.Player == local && !hole.IncludeSelf)
+                continue;
+            const float distance = Unity::Vector3::Distance(entry.Point, hole.Center);
+            if (distance > hole.Radius || (!collapse && distance < 0.8f))
+                continue;
+            PlayerTumble tumble = entry.Player.tumble();
+            if (!tumble)
+                continue;
+            try
+            {
+                const Unity::Vector3 inward = distance > 0.01f ? (hole.Center - entry.Point) * (1.f / distance) : up;
+                if (collapse)
+                {
+                    tumble.TumbleForce(inward * -30.f + up * 12.f);
+                    continue;
+                }
+                if (!entry.Player.isTumbling())
+                {
+                    s_ForcedPlayerTumble = true;
+                    tumble.TumbleRequest(true, false);
+                    s_ForcedPlayerTumble = false;
+                }
+                const float closeness = 1.f - distance / hole.Radius;
+                tumble.TumbleForce(inward * (4.f + hole.Strength * strengthScale * 0.6f * closeness) * ramp + up * 1.5f);
+            }
+            catch (System::Exception& ex)
+            {
+                s_ForcedPlayerTumble = false;
+                LogFunException(L"Black hole player", ex);
+            }
+        }
+    }
+
+    static void ShakeBlackHoleCamera(float strength, float time)
+    {
+        if (GameDirector director = GameDirector::instance())
+        {
+            if (FunCameraShake shake = director.cameraShake())
+                shake.ShakeDistance(strength, 3.f, s_BlackHole.Radius * 2.5f, s_BlackHole.Center, time);
+        }
+    }
+
+    static void StopBlackHole(bool destroyObjects)
+    {
+        BlackHoleState& hole = s_BlackHole;
+        if (destroyObjects)
+        {
+            for (Unity::GameObject& object : hole.Core)
+                DestroyDroneObject(object);
+            for (Unity::GameObject& object : hole.Shells)
+                DestroyDroneObject(object);
+            for (Unity::GameObject& object : hole.Orbs)
+                DestroyDroneObject(object);
+            DestroyBlackHoleVisuals(hole.Visuals);
         }
         hole = {};
         G->BlackHoleActive = false;
@@ -5530,26 +5922,37 @@ namespace Cheat
         hole.Active = true;
         hole.Center = center + Unity::Vector3::up() * 1.2f;
         hole.Radius = radius;
-        hole.Duration = duration;
+        hole.Duration = std::max(duration, 1.f);
         hole.Strength = strength;
         hole.IncludeSelf = includeSelf;
 
         for (int i = 0; i < 2; ++i)
         {
-            try
-            {
-                hole.Core[i] = SpawnDroneObject(s_DronePrefabs.Grenade, hole.Center, Unity::Quaternion::identity());
-            }
-            catch (System::Exception& ex)
-            {
-                LogFunException(L"Black hole core", ex);
-                hole.Core[i] = null;
-            }
-            if (!hole.Core[i])
-                break;
-            hole.CoreBodies[i] = PrepareDroneBody(hole.Core[i]);
+            hole.Core[i] = SpawnBlackHolePart(s_DronePrefabs.Grenade, hole.Center, hole.CoreBodies[i]);
             hole.CoreGrenades[i] = DroneFindComponent<ItemGrenade>(hole.Core[i]);
         }
+
+        if (Item orb = FindBlackHoleOrbItem())
+        {
+            for (int i = 0; i < BlackHoleOrbCount; ++i)
+            {
+                const float a = (float)i / (float)BlackHoleOrbCount * 6.2831853f;
+                hole.Orbs[i] = SpawnBlackHolePart(orb, hole.Center + Unity::Vector3(std::cos(a), 0.f, std::sin(a)) * 3.5f, hole.OrbBodies[i]);
+                if (!hole.Orbs[i])
+                    break;
+            }
+        }
+
+        try
+        {
+            BuildBlackHoleVisuals(hole);
+        }
+        catch (System::Exception& ex)
+        {
+            LogFunException(L"Black hole visuals", ex);
+            DestroyBlackHoleVisuals(hole.Visuals);
+        }
+
         G->BlackHoleActive = true;
         SetSessionAction(G->Loc[LocKey_ActionBlackHoleOpened]);
     }
@@ -5562,37 +5965,17 @@ namespace Cheat
             DetonateGrenade(hole.Core[i], hole.CoreGrenades[i]);
             hole.Core[i] = null;
         }
-
-        // Fling everything back out.
-        for (Unity::Rigidbody& body : hole.Bodies)
+        for (int i = 0; i < BlackHoleFinaleShells; ++i)
         {
-            try
-            {
-                if (!body)
-                    continue;
-                Unity::Vector3 away = body.GetTransform().GetPosition() - hole.Center;
-                const float distance = away.GetMagnitude();
-                away = distance > 0.01f ? away * (1.f / distance) : Unity::Vector3::up();
-                body.SetVelocity(away * (hole.Strength * 2.f) + Unity::Vector3::up() * 6.f);
-            }
-            catch (System::Exception&)
-            {
-            }
+            DetonateGrenade(hole.Shells[i], hole.ShellGrenades[i]);
+            hole.Shells[i] = null;
         }
+        PushBlackHoleBodies(0.f, true, 1.f);
+        PushBlackHolePlayers(local, true, 1.f);
+        ShakeBlackHoleCamera(14.f, 1.2f);
 
-        EnsureFrameTargets();
-        for (const FunFrameTarget& entry : s_FramePlayers)
-        {
-            if (entry.Player == local && !hole.IncludeSelf)
-                continue;
-            if (Unity::Vector3::Distance(entry.Point, hole.Center) > hole.Radius || !entry.Player.tumble())
-                continue;
-            Unity::Vector3 away = entry.Point - hole.Center;
-            const float distance = away.GetMagnitude();
-            away = distance > 0.01f ? away * (1.f / distance) : Unity::Vector3::up();
-            entry.Player.tumble().TumbleForce(away * 25.f + Unity::Vector3::up() * 10.f);
-        }
-        StopBlackHole(false);
+        hole.Finale = true;
+        hole.FinaleTime = 0.f;
     }
 
     static void UpdateBlackHole(PlayerAvatar local, float dt)
@@ -5607,110 +5990,101 @@ namespace Cheat
         if (G->BlackHoleStopRequested)
         {
             G->BlackHoleStopRequested = false;
-            if (s_BlackHole.Active)
-                s_BlackHole.Time = s_BlackHole.Duration; // collapse now
+            if (s_BlackHole.Active && !s_BlackHole.Finale)
+                s_BlackHole.Duration = std::min(s_BlackHole.Duration, s_BlackHole.Time + BlackHoleImplosionTime); // implode now
         }
 
         BlackHoleState& hole = s_BlackHole;
         if (!hole.Active)
             return;
 
-        hole.Time += dt;
-        if (hole.Time >= hole.Duration)
+        if (hole.Finale)
         {
-            CollapseBlackHole(local);
+            hole.FinaleTime += dt;
+            UpdateBlackHoleVisuals(hole);
+            if (hole.FinaleTime >= BlackHoleFinaleTime)
+                StopBlackHole(true); // orbs and visuals; the grenades are already gone
             return;
         }
 
-        // Hold the core in the middle and let it spin.
+        hole.Time += dt;
+        const float left = hole.Duration - hole.Time;
+        const bool imploding = left < BlackHoleImplosionTime;
+
+        if (!hole.FinaleSpawned && left < BlackHoleFinaleSpawnLead)
+        {
+            hole.FinaleSpawned = true;
+            for (int i = 0; i < BlackHoleFinaleShells; ++i)
+            {
+                const float a = (float)i / (float)BlackHoleFinaleShells * 6.2831853f;
+                hole.Shells[i] = SpawnBlackHolePart(s_DronePrefabs.Grenade,
+                    hole.Center + Unity::Vector3(std::cos(a), 0.f, std::sin(a)) * 2.5f, hole.ShellBodies[i]);
+                hole.ShellGrenades[i] = DroneFindComponent<ItemGrenade>(hole.Shells[i]);
+            }
+        }
+
+        if (left <= 0.f)
+        {
+            CollapseBlackHole(local);
+            UpdateBlackHoleVisuals(hole);
+            return;
+        }
+
+        const float coreRadius = BlackHoleCoreRadius(hole);
+
+        // Core grenades spin in the middle.
         for (int i = 0; i < 2; ++i)
         {
             const float angle = hole.Time * 9.f + (float)i * 3.1415926f;
-            const Unity::Vector3 point = hole.Center + Unity::Vector3(std::cos(angle), 0.f, std::sin(angle)) * 0.3f;
-            DriveDroneBody(hole.Core[i], hole.CoreBodies[i], point, Unity::Vector3::zero(), nullptr);
+            DriveDroneBody(hole.Core[i], hole.CoreBodies[i],
+                hole.Center + Unity::Vector3(std::cos(angle), 0.f, std::sin(angle)) * 0.3f, Unity::Vector3::zero(), nullptr);
         }
 
-        hole.ScanTimer -= dt;
-        if (hole.ScanTimer <= 0.f)
+        // Glowing orbs spiral in: visible to every player.
+        const float progress = std::clamp(hole.Time / hole.Duration, 0.f, 1.f);
+        for (int i = 0; i < BlackHoleOrbCount; ++i)
         {
-            hole.ScanTimer = 0.5f;
-            ScanBlackHoleBodies();
+            const float angle = hole.Time * (1.6f + 2.4f * progress) + (float)i / (float)BlackHoleOrbCount * 6.2831853f;
+            const float radius = 3.5f + (coreRadius * 1.6f - 3.5f) * progress;
+            const Unity::Vector3 point = hole.Center + Unity::Vector3(std::cos(angle) * radius,
+                std::sin(hole.Time * 2.f + (float)i) * 0.4f, std::sin(angle) * radius);
+            DriveDroneBody(hole.Orbs[i], hole.OrbBodies[i], point, Unity::Vector3::zero(), nullptr);
         }
 
-        // Spin up over the first second so it builds instead of snapping.
-        const float ramp = std::clamp(hole.Time, 0.f, 1.f);
-        const Unity::Vector3 up = Unity::Vector3::up();
-        for (size_t i = 0; i < hole.Bodies.size();)
+        // Finale grenades close in on the core with everything else.
+        for (int i = 0; i < BlackHoleFinaleShells; ++i)
         {
-            Unity::Rigidbody body = hole.Bodies[i];
-            try
-            {
-                if (!body)
-                {
-                    hole.Bodies.erase(hole.Bodies.begin() + (ptrdiff_t)i);
-                    continue;
-                }
-                const Unity::Vector3 position = body.GetTransform().GetPosition();
-                Unity::Vector3 inward = hole.Center - position;
-                const float distance = inward.GetMagnitude();
-                if (distance > hole.Radius * 1.5f)
-                {
-                    ++i;
-                    continue;
-                }
-                inward = distance > 0.01f ? inward * (1.f / distance) : up;
-                const Unity::Vector3 tangent = up.Cross(inward).GetNormalized();
-                const float closeness = 1.f - std::clamp(distance / hole.Radius, 0.f, 1.f);
-                Unity::Vector3 desired = distance < 1.2f
-                    ? tangent * (hole.Strength * 0.8f) + inward * distance * 2.f
-                    : inward * (hole.Strength * (0.6f + 1.4f * closeness)) + tangent * (hole.Strength * 0.9f * closeness) + up * 0.6f;
-                desired = desired * ramp;
-                const Unity::Vector3 velocity = body.GetVelocity();
-                body.SetVelocity(velocity + (desired - velocity) * (1.f - std::exp(-3.f * dt)));
-            }
-            catch (System::Exception&)
-            {
-                hole.Bodies.erase(hole.Bodies.begin() + (ptrdiff_t)i);
-                continue;
-            }
-            ++i;
+            const float angle = (float)i / (float)BlackHoleFinaleShells * 6.2831853f + hole.Time * 6.f;
+            const float radius = std::max(0.4f, 2.5f * std::clamp(left / BlackHoleFinaleSpawnLead, 0.f, 1.f));
+            DriveDroneBody(hole.Shells[i], hole.ShellBodies[i],
+                hole.Center + Unity::Vector3(std::cos(angle), 0.f, std::sin(angle)) * radius, Unity::Vector3::zero(), nullptr);
         }
 
-        // Players: knock them over and drag them in.
+        // Velocity carries over between pushes, so ~12 pushes a second look smooth.
+        hole.PullTimer -= dt;
+        hole.PullDt += dt;
+        if (hole.PullTimer <= 0.f)
+        {
+            hole.PullTimer = BlackHolePullInterval;
+            PushBlackHoleBodies(hole.PullDt, false, imploding ? 3.f : 1.f);
+            hole.PullDt = 0.f;
+        }
+
         hole.PlayerTimer -= dt;
         if (hole.PlayerTimer <= 0.f)
         {
             hole.PlayerTimer = 0.25f;
-            EnsureFrameTargets();
-            for (const FunFrameTarget& entry : s_FramePlayers)
-            {
-                if (entry.Player == local && !hole.IncludeSelf)
-                    continue;
-                const float distance = Unity::Vector3::Distance(entry.Point, hole.Center);
-                if (distance > hole.Radius || distance < 0.8f)
-                    continue;
-                PlayerTumble tumble = entry.Player.tumble();
-                if (!tumble)
-                    continue;
-                try
-                {
-                    if (!entry.Player.isTumbling())
-                    {
-                        s_ForcedPlayerTumble = true;
-                        tumble.TumbleRequest(true, false);
-                        s_ForcedPlayerTumble = false;
-                    }
-                    const Unity::Vector3 inward = (hole.Center - entry.Point) * (1.f / distance);
-                    const float closeness = 1.f - distance / hole.Radius;
-                    tumble.TumbleForce(inward * (4.f + hole.Strength * 0.6f * closeness) * ramp + up * 1.5f);
-                }
-                catch (System::Exception& ex)
-                {
-                    s_ForcedPlayerTumble = false;
-                    LogFunException(L"Black hole player", ex);
-                }
-            }
+            PushBlackHolePlayers(local, false, imploding ? 2.5f : 1.f);
         }
+
+        hole.ShakeTimer -= dt;
+        if (hole.ShakeTimer <= 0.f)
+        {
+            hole.ShakeTimer = 0.2f;
+            ShakeBlackHoleCamera((imploding ? 5.f : 1.5f) * std::clamp(hole.Time, 0.f, 1.f), 0.3f);
+        }
+
+        UpdateBlackHoleVisuals(hole);
     }
 
     // ---------------------------------------------------------------- Chaos mode
@@ -5934,10 +6308,7 @@ namespace Cheat
                 if (FunOwns(transform, strike.Shells[i].Object))
                     return true;
         }
-        for (Unity::GameObject core : s_BlackHole.Core)
-            if (FunOwns(transform, core))
-                return true;
-        return false;
+        return BlackHoleOwns(transform);
     }
 
     // ---------------------------------------------------------------- Driver
@@ -5994,6 +6365,223 @@ namespace Cheat
         }
     }
 
+    // ---------------------------------------------------------------- Spectator
+    // While dead the game runs its own SpectateCamera (death cam, then an orbit around a
+    // teammate that LMB/RMB/Space already switch). On top of it we offer a CS-style view
+    // from the teammate's eyes and a free-flying camera. The camera is moved only for this
+    // frame's render and put back in Hooked__PresentAfterDrawLoop, like the FPV feed.
+    struct SpectatorCameraBackup
+    {
+        bool Valid = false;
+        Unity::Camera Camera = null;
+        Unity::Transform Transform = null;
+        Unity::Vector3 LocalPosition{};
+        Unity::Quaternion Rotation = Unity::Quaternion::identity();
+        float NearClip = 0.01f;
+    };
+    static SpectatorCameraBackup s_SpecBackup;
+    static Unity::Vector3 s_SpecFreePos{};
+    static int s_SpecFreeReinitFrames = 1;   // > 0: copy the game camera position before flying
+    static bool s_SpecKeyWasDown[3];
+
+    enum { SpecKey_Prev, SpecKey_Next, SpecKey_View };
+
+    static bool SpectatorKeyDown(int vk)
+    {
+        return vk > 0 && vk < 256 && (G->GetAsyncKeyStateHook.unsafe_stdcall<SHORT, int>(vk) & 0x8000) != 0;
+    }
+
+    static bool SpectatorKeyPressed(int slot, int vk, bool inputAllowed)
+    {
+        const bool down = SpectatorKeyDown(vk);
+        const bool pressed = down && !s_SpecKeyWasDown[slot];
+        s_SpecKeyWasDown[slot] = down;
+        return pressed && inputAllowed;
+    }
+
+    static void SpectatorFillTarget(PlayerAvatar target)
+    {
+        G->SpectatorTargetName[0] = 0;
+        G->SpectatorTargetIndex = 0;
+        G->SpectatorTargetCount = 0;
+        GameDirector director = GameDirector::instance();
+        if (!director)
+            return;
+        for (PlayerAvatar player : director.PlayerList())
+        {
+            if (!player || player.isDisabled())
+                continue;
+            ++G->SpectatorTargetCount;
+            if (target && player == target)
+                G->SpectatorTargetIndex = G->SpectatorTargetCount;
+        }
+        if (target)
+        {
+            System::String name = target.playerName();
+            if (name != null && name.GetRawStringData())
+                wcsncpy_s(G->SpectatorTargetName, name.GetRawStringData(), _TRUNCATE);
+        }
+    }
+
+    static bool SpectatorEyes(PlayerAvatar target, PlayerAvatar local, Unity::Vector3& position, Unity::Quaternion& rotation)
+    {
+        if (!target || target == local || target.isDisabled() || target.deadSet())
+            return false;
+        PlayerLocalCamera eyes = target.localCamera();
+        if (!eyes)
+            return false;
+        Unity::Transform eyesTransform = eyes.GetTransform();
+        if (!eyesTransform)
+            return false;
+        rotation = eyesTransform.GetRotation();
+        // A little forward so the camera sits in front of the teammate's eyes; the raised
+        // near plane (see ApplySpectatorCamera) culls the rest of their head.
+        position = eyesTransform.GetPosition() + (rotation * Unity::Vector3::forward()) * 0.08f;
+        return true;
+    }
+
+    static void SpectatorFreeFly(Unity::Transform cameraTransform, Unity::Vector3& position, Unity::Quaternion& rotation, bool inputAllowed)
+    {
+        if (s_SpecFreeReinitFrames > 0)
+        {
+            --s_SpecFreeReinitFrames;
+            s_SpecFreePos = cameraTransform.GetPosition();
+        }
+
+        // The game's orbit camera already turns with the mouse (with the player's
+        // sensitivity settings), so the free camera borrows its rotation.
+        rotation = cameraTransform.GetRotation();
+
+        if (inputAllowed)
+        {
+            const float dt = std::clamp(Unity::Time::GetDeltaTime(), 0.f, 0.1f);
+            float speed = (float)G->SpectatorFreeSpeed;
+            if (SpectatorKeyDown(VK_SHIFT))
+                speed *= 3.f;
+            if (SpectatorKeyDown(VK_MENU))
+                speed *= 0.3f;
+
+            const Unity::Vector3 forward = rotation * Unity::Vector3::forward();
+            const Unity::Vector3 right = rotation * Unity::Vector3::right();
+            Unity::Vector3 move = Unity::Vector3::zero();
+            if (SpectatorKeyDown('W')) move = move + forward;
+            if (SpectatorKeyDown('S')) move = move - forward;
+            if (SpectatorKeyDown('D')) move = move + right;
+            if (SpectatorKeyDown('A')) move = move - right;
+            if (SpectatorKeyDown(VK_SPACE)) move = move + Unity::Vector3::up();
+            if (SpectatorKeyDown(VK_CONTROL)) move = move - Unity::Vector3::up();
+            if (move.GetMagnitude() > 0.001f)
+                s_SpecFreePos = s_SpecFreePos + move.GetNormalized() * (speed * dt);
+        }
+        position = s_SpecFreePos;
+    }
+
+    static void ApplySpectatorCamera()
+    {
+        G->SpectatorActive = false;
+        G->SpectatorDeathCam = false;
+
+        const bool inputAllowed = !G->MenuVisible && G->KeyListenerId == 0 &&
+            ::GetForegroundWindow() == G->GameWndHandle &&
+            !(MenuManager::instance() && MenuManager::instance().currentMenuPage());
+
+        // Always sample the keys so a press made before death does not fire later.
+        const bool prevPressed = SpectatorKeyPressed(SpecKey_Prev, VK_LBUTTON, inputAllowed);
+        const bool nextPressed = SpectatorKeyPressed(SpecKey_Next, VK_RBUTTON, inputAllowed);
+        const bool viewPressed = SpectatorKeyPressed(SpecKey_View, G->VkSpectatorView, inputAllowed);
+
+        PlayerAvatar local = PlayerAvatar::instance();
+        SpectateCamera spectate = G->IsInGame && G->SpectatorEnabled ? SpectateCamera::instance() : null;
+        if (!spectate || !local || !local.deadSet() || G->FpvActive)
+        {
+            s_SpecFreeReinitFrames = 1;
+            return;
+        }
+
+        const int state = spectate.currentState();
+        if (state == 0)
+        {
+            // Death cam: any mouse button jumps straight to watching a teammate.
+            G->SpectatorDeathCam = true;
+            if (G->SpectatorSkipDeathCam && (prevPressed || nextPressed))
+            {
+                spectate.stateDeathDelayTimer() = 0.f;
+                spectate.stateTimer() = 0.f;
+            }
+            return;
+        }
+        if (state != 1)
+            return; // Head state: the player is steering their own dead head.
+
+        if (viewPressed)
+        {
+            G->SpectatorViewMode = (G->SpectatorViewMode + 1) % SpectatorView_Count;
+            s_SpecFreeReinitFrames = 1;
+        }
+        // The game switches the target itself on LMB/RMB this frame; the free camera then
+        // jumps to the new teammate once the orbit camera has moved there.
+        if ((prevPressed || nextPressed) && G->SpectatorViewMode == SpectatorView_Free)
+            s_SpecFreeReinitFrames = 2;
+
+        PlayerAvatar target = spectate.player();
+        SpectatorFillTarget(target);
+        G->SpectatorActive = true;
+
+        if (G->SpectatorViewMode == SpectatorView_Game)
+            return;
+
+        Unity::Camera camera = SemiFunc::MainCamera();
+        if (!camera)
+            return;
+        Unity::Transform cameraTransform = camera.GetTransform();
+        if (!cameraTransform)
+            return;
+
+        Unity::Vector3 position{};
+        Unity::Quaternion rotation = Unity::Quaternion::identity();
+        float nearClip = -1.f;
+        if (G->SpectatorViewMode == SpectatorView_Eyes)
+        {
+            if (!SpectatorEyes(target, local, position, rotation))
+                return; // nobody to look through: keep the game's orbit
+            nearClip = 0.18f;
+        }
+        else
+        {
+            SpectatorFreeFly(cameraTransform, position, rotation, inputAllowed);
+        }
+
+        s_SpecBackup = {true, camera, cameraTransform, cameraTransform.GetLocalPosition(), cameraTransform.GetRotation(), camera.GetNearClipPlane()};
+        cameraTransform.SetPosition(position);
+        cameraTransform.SetRotation(rotation);
+        if (nearClip > 0.f && s_SpecBackup.NearClip < nearClip)
+            camera.SetNearClipPlane(nearClip);
+    }
+
+    static void RestoreSpectatorCamera()
+    {
+        if (!s_SpecBackup.Valid)
+            return;
+        s_SpecBackup.Valid = false;
+        try
+        {
+            if (s_SpecBackup.Transform)
+            {
+                s_SpecBackup.Transform.SetLocalPosition(s_SpecBackup.LocalPosition);
+                s_SpecBackup.Transform.SetRotation(s_SpecBackup.Rotation);
+            }
+            if (s_SpecBackup.Camera)
+                s_SpecBackup.Camera.SetNearClipPlane(s_SpecBackup.NearClip);
+        }
+        catch (System::Exception& ex)
+        {
+            System::String message = ex.Message();
+            Hax::LogError(G->Logger, L"Spectator restore: %ls", message != null ? message.ToString().GetRawStringData() : L"Exception without message");
+        }
+        s_SpecBackup.Transform = null;
+        s_SpecBackup.Camera = null;
+    }
+
     static float prevPlane;
     static float prevFov;
     static bool prevOcclusionCulling;
@@ -6001,6 +6589,20 @@ namespace Cheat
     static bool restoreOcclusionCulling;
     static void Hooked__PostLateUpdateLoop()
     {
+        // Runs first: it may move the camera onto an FPV drone, and the ESP below
+        // must project from the view that is actually rendered.
+        UpdateFunFeatures();
+
+        try
+        {
+            ApplySpectatorCamera();
+        }
+        catch (System::Exception& ex)
+        {
+            System::String message = ex.Message();
+            Hax::LogError(G->Logger, L"Spectator: %ls", message != null ? message.ToString().GetRawStringData() : L"Exception without message");
+        }
+
         try
         {
             Unity::Camera mainCam = SemiFunc::MainCamera();
@@ -6034,7 +6636,8 @@ namespace Cheat
                     mainCam.SetFieldOfView((float)G->Fov);
 
                 if (G->ThirdPerson && !SpectateCamera::instance())
-                    SetThirdPerson();
+                    if (!G->FpvActive)
+                        SetThirdPerson();
 
                 if (ShouldDrawEsp())
                 {
@@ -6152,7 +6755,6 @@ namespace Cheat
 
         G->PostLateUpdateHook.unsafe_call<void>();
         UpdateEyeLasers();
-        UpdateFunFeatures();
 
         static bool s_FogOverridden = false;
         static bool s_PreviousFog = true;
@@ -6185,8 +6787,6 @@ namespace Cheat
     {
         try
         {
-            RestoreDroneFpvCamera();
-
             Unity::Camera mainCam = SemiFunc::MainCamera();
             if (mainCam && G->IsInGame)
             {
@@ -6207,6 +6807,8 @@ namespace Cheat
                 if (G->ThirdPerson && !SpectateCamera::instance())
                     mainCam.GetTransform().SetLocalPosition(Unity::Vector3::zero());
             }
+            RestoreDroneFpvCamera();
+            RestoreSpectatorCamera();
         }
         catch (System::Exception& ex)
         {

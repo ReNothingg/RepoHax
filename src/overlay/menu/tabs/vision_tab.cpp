@@ -68,6 +68,31 @@ namespace Cheat
                 ToggleEx(LINE_ID, G->MaxHeadBattery, G->Loc[LocKey_MaxBatteryHead]);
             }
             EndPanel();
+
+            BeginPanel(LINE_ID);
+            PanelHeader(G->Loc[LocKey_SPECTATOR], G->Loc[LocKey_SpectatorDesc],
+                {.Icon = Icon::Ghost, .Toggle = &G->SpectatorEnabled});
+            {
+                const Hax::WStringView views[SpectatorView_Count] =
+                {
+                    G->Loc[LocKey_SpecViewGameShort], G->Loc[LocKey_SpecViewEyesShort], G->Loc[LocKey_SpecViewFreeShort]
+                };
+                const int picked = SegmentedRow(LINE_ID, G->Loc[LocKey_SpectatorView], views, SpectatorView_Count,
+                    G->SpectatorViewMode, G->SpectatorEnabled, true);
+                if (picked >= 0)
+                    G->SpectatorViewMode = picked;
+                HorizontalLine(1_px);
+                HotkeyEx(Hax::Hash(L"SpectatorViewHotkeyEditor"), G->VkSpectatorView, G->Loc[LocKey_SpectatorViewKey]);
+                HorizontalLine(1_px);
+                ToggleEx(LINE_ID, G->SpectatorSkipDeathCam, G->Loc[LocKey_SpectatorSkipDeathCam], G->Loc[LocKey_SpectatorSkipDeathCamDesc],
+                    {.Disabled = !G->SpectatorEnabled});
+                HorizontalLine(1_px);
+
+                Hax::char16 buf[32] = {};
+                swprintf_s(buf, _countof(buf), L"%d m/s", G->SpectatorFreeSpeed);
+                SliderEx(LINE_ID, G->Loc[LocKey_SpectatorFreeSpeed], buf, &G->SpectatorFreeSpeed, 2, 40, SliderConvertInt);
+            }
+            EndPanel();
         }
         EndColumns();
     }
