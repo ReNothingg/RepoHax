@@ -270,6 +270,8 @@ namespace Cheat
 
     static void CloseMenu()
     {
+        Hax::IniSaveIfChanged(G->Config);
+
         if (G->GodGizmoEditMode && G->GodTargetObjectValid && G->IsInGame)
         {
             G->MenuVisible = false;

@@ -92,14 +92,17 @@ namespace Hax
             Delete(section);
     }
 
-    void IniSave(IniFile& iniFile)
+    static void IniSerialize(const IniFile& iniFile, Vector<char>& out)
     {
-        HANDLE hFile = ::CreateFileW(iniFile.FileName, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-        if (hFile == INVALID_HANDLE_VALUE)
-            return;
-
+        out.Clear();
         IniStringBuilder sb;
-        DWORD written = 0;
+        auto append = [&out](const IniStringBuilder& b)
+        {
+            const size_t size = b.SizeInBytes();
+            const size_t old = out.Size();
+            out.Resize(old + size);
+            memcpy(out.Data() + old, b.CStr(), size);
+        };
 
         for (const IniFileSection* section : iniFile.Sections)
         {
@@ -108,7 +111,7 @@ namespace Hax
 
             sb.Clear();
             sb.AppendF("[%s]\r\n", section->Name);
-            ::WriteFile(hFile, sb.CStr(), (DWORD)sb.SizeInBytes(), &written, nullptr);
+            append(sb);
 
             for (const IniFileEntry& entry : section->Entries)
             {
@@ -116,11 +119,46 @@ namespace Hax
                 sb.AppendF("%s=", entry.Name);
                 entry.WriteFn(entry.Data, sb);
                 sb.Append("\r\n");
-                ::WriteFile(hFile, sb.CStr(), (DWORD)sb.SizeInBytes(), &written, nullptr);
+                append(sb);
             }
         }
+    }
 
+    static bool IniWrite(IniFile& iniFile, const Vector<char>& content)
+    {
+        HANDLE hFile = ::CreateFileW(iniFile.FileName, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (hFile == INVALID_HANDLE_VALUE)
+            return false;
+
+        DWORD written = 0;
+        const BOOL ok = ::WriteFile(hFile, content.Data(), (DWORD)content.Size(), &written, nullptr);
         ::CloseHandle(hFile);
+
+        if (!ok || written != (DWORD)content.Size())
+            return false;
+
+        iniFile.LastSaved.Resize(content.Size());
+        if (!content.Empty())
+            memcpy(iniFile.LastSaved.Data(), content.Data(), content.Size());
+        return true;
+    }
+
+    void IniSave(IniFile& iniFile)
+    {
+        Vector<char> content;
+        IniSerialize(iniFile, content);
+        IniWrite(iniFile, content);
+    }
+
+    bool IniSaveIfChanged(IniFile& iniFile)
+    {
+        Vector<char> content;
+        IniSerialize(iniFile, content);
+        if (content.Size() == iniFile.LastSaved.Size() &&
+            (content.Empty() || memcmp(content.Data(), iniFile.LastSaved.Data(), content.Size()) == 0))
+            return false;
+
+        return IniWrite(iniFile, content);
     }
 
     void IniLoad(IniFile& iniFile)

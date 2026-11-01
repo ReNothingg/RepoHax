@@ -373,6 +373,16 @@ namespace Cheat
 
     void RenderOverlay()
     {
+        // Persist settings as soon as something changes, so the next launch picks them up
+        // even if the game exits without going through TerminateProcess.
+        static ULONGLONG s_NextConfigCheck = 0;
+        const ULONGLONG tick = ::GetTickCount64();
+        if (tick >= s_NextConfigCheck)
+        {
+            s_NextConfigCheck = tick + 1000;
+            Hax::IniSaveIfChanged(G->Config);
+        }
+
         // The menu key stays live while typing in search so the menu can always be closed.
         if ((G->KeyListenerId == 0 || G->KeyListenerId == HAX_LINE) && Hax::Gui::IsKeyJustDown((Hax::uint8)G->VkOpenClose))
             ToggleMenuVisibility();

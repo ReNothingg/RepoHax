@@ -740,9 +740,11 @@ namespace Hax
 
         Vector<IniFileSection*> Sections;
         const char16*           FileName;
+        Vector<char>            LastSaved; // content of the last write, used to skip redundant saves
     };
 
     void IniSave(IniFile& iniFile);
+    bool IniSaveIfChanged(IniFile& iniFile); // writes only when a value differs from the last save
     void IniLoad(IniFile& iniFile);
     void IniAddEntry(IniFile& iniFile, const char* section, const char* name, void* data, IniFileWrite writeFn, IniFileRead readFn);
     void IniRemoveEntry(IniFile& iniFile, const char* section, const char* name);
